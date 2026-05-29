@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "DigiLog 360",
+    "slug": "digilog360",
+    "scheme": "digilog360",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#667eea",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.netstream.digilog360",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scan checkpoint QR codes and capture incident photos.",
+        "NSLocationWhenInUseUsageDescription": "Verify your presence at patrol checkpoints.",
+        "NFCReaderUsageDescription": "Tap NFC checkpoint tags to log your patrol."
+      }
+    },
+    "android": {
+      "package": "com.netstream.digilog360",
+      "adaptiveIcon": { "backgroundColor": "#667eea" },
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "NFC",
+        "VIBRATE"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-camera", { "cameraPermission": "Allow DigiLog to scan checkpoints and capture photos." }],
+      ["expo-location", { "locationWhenInUsePermission": "Allow DigiLog to verify checkpoint presence." }],
+      ["react-native-nfc-manager", { "nfcPermission": "Allow DigiLog to read NFC checkpoint tags." }]
+    ],
+    "extra": {
+      "router": { "origin": false }
+    }
+  }
+}

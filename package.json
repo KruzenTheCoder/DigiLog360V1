@@ -1,0 +1,29 @@
+{
+  "name": "digilog360",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DigiLog 360 — security operations platform. Next.js admin console + Expo mobile guard app + Supabase backend.",
+  "author": "Kruz Naidoo",
+  "license": "UNLICENSED",
+  "copyright": "Copyright (c) 2026 Kruz Naidoo. All Rights Reserved.",
+  "workspaces": [
+    "packages/*",
+    "apps/admin"
+  ],
+  "scripts": {
+    "admin": "npm run dev --workspace=@digilog/admin",
+    "admin:build": "npm run build --workspace=@digilog/admin",
+    "mobile": "cd apps/mobile && npm run start",
+    "shared:build": "npm run build --workspace=@digilog/shared",
+    "db:types": "supabase gen types typescript --linked > packages/shared/src/database.types.ts",
+    "db:push": "supabase db push",
+    "db:reset": "supabase db reset",
+    "functions:deploy": "supabase functions deploy"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

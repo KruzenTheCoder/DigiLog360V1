@@ -1,0 +1,90 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { Search } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Input, Select } from '@/components/ui/input';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
+import { formatDateTime } from '@/lib/utils';
+import {
+  OCCURRENCE_STATUSES, SEVERITIES, STATUS_LABELS, SEVERITY_LABELS, type Occurrence,
+} from '@digilog/shared';
+
+export function OccurrencesTable({ rows }: { rows: Occurrence[] }) {
+  const [q, setQ] = useState('');
+  const [status, setStatus] = useState('');
+  const [severity, setSeverity] = useState('');
+  const [site, setSite] = useState('');
+
+  const sites = useMemo(
+    () => [...new Set(rows.map((r) => r.site_name).filter(Boolean))] as string[],
+    [rows],
+  );
+
+  const filtered = useMemo(() => rows.filter((r) => {
+    if (status && r.status !== status) return false;
+    if (severity && r.severity !== severity) return false;
+    if (site && r.site_name !== site) return false;
+    if (q) {
+      const hay = `${r.ob_number} ${r.occurrence_type} ${r.description} ${r.logged_by_name}`.toLowerCase();
+      if (!hay.includes(q.toLowerCase())) return false;
+    }
+    return true;
+  }), [rows, q, status, severity, site]);
+
+  return (
+    <Card className="p-4">
+      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted))]" />
+          <Input className="pl-9" placeholder="Search OB, type, description…" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          {OCCURRENCE_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+        </Select>
+        <Select value={severity} onChange={(e) => setSeverity(e.target.value)}>
+          <option value="">All severities</option>
+          {SEVERITIES.map((s) => <option key={s} value={s}>{SEVERITY_LABELS[s]}</option>)}
+        </Select>
+        <Select value={site} onChange={(e) => setSite(e.target.value)}>
+          <option value="">All sites</option>
+          {sites.map((s) => <option key={s} value={s}>{s}</option>)}
+        </Select>
+      </div>
+
+      <p className="mb-2 text-xs text-[hsl(var(--muted))]">{filtered.length} of {rows.length} occurrences</p>
+
+      <Table>
+        <THead>
+          <TR>
+            <TH>OB #</TH><TH>Type</TH><TH>Severity</TH><TH>Status</TH>
+            <TH>Site</TH><TH>Logged By</TH><TH>Incident</TH>
+          </TR>
+        </THead>
+        <TBody>
+          {filtered.map((r) => (
+            <TR key={r.id}>
+              <TD>
+                <Link href={`/occurrences/${r.id}`} className="font-medium text-brand hover:underline">
+                  {r.ob_number}
+                </Link>
+              </TD>
+              <TD>{r.occurrence_type}</TD>
+              <TD><SeverityBadge severity={r.severity} /></TD>
+              <TD><StatusBadge status={r.status} /></TD>
+              <TD>{r.site_name ?? '—'}</TD>
+              <TD>{r.logged_by_name ?? '—'}</TD>
+              <TD className="whitespace-nowrap text-xs text-[hsl(var(--muted))]">{formatDateTime(r.incident_at)}</TD>
+            </TR>
+          ))}
+          {filtered.length === 0 && (
+            <TR><TD colSpan={7} className="py-8 text-center text-[hsl(var(--muted))]">No matching occurrences.</TD></TR>
+          )}
+        </TBody>
+      </Table>
+    </Card>
+  );
+}
