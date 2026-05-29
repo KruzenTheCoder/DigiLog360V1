@@ -232,7 +232,7 @@ erDiagram
     bool is_active
   }
   PROFILES {
-    uuid id PK_FK "→ auth.users"
+    uuid id PK "FK to auth.users"
     text email
     text full_name
     app_role role
@@ -266,7 +266,7 @@ erDiagram
   }
   OCCURRENCE_REPORTS {
     bigint id PK
-    bigint occurrence_id FK_UK
+    bigint occurrence_id FK "unique, 1:1"
     text description
     text personnel
     text responding_officer
@@ -652,5 +652,3 @@ This software and all associated materials are the exclusive intellectual
 property of Kruz Naidoo. No use, reproduction, modification, or distribution is
 permitted without express prior written authorization. See [`LICENSE`](LICENSE)
 for the full terms.
-#   D i g i t a l - A p p l i c a t i o n  
- 
