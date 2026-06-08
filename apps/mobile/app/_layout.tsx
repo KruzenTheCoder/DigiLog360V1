@@ -3,11 +3,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { registerPushToken } from '@/lib/push';
 import { startAutoFlush, flushQueue } from '@/lib/offline-queue';
+import { useOtaUpdates } from '@/lib/updates';
+import { BrandSplash } from '@/components/splash';
 import { theme } from '@/lib/theme';
 
 // Notification payload shapes we accept. Anything else falls through to /inbox.
@@ -33,6 +34,7 @@ function pickRouteForNotification(data: PushData | undefined): string {
 
 function RootNavigator() {
   const { session, profile, loading } = useAuth();
+  const ota = useOtaUpdates();
   const segments = useSegments();
   const router = useRouter();
 
@@ -84,11 +86,21 @@ function RootNavigator() {
     return () => { sub.remove(); };
   }, [session?.user?.id, router]);
 
-  if (loading) {
+  // Hold on the branded splash while we either pull an OTA update or restore
+  // the session. The OTA hook fails open, so this never blocks boot when the
+  // device is offline.
+  const updating = ota === 'checking' || ota === 'downloading';
+  if (updating || loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: theme.bg, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator color={theme.brand} size="large" />
-      </View>
+      <BrandSplash
+        status={
+          ota === 'downloading'
+            ? 'Installing the latest update…'
+            : ota === 'checking'
+              ? 'Checking for updates…'
+              : undefined
+        }
+      />
     );
   }
 

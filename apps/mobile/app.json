@@ -14,11 +14,11 @@
       "fallbackToCacheTimeout": 0,
       "url": "https://u.expo.dev/your-project-id"
     },
-    "icon": "./assets/branding/digilog-mark.png",
+    "icon": "./assets/icon.png",
     "splash": {
-      "image": "./assets/branding/digilog-logo.png",
-      "backgroundColor": "#667eea",
-      "resizeMode": "contain"
+      "image": "./assets/splash.png",
+      "backgroundColor": "#0b1020",
+      "resizeMode": "cover"
     },
     "assetBundlePatterns": [
       "**/*",
@@ -29,7 +29,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.netstream.digilog360",
-      "icon": "./assets/branding/digilog-mark.png",
+      "icon": "./assets/icon.png",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan checkpoint QR codes and capture incident photos.",
         "NSLocationWhenInUseUsageDescription": "Verify your presence at patrol checkpoints.",
@@ -44,8 +44,8 @@
       "package": "com.netstream.digilog360",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/branding/digilog-mark.png",
-        "backgroundColor": "#667eea"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0e1426"
       },
       "permissions": [
         "CAMERA",
@@ -84,7 +84,7 @@
         "nfcPermission": "Allow DigiLog to read NFC checkpoint tags." 
       }],
       ["expo-notifications", {
-        "icon": "./assets/branding/digilog-mark.png",
+        "icon": "./assets/notification-icon.png",
         "color": "#667eea",
         "defaultChannel": "default"
       }]
