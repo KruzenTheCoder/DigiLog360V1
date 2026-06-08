@@ -281,6 +281,10 @@ function UserDialog({
 
   // PIN is required if the user holds ANY mobile-app role.
   const isPinRole = roles.some((r) => r === 'guard' || r === 'supervisor');
+  // Guards/supervisors sign in by PIN on mobile, so an email is optional — if
+  // left blank the server generates one from their name + organization. Web
+  // roles (admin/manager/etc.) still need a real email to log in.
+  const mobileOnly = roles.length > 0 && roles.every((r) => r === 'guard' || r === 'supervisor');
 
   async function handlePinConfirm() {
     if (pin.length !== 4) {
@@ -331,7 +335,7 @@ function UserDialog({
   }, [roles]);
 
   async function submit() {
-    if (mode === 'create' && !email.trim()) { setError('Email is required.'); return; }
+    if (mode === 'create' && !email.trim() && !mobileOnly) { setError('Email is required.'); return; }
     if (pin && !/^\d{4}$/.test(pin)) { setError('PIN must be exactly 4 digits.'); return; }
     if (mode === 'create' && isPinRole && !pin) { 
       setError('PIN is required for Guard/Supervisor roles. Click the phone icon to set a PIN.'); 
@@ -394,8 +398,19 @@ function UserDialog({
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label>Email *</Label>
-            <Input type="email" value={email} disabled={mode === 'edit'} onChange={(e) => setEmail(e.target.value)} />
+            <Label>{mobileOnly && mode === 'create' ? 'Email' : 'Email *'}</Label>
+            <Input
+              type="email"
+              value={email}
+              disabled={mode === 'edit'}
+              placeholder={mobileOnly && mode === 'create' ? 'Auto-generated if left blank' : undefined}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            {mobileOnly && mode === 'create' && (
+              <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">
+                Leave blank to auto-generate from name &amp; organization. Guards/supervisors sign in with a PIN.
+              </p>
+            )}
           </div>
           <div>
             <Label>Full Name</Label>

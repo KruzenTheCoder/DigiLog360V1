@@ -16,6 +16,55 @@ import {
 } from '../_shared/auth.ts';
 import { hashPin, isValidPin } from '../_shared/pin.ts';
 
+// Turn an arbitrary string into a safe email local-part / subdomain token:
+// lowercase, accents stripped, every run of non-alphanumerics collapsed to a
+// single dot, no leading/trailing dots.
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFKD') // decompose accents; the next step drops the marks
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/\.{2,}/g, '.')
+    .replace(/^\.+|\.+$/g, '');
+}
+
+// Build a stable, non-routable placeholder email for a PIN-only mobile user
+// who wasn't given one. Form: <name-or-emp-or-role>@<org-slug>.digilog.local.
+// We use the reserved-style `.local` suffix so these addresses can never
+// receive real mail, and append a numeric suffix to guarantee uniqueness.
+async function generatePlaceholderEmail(
+  // deno-lint-ignore no-explicit-any
+  admin: any,
+  org_id: string,
+  full_name: string | null,
+  employee_number: string | null,
+  role: string,
+): Promise<string> {
+  const { data: org } = await admin
+    .from('organizations')
+    .select('slug')
+    .eq('id', org_id)
+    .maybeSingle();
+  const orgToken = (org?.slug && slugify(org.slug)) || 'org';
+  const domain = `${orgToken}.digilog.local`;
+
+  const base =
+    (full_name && slugify(full_name)) ||
+    (employee_number && slugify(employee_number)) ||
+    role;
+
+  let candidate = `${base}@${domain}`;
+  for (let n = 2; ; n++) {
+    const { data: clash } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('email', candidate)
+      .maybeSingle();
+    if (!clash) return candidate;
+    candidate = `${base}.${n}@${domain}`;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -63,11 +112,17 @@ Deno.serve(async (req) => {
   const pin = body.pin ? String(body.pin) : null;
   const org_id_input = body.org_id ? String(body.org_id) : null;
 
-  if (!email) return json({ error: 'email is required' }, 400);
   if (rolesArray.length === 0) return json({ error: 'At least one role is required' }, 400);
   for (const r of rolesArray) {
     if (!ALL_ROLES.includes(r)) return json({ error: `Invalid role: ${r}` }, 400);
   }
+
+  // Guards and supervisors sign in on mobile with a PIN, never an email/
+  // password, so an email is optional for them. Web roles
+  // (admin/manager/control_room/super_user) still require a real email. The
+  // actual placeholder is synthesised below, once org_id is resolved.
+  const mobileOnly = rolesArray.every((r) => r === 'guard' || r === 'supervisor');
+  if (!email && !mobileOnly) return json({ error: 'email is required' }, 400);
 
   // Only super_user can grant super_user.
   if (rolesArray.includes('super_user') && !isSuperUser(profile)) {
@@ -87,6 +142,12 @@ Deno.serve(async (req) => {
     org_id = profile.org_id;
   }
 
+  // Synthesise a placeholder email for PIN-only mobile users who weren't given
+  // one. Stable & human-readable (name + org slug), non-routable, unique.
+  const resolvedEmail = email
+    ? email
+    : await generatePlaceholderEmail(admin, org_id, full_name, employee_number, role);
+
   if (pin && !isValidPin(pin)) return json({ error: 'PIN must be 4 digits' }, 400);
 
   // Passwords still required by Supabase Auth. For PIN-only mobile users we
@@ -97,7 +158,7 @@ Deno.serve(async (req) => {
   }
 
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email,
+    email: resolvedEmail,
     password: effectivePassword,
     email_confirm: true,
     user_metadata: {
@@ -111,7 +172,7 @@ Deno.serve(async (req) => {
   const profilePatch: Record<string, unknown> = {
     role, roles: rolesArray,
     site_id, site_ids,
-    full_name, phone, email, org_id, employee_number,
+    full_name, phone, email: resolvedEmail, org_id, employee_number,
   };
   if (pin) {
     profilePatch.pin_hash = await hashPin(pin);
@@ -125,12 +186,12 @@ Deno.serve(async (req) => {
     _org_id: org_id,
     _target_table: 'profiles',
     _target_id: userId,
-    _summary: `${email} created as ${role}`,
-    _metadata: { email, role, pin_set: !!pin, employee_number },
+    _summary: `${resolvedEmail} created as ${role}`,
+    _metadata: { email: resolvedEmail, role, pin_set: !!pin, employee_number },
   });
 
   return json({
-    id: userId, email, role, roles: rolesArray,
+    id: userId, email: resolvedEmail, role, roles: rolesArray,
     site_id, full_name, org_id, employee_number,
     pin_set: !!pin,
   }, 201);
