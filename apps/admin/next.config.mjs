@@ -69,15 +69,16 @@ const nextConfig = {
       dynamic: 30,
       static: 180,
     },
-    // Fix Vercel file tracing issues
-    outputFileTracingExcludes: {
-      '*': [
-        'node_modules/@swc/core-linux-x64-gnu',
-        'node_modules/@swc/core-linux-x64-musl',
-        'node_modules/@swc/core-darwin-x64',
-        'node_modules/@swc/core-win32-x64-msvc',
-      ],
-    },
+  },
+
+  // Fix Vercel file tracing issues (moved out of `experimental` in Next 15)
+  outputFileTracingExcludes: {
+    '*': [
+      'node_modules/@swc/core-linux-x64-gnu',
+      'node_modules/@swc/core-linux-x64-musl',
+      'node_modules/@swc/core-darwin-x64',
+      'node_modules/@swc/core-win32-x64-msvc',
+    ],
   },
   
   // ===== TURBOPACK CONFIGURATION =====
