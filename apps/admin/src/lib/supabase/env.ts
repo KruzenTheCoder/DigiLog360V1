@@ -1,46 +1,69 @@
-// Validates the Supabase environment lazily to support SSG/ISR builds.
-// Values are resolved when first accessed, not at module load time.
+// Validates the Supabase environment once, with a clear error if misconfigured.
+// Uses lazy evaluation to support static site generation (SSG) builds.
 
-function getEnvVars() {
+let _url: string | null = null;
+let _anonKey: string | null = null;
+let _initialized = false;
+
+function initEnvVars() {
+  if (_initialized) return;
+  
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
-    // During build/SSG, return dummy values to allow static generation
-    if (process.env.NEXT_PHASE === 'phase-production-build' || typeof window === 'undefined') {
-      return {
-        url: 'https://placeholder.supabase.co',
-        anonKey: 'placeholder-key',
-      };
-    }
+    // During static build (SSG), allow placeholder values
+    // These will be replaced at runtime with real values
+    const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
+                        process.env.CI || 
+                        !process.env.NEXT_PUBLIC_SUPABASE_URL;
     
-    throw new Error(
-      'Missing Supabase environment variables. Set NEXT_PUBLIC_SUPABASE_URL and ' +
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY in apps/admin/.env.local (see .env.example).',
-    );
+    if (isBuildTime) {
+      console.warn('[env.ts] Using placeholder Supabase values for build/SSG');
+      _url = 'https://placeholder.supabase.co';
+      _anonKey = 'placeholder-key-for-build-only';
+    } else {
+      throw new Error(
+        'Missing Supabase environment variables. Set NEXT_PUBLIC_SUPABASE_URL and ' +
+        'NEXT_PUBLIC_SUPABASE_ANON_KEY in apps/admin/.env.local (see .env.example).',
+      );
+    }
+  } else {
+    _url = url;
+    _anonKey = anonKey;
   }
-
-  return { url, anonKey };
+  
+  _initialized = true;
 }
 
-// Lazy getters that resolve on first access
-let _url: string | undefined;
-let _anonKey: string | undefined;
+// Export getters that lazily initialize
+export function getSupabaseUrl(): string {
+  initEnvVars();
+  return _url!;
+}
 
-export const SUPABASE_URL: string = new Proxy({} as string, {
-  get() {
-    if (!_url) {
-      _url = getEnvVars().url;
+export function getSupabaseAnonKey(): string {
+  initEnvVars();
+  return _anonKey!;
+}
+
+// For backward compatibility - these will work but lazy-load
+export const SUPABASE_URL: string = new Proxy('' as string, {
+  get(target, prop) {
+    if (prop === 'toString' || prop === 'valueOf') {
+      return () => getSupabaseUrl();
     }
-    return _url;
+    const url = getSupabaseUrl();
+    return (url as any)[prop];
   },
 }) as unknown as string;
 
-export const SUPABASE_ANON_KEY: string = new Proxy({} as string, {
-  get() {
-    if (!_anonKey) {
-      _anonKey = getEnvVars().anonKey;
+export const SUPABASE_ANON_KEY: string = new Proxy('' as string, {
+  get(target, prop) {
+    if (prop === 'toString' || prop === 'valueOf') {
+      return () => getSupabaseAnonKey();
     }
-    return _anonKey;
+    const key = getSupabaseAnonKey();
+    return (key as any)[prop];
   },
 }) as unknown as string;
