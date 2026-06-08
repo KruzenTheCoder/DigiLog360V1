@@ -94,7 +94,6 @@
       "eas": {
         "projectId": "your-project-id"
       }
-    },
-    "owner": "your-expo-username"
+    }
   }
 }
