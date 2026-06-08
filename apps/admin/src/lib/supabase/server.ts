@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Database } from '@digilog/shared';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './env';
+import { getSupabaseUrl, getSupabaseAnonKey } from './env';
 
 // Connection pool and retry configuration
 const MAX_RETRIES = 3;
@@ -16,8 +16,8 @@ export async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY,
+    getSupabaseUrl(),
+    getSupabaseAnonKey(),
     {
       auth: {
         // Persist session in cookies
