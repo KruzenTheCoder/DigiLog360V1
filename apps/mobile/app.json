@@ -82,16 +82,6 @@
             "android.intent.category.DEFAULT",
             "android.intent.category.BROWSABLE"
           ]
-        },
-        {
-          "action": "android.intent.action.VIEW",
-          "data": {
-            "scheme": "digilog360"
-          },
-          "category": [
-            "android.intent.category.DEFAULT",
-            "android.intent.category.BROWSABLE"
-          ]
         }
       ]
     },

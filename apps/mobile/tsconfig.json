@@ -10,7 +10,7 @@
         "./src/*"
       ],
       "@digilog/shared": [
-        "../../packages/shared/src/index.ts"
+        "./src/shared/index.ts"
       ]
     }
   },
