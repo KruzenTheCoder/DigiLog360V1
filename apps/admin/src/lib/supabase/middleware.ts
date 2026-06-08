@@ -18,6 +18,24 @@ const CACHE_DURATION = {
 // ============================================================================
 
 export async function updateSession(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // Resolve Supabase config up front. If it's missing/misconfigured we must NOT
+  // let the middleware throw — an unhandled throw here surfaces as a site-wide
+  // 500 (MIDDLEWARE_INVOCATION_FAILED). Instead we fail CLOSED: everything goes
+  // to /login (which renders without a session) rather than exposing protected
+  // routes or 500-ing the whole app.
+  let supabaseUrl: string;
+  let supabaseAnonKey: string;
+  try {
+    supabaseUrl = getSupabaseUrl();
+    supabaseAnonKey = getSupabaseAnonKey();
+  } catch (err) {
+    console.error('[middleware] Supabase env not configured:', err);
+    if (pathname === '/login') return NextResponse.next({ request });
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
   // Create response with optimized headers
   let supabaseResponse = NextResponse.next({
     request,
@@ -25,8 +43,8 @@ export async function updateSession(request: NextRequest) {
 
   // Create Supabase client with middleware-specific optimizations
   const supabase = createServerClient(
-    getSupabaseUrl(),
-    getSupabaseAnonKey(),
+    supabaseUrl,
+    supabaseAnonKey,
     {
       auth: {
         persistSession: true,
@@ -54,12 +72,20 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refresh session if needed
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  // Refresh session if needed. getUser() makes a network call to the auth
+  // server, which can reject on a transient error — never let that throw out
+  // of the middleware and 500 the whole site. Treat any failure as "no user".
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] = null;
+  let userError: unknown = null;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+    userError = result.error;
+  } catch (err) {
+    console.error('[middleware] auth.getUser failed:', err);
+    userError = err;
+  }
 
-  // Handle authentication redirects
-  const pathname = request.nextUrl.pathname;
-  
   // Skip middleware for static assets
   if (
     pathname.startsWith('/_next') ||
