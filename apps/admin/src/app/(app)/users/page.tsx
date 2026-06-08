@@ -1,15 +1,15 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { requireProfile } from '@/lib/auth';
+import { requireProfile, isAdmin } from '@/lib/auth';
 import { PageHeader } from '@/components/page-header';
 import { UsersManager } from '@/components/users/users-manager';
-import type { Site } from '@digilog/shared';
+import { profileRoles, type Site } from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
 
 export default async function UsersPage() {
   const profile = await requireProfile();
-  if (profile.role !== 'admin') redirect('/dashboard');
+  if (!isAdmin(profile)) redirect('/dashboard');
 
   const supabase = await createClient();
   const [{ data: users }, { data: sites }] = await Promise.all([
@@ -19,9 +19,17 @@ export default async function UsersPage() {
 
   return (
     <>
-      <PageHeader title="Users" description="Manage console and field accounts, roles and site assignments." />
+      <PageHeader
+        title="Users"
+        description="Manage console and field accounts, roles, employee numbers and PINs."
+      />
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <UsersManager users={(users ?? []) as any} sites={(sites ?? []) as Site[]} />
+      <UsersManager
+        users={(users ?? []) as any}
+        sites={(sites ?? []) as Site[]}
+        callerRoles={profileRoles(profile)}
+        callerOrgId={profile.org_id}
+      />
     </>
   );
 }

@@ -7,40 +7,94 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": { "policy": "appVersion" },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/your-project-id"
+    },
+    "icon": "./assets/branding/digilog-mark.png",
     "splash": {
+      "image": "./assets/branding/digilog-logo.png",
       "backgroundColor": "#667eea",
       "resizeMode": "contain"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*",
+      "!**/*.psd",
+      "!**/*.ai",
+      "!**/*.sketch"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.netstream.digilog360",
+      "icon": "./assets/branding/digilog-mark.png",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan checkpoint QR codes and capture incident photos.",
         "NSLocationWhenInUseUsageDescription": "Verify your presence at patrol checkpoints.",
-        "NFCReaderUsageDescription": "Tap NFC checkpoint tags to log your patrol."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Track patrol routes in the background.",
+        "NSMicrophoneUsageDescription": "Record voice notes for incidents.",
+        "NFCReaderUsageDescription": "Tap NFC checkpoint tags to log your patrol.",
+        "UIBackgroundModes": ["location", "fetch", "remote-notification"],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.netstream.digilog360",
-      "adaptiveIcon": { "backgroundColor": "#667eea" },
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/branding/digilog-mark.png",
+        "backgroundColor": "#667eea"
+      },
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
         "NFC",
-        "VIBRATE"
+        "VIBRATE",
+        "WAKE_LOCK",
+        "FOREGROUND_SERVICE",
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS"
+      ],
+      "intentFilters": [
+        {
+          "action": "android.intent.action.VIEW",
+          "data": {
+            "scheme": "digilog360"
+          },
+          "category": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"]
+        }
       ]
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      ["expo-camera", { "cameraPermission": "Allow DigiLog to scan checkpoints and capture photos." }],
-      ["expo-location", { "locationWhenInUsePermission": "Allow DigiLog to verify checkpoint presence." }],
-      ["react-native-nfc-manager", { "nfcPermission": "Allow DigiLog to read NFC checkpoint tags." }]
+      "expo-updates",
+      ["expo-camera", { 
+        "cameraPermission": "Allow DigiLog to scan checkpoints and capture photos." 
+      }],
+      ["expo-location", { 
+        "locationWhenInUsePermission": "Allow DigiLog to verify checkpoint presence.",
+        "locationAlwaysAndWhenInUsePermission": "Allow DigiLog to track patrol routes."
+      }],
+      ["react-native-nfc-manager", { 
+        "nfcPermission": "Allow DigiLog to read NFC checkpoint tags." 
+      }],
+      ["expo-notifications", {
+        "icon": "./assets/branding/digilog-mark.png",
+        "color": "#667eea",
+        "defaultChannel": "default"
+      }]
     ],
     "extra": {
-      "router": { "origin": false }
-    }
+      "router": { "origin": false },
+      "eas": {
+        "projectId": "your-project-id"
+      }
+    },
+    "owner": "your-expo-username"
   }
 }

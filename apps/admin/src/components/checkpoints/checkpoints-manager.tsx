@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
-import { Loader2, Plus, Pencil, QrCode, Printer, MapPin, Nfc } from 'lucide-react';
+import { Loader2, Plus, Pencil, QrCode, Printer, MapPin, Nfc, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -88,6 +88,7 @@ function CheckpointDialog({
   const [lng, setLng] = useState(checkpoint?.longitude?.toString() ?? '');
   const [radius, setRadius] = useState(checkpoint?.geofence_radius_m?.toString() ?? '50');
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
@@ -104,6 +105,25 @@ function CheckpointDialog({
       : await supabase.from('checkpoints').insert(payload);
     setBusy(false);
     if (e) { setError(e.message); return; }
+    onClose(); onDone();
+  }
+
+  async function remove() {
+    if (!checkpoint) return;
+    if (!confirm(
+      `Delete "${checkpoint.name}"?\n\n` +
+      `This also removes its presence on any patrol routes. Historical scans stay intact.`,
+    )) return;
+    setDeleting(true); setError(null);
+    const supabase = createClient();
+    // route_checkpoints FK has ON DELETE CASCADE in the schema; scans keep
+    // a snapshot of checkpoint_name so historical data isn't lost.
+    const { error: e } = await supabase.from('checkpoints').delete().eq('id', checkpoint.id);
+    setDeleting(false);
+    if (e) {
+      setError(e.message);
+      return;
+    }
     onClose(); onDone();
   }
 
@@ -127,7 +147,23 @@ function CheckpointDialog({
           <div><Label>Radius (m)</Label><Input value={radius} onChange={(e) => setRadius(e.target.value)} /></div>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={submit} disabled={busy}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button></div>
+
+        <div className="flex items-center justify-between gap-2">
+          {/* Delete is only meaningful on existing rows. Left-aligned so it
+              doesn't sit beside Save — reduces the chance of misclicks. */}
+          {checkpoint ? (
+            <Button variant="destructive" onClick={remove} disabled={deleting || busy}>
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Delete
+            </Button>
+          ) : <span />}
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button onClick={submit} disabled={busy || deleting}>
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Save
+            </Button>
+          </div>
+        </div>
       </div>
     </Dialog>
   );

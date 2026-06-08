@@ -1,15 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea, Select, Label } from '@/components/ui/input';
+import { OcrDropzone } from './ocr-dropzone';
 import {
-  OCCURRENCE_TYPES, SEVERITIES, SEVERITY_LABELS, SLA_CONFIG,
+  SEVERITIES, SEVERITY_LABELS, SLA_CONFIG,
+  mergeIncidentCategories, mergeIncidentSubcategories, mergeIncidentTypes,
   type Profile, type Site, type SeverityLevel,
+  type OrgIncidentType, type OrgIncidentCategory, type OrgIncidentSubcategory,
 } from '@digilog/shared';
 
 export function LogIncidentForm({
@@ -20,6 +23,8 @@ export function LogIncidentForm({
   reporters: { id: string; name: string }[];
 }) {
   const router = useRouter();
+  const [category, setCategory] = useState('');
+  const [subcategory, setSubcategory] = useState('');
   const [type, setType] = useState('');
   const [severity, setSeverity] = useState<SeverityLevel>('medium');
   const [description, setDescription] = useState('');
@@ -29,11 +34,47 @@ export function LogIncidentForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [orgTypes, setOrgTypes] = useState<OrgIncidentType[]>([]);
+  const [orgCategories, setOrgCategories] = useState<OrgIncidentCategory[]>([]);
+  const [orgSubcategories, setOrgSubcategories] = useState<OrgIncidentSubcategory[]>([]);
+
+  // Load the org's custom taxonomy (categories + sub-categories + types).
+  useEffect(() => {
+    const supabase = createClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb: any = supabase;
+    sb.from('org_occurrence_types').select('name, category, subcategory, is_active, sort_order')
+      .then(({ data }: { data: OrgIncidentType[] | null }) => setOrgTypes(data ?? []));
+    sb.from('org_incident_categories').select('name, is_active, sort_order')
+      .then(({ data }: { data: OrgIncidentCategory[] | null }) => setOrgCategories(data ?? []));
+    sb.from('org_incident_subcategories').select('category, name, is_active, sort_order')
+      .then(({ data }: { data: OrgIncidentSubcategory[] | null }) => setOrgSubcategories(data ?? []));
+  }, []);
+
+  // Cascaded option lists — built-in + active org-custom at every level.
+  const categoryOptions = mergeIncidentCategories(orgCategories);
+  const subcategoryOptions = mergeIncidentSubcategories(category, orgSubcategories);
+  const typeOptions = mergeIncidentTypes(category, subcategory, orgTypes);
+
+  // Reset downstream selections whenever an upstream choice changes so we
+  // never submit a stale (category, subcategory, type) combination.
+  function onCategoryChange(c: string) {
+    setCategory(c);
+    setSubcategory('');
+    setType('');
+  }
+  function onSubcategoryChange(s: string) {
+    setSubcategory(s);
+    setType('');
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null); setOk(null);
-    if (!type || !description || !incidentAt) { setError('Fill in all required fields.'); return; }
+    if (!category) { setError('Pick a category.'); return; }
+    if (!subcategory) { setError('Pick a sub-category.'); return; }
+    if (!type) { setError('Pick the specific type.'); return; }
+    if (!description || !incidentAt) { setError('Fill in all required fields.'); return; }
     setSaving(true);
 
     const supabase = createClient();
@@ -41,6 +82,8 @@ export function LogIncidentForm({
 
     const { data, error: insErr } = await supabase.from('occurrences').insert({
       occurrence_type: type,
+      category,
+      subcategory,
       severity,
       description: description.trim(),
       incident_at: new Date(incidentAt).toISOString(),
@@ -54,7 +97,7 @@ export function LogIncidentForm({
     setSaving(false);
     if (insErr) { setError(insErr.message); return; }
     setOk(`Occurrence ${data?.ob_number} logged successfully.`);
-    setType(''); setDescription('');
+    setCategory(''); setSubcategory(''); setType(''); setDescription('');
     router.refresh();
   }
 
@@ -64,20 +107,45 @@ export function LogIncidentForm({
     <Card>
       <CardContent className="pt-5">
         <form onSubmit={submit} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <Label>Occurrence Type *</Label>
-              <Select value={type} onChange={(e) => setType(e.target.value)} required>
-                <option value="">Select type…</option>
-                {OCCURRENCE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              <Label>Category *</Label>
+              <Select value={category} onChange={(e) => onCategoryChange(e.target.value)} required>
+                <option value="">Select…</option>
+                {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
               </Select>
             </div>
             <div>
-              <Label>Severity *</Label>
-              <Select value={severity} onChange={(e) => setSeverity(e.target.value as SeverityLevel)}>
-                {SEVERITIES.map((s) => <option key={s} value={s}>{SEVERITY_LABELS[s]}</option>)}
+              <Label>Sub-category *</Label>
+              <Select
+                value={subcategory}
+                onChange={(e) => onSubcategoryChange(e.target.value)}
+                disabled={!category}
+                required
+              >
+                <option value="">{category ? 'Select…' : 'Pick a category first'}</option>
+                {subcategoryOptions.map((s) => <option key={s} value={s}>{s}</option>)}
               </Select>
             </div>
+            <div>
+              <Label>Specific Type *</Label>
+              <Select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                disabled={!subcategory}
+                required
+              >
+                <option value="">{subcategory ? 'Select…' : 'Pick a sub-category first'}</option>
+                {typeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label>Severity *</Label>
+            <Select value={severity} onChange={(e) => setSeverity(e.target.value as SeverityLevel)}>
+              {SEVERITIES.map((s) => <option key={s} value={s}>{SEVERITY_LABELS[s]}</option>)}
+            </Select>
           </div>
 
           <div className="rounded-lg bg-brand/5 px-3 py-2 text-xs text-brand">
@@ -115,6 +183,11 @@ export function LogIncidentForm({
             <Label>Description *</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe what happened…" className="min-h-[120px]" required />
+            <div className="mt-2">
+              <OcrDropzone
+                onText={(text) => setDescription((d) => d ? `${d}\n\n${text}` : text)}
+              />
+            </div>
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

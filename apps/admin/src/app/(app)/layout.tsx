@@ -1,9 +1,12 @@
-import { requireProfile } from '@/lib/auth';
+import { requireProfile, loadMyCapabilities } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { AppShell } from '@/components/layout/app-shell';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireProfile();
+  const capsSet = await loadMyCapabilities();
+  // Serialise to a plain array for the client component.
+  const capabilities = Array.from(capsSet);
 
   let siteName: string | null = null;
   if (profile.site_id) {
@@ -13,7 +16,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <AppShell profile={profile} siteName={profile.role === 'admin' ? null : siteName}>
+    <AppShell
+      profile={profile}
+      siteName={profile.role === 'admin' ? null : siteName}
+      capabilities={capabilities}
+    >
       {children}
     </AppShell>
   );

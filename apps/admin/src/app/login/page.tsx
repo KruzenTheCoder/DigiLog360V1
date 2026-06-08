@@ -2,7 +2,8 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ShieldCheck, Loader2 } from 'lucide-react';
+import Image from 'next/image';
+import { Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
@@ -69,7 +70,14 @@ function LoginForm() {
       {/* Brand panel */}
       <div className="relative hidden flex-col justify-between bg-brand-gradient p-12 text-white lg:flex">
         <div className="flex items-center gap-3">
-          <ShieldCheck className="h-9 w-9" />
+          <Image
+            src={BRAND.logo.monogram}
+            alt={`${BRAND.name} mark`}
+            width={48}
+            height={48}
+            className="rounded-md bg-white/10 p-1"
+            priority
+          />
           <span className="text-2xl font-bold tracking-tight">{BRAND.name}</span>
         </div>
         <div>
@@ -85,11 +93,15 @@ function LoginForm() {
       {/* Form */}
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          <div className="mb-8 lg:hidden">
-            <div className="flex items-center gap-2 text-brand">
-              <ShieldCheck className="h-7 w-7" />
-              <span className="text-xl font-bold">{BRAND.name}</span>
-            </div>
+          <div className="mb-8 flex items-center gap-2 text-brand lg:hidden">
+            <Image
+              src={BRAND.logo.monogram}
+              alt={`${BRAND.name} mark`}
+              width={36}
+              height={36}
+              priority
+            />
+            <span className="text-xl font-bold">{BRAND.name}</span>
           </div>
           <h2 className="text-2xl font-bold">Sign in</h2>
           <p className="mt-1 text-sm text-[hsl(var(--muted))]">Access the security console.</p>

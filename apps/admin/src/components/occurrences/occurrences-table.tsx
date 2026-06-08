@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
 import { formatDateTime } from '@/lib/utils';
+import { toCsv, downloadCsv } from '@/lib/csv';
 import {
   OCCURRENCE_STATUSES, SEVERITIES, STATUS_LABELS, SEVERITY_LABELS, type Occurrence,
 } from '@digilog/shared';
@@ -55,7 +57,29 @@ export function OccurrencesTable({ rows }: { rows: Occurrence[] }) {
         </Select>
       </div>
 
-      <p className="mb-2 text-xs text-[hsl(var(--muted))]">{filtered.length} of {rows.length} occurrences</p>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs text-[hsl(var(--muted))]">{filtered.length} of {rows.length} occurrences</p>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            const csv = toCsv(filtered, [
+              { key: 'ob_number', header: 'OB #' },
+              { key: 'occurrence_type', header: 'Type' },
+              { key: 'severity', header: 'Severity' },
+              { key: 'status', header: 'Status' },
+              { key: 'site_name', header: 'Site' },
+              { key: 'logged_by_name', header: 'Logged By' },
+              { key: 'incident_at', header: 'Incident', format: (v) => v ? new Date(String(v)).toISOString() : '' },
+              { key: 'created_at', header: 'Logged', format: (v) => v ? new Date(String(v)).toISOString() : '' },
+              { key: 'description', header: 'Description' },
+            ]);
+            downloadCsv(`occurrences-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+          }}
+        >
+          <Download className="h-4 w-4" /> Export CSV
+        </Button>
+      </div>
 
       <Table>
         <THead>

@@ -17,8 +17,15 @@ $$;
 -- ----------------------------------------------------------------------------
 -- occurrences_live — open occurrences with computed SLA state.
 -- security_invoker => the querying user's RLS still applies.
+--
+-- Use DROP + CREATE rather than OR REPLACE: later migrations add columns to
+-- public.occurrences (org_id, assigned_to, deleted_at, …), and `select o.*`
+-- expands at parse time. OR REPLACE refuses any column reordering, so re-
+-- running this file against an already-evolved schema would fail with
+-- "cannot change name of view column".
 -- ----------------------------------------------------------------------------
-create or replace view public.occurrences_live
+drop view if exists public.occurrences_live cascade;
+create view public.occurrences_live
   with (security_invoker = on) as
 select
   o.*,
@@ -41,8 +48,10 @@ where o.status not in ('resolved','closed');
 
 -- ----------------------------------------------------------------------------
 -- patrols_detailed — patrol rows enriched with route & scan progress.
+-- Same DROP/CREATE rationale as occurrences_live above.
 -- ----------------------------------------------------------------------------
-create or replace view public.patrols_detailed
+drop view if exists public.patrols_detailed cascade;
+create view public.patrols_detailed
   with (security_invoker = on) as
 select
   p.*,

@@ -39,11 +39,57 @@ export default async function PrintReportPage({ params }: { params: Promise<{ ob
       <style>{`@media print { .no-print { display: none !important; } @page { margin: 16mm; } }`}</style>
       <AutoPrint />
 
-      <div style={{ textAlign: 'center', borderBottom: `3px solid ${BRAND.primary}`, paddingBottom: 12, marginBottom: 20 }}>
+      <div style={{ textAlign: 'center', borderBottom: `3px solid ${BRAND.primary}`, paddingBottom: 12, marginBottom: 20, position: 'relative' }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, color: '#475569' }}>{BRAND.company.toUpperCase()}</div>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: BRAND.primary, margin: '6px 0' }}>OCCURRENCE REPORT — {o.ob_number}</h1>
         <div style={{ fontSize: 12, color: '#64748b' }}>Generated {formatDateTime(new Date())}</div>
+
+        {/* Auto-generated stamp — angled red rubber-stamp look so it's
+            unmistakable both on screen and on a printed page. */}
+        {rep?.auto_generated && (
+          <div
+            aria-label="Auto-generated"
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: 0,
+              transform: 'rotate(-12deg)',
+              border: '3px solid #dc2626',
+              color: '#dc2626',
+              padding: '6px 14px',
+              fontWeight: 800,
+              fontSize: 14,
+              letterSpacing: 1.5,
+              borderRadius: 6,
+              opacity: 0.85,
+              background: 'rgba(255,255,255,0.85)',
+            }}
+          >
+            AUTO-GENERATED
+          </div>
+        )}
       </div>
+
+      {/* Inline notice below the header so screen-readers + on-screen viewers
+          get the same context the stamp gives a printed page. */}
+      {rep?.auto_generated && (
+        <div
+          className="no-print"
+          style={{
+            marginBottom: 16,
+            padding: 10,
+            borderRadius: 6,
+            border: '1px solid #fca5a5',
+            background: '#fef2f2',
+            color: '#991b1b',
+            fontSize: 12,
+          }}
+        >
+          <strong>This report was auto-generated</strong> when the occurrence was closed in
+          bulk by a manager. Edit it from the Reports list if you need to fill in additional
+          investigation detail.
+        </div>
+      )}
 
       <h2 style={{ background: '#f1f5f9', padding: 8, fontSize: 15 }}>Basic Information</h2>
       <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse', marginBottom: 16 }}><tbody>

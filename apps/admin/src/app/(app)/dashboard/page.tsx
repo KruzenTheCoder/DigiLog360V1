@@ -7,24 +7,49 @@ import { MonthlyTrendChart, TypeBreakdownChart, SeverityPie } from '@/components
 import { isSlaBreached, isSlaUpdateDue, SEVERITIES, SEVERITY_LABELS } from '@digilog/shared';
 import type { Occurrence } from '@digilog/shared';
 
+// Minimal projection — exactly the columns the dashboard aggregates over.
+// Keeps payloads small on big orgs (thousands of occurrences in 6 months).
+type DashboardOcc = Pick<
+  Occurrence,
+  'id' | 'status' | 'severity' | 'occurrence_type' | 'site_name'
+  | 'incident_at' | 'sla_due_at' | 'last_sla_update_at' | 'sla_hours' | 'closed_at'
+>;
+
 export const dynamic = 'force-dynamic';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export default async function DashboardPage() {
+interface DashboardProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function DashboardPage({ searchParams }: DashboardProps) {
   const profile = await requireProfile();
   const supabase = await createClient();
+  const params = await searchParams;
+  const siteParam = typeof params.site === 'string' ? params.site : undefined;
 
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-  const { data } = await supabase
+  // Run the two queries in parallel. The previous version waited on sites
+  // first; sequencing them serially added a full round-trip on every page
+  // load. Also: select only the columns the dashboard aggregates over —
+  // pulling `select('*')` was returning ~25 KB per row × thousands of rows.
+  let occQ = supabase
     .from('occurrences')
-    .select('*')
+    .select('id, status, severity, occurrence_type, site_name, incident_at, sla_due_at, last_sla_update_at, sla_hours, closed_at')
     .gte('incident_at', sixMonthsAgo.toISOString())
     .order('incident_at', { ascending: false });
+  if (siteParam) occQ = occQ.eq('site_id', siteParam);
 
-  const occ = (data ?? []) as Occurrence[];
+  const [{ data: allSites }, { data }] = await Promise.all([
+    supabase.from('sites').select('id, name').order('name'),
+    occQ,
+  ]);
+  const activeSite = siteParam ? (allSites ?? []).find((s) => s.id === siteParam) : null;
+
+  const occ = (data ?? []) as DashboardOcc[];
   const now = new Date();
   const todayStr = now.toDateString();
   const last30 = new Date(now.getTime() - 30 * 864e5);
@@ -80,8 +105,29 @@ export default async function DashboardPage() {
     <>
       <PageHeader
         title="Dashboard"
-        description={`Operational overview — last 30 days${profile.role === 'admin' ? ' · all sites' : ''}`}
+        description={`Operational overview — last 30 days${activeSite ? ` · ${activeSite.name}` : profile.role === 'admin' ? ' · all sites' : ''}`}
       />
+
+      {(allSites ?? []).length > 1 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-[hsl(var(--muted))]">Filter:</span>
+          <a
+            href="/dashboard"
+            className={`rounded-full px-3 py-1 ${!siteParam ? 'bg-brand text-white' : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700'}`}
+          >
+            All sites
+          </a>
+          {(allSites ?? []).map((s) => (
+            <a
+              key={s.id}
+              href={`/dashboard?site=${s.id}`}
+              className={`rounded-full px-3 py-1 ${siteParam === s.id ? 'bg-brand text-white' : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700'}`}
+            >
+              {s.name}
+            </a>
+          ))}
+        </div>
+      )}
 
       {(breached > 0 || updateDue > 3) && (
         <div className="mb-5 flex flex-wrap gap-3">

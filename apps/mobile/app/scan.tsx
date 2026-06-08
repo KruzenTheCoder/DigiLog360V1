@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { getActivePatrol, recordScan, haversineMeters } from '@/lib/patrol';
 import { Button } from '@/components/ui';
+import { ScreenHeader } from '@/components/primitives';
 import { theme, spacing, radius } from '@/lib/theme';
 import { decodeCheckpointQr, type Patrol, type Checkpoint } from '@digilog/shared';
 
@@ -23,17 +24,26 @@ export default function Scan() {
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result>(null);
+  // Track whether we've finished checking for an active patrol. Without this
+  // the screen briefly renders the "no patrol" empty state (back button +
+  // walk icon) on first paint before the async getActivePatrol resolves,
+  // causing a visible flash for users who actually ARE on patrol.
+  const [patrolChecked, setPatrolChecked] = useState(false);
   const lock = useRef(false);
 
   useEffect(() => {
     (async () => {
       if (!profile) return;
-      const active = await getActivePatrol(profile.id);
-      setPatrol(active);
-      if (profile.site_id) {
-        const { data } = await supabase.from('checkpoints').select('*')
-          .eq('site_id', profile.site_id).eq('is_active', true);
-        setCheckpoints((data ?? []) as Checkpoint[]);
+      try {
+        const active = await getActivePatrol(profile.id);
+        setPatrol(active);
+        if (profile.site_id) {
+          const { data } = await supabase.from('checkpoints').select('*')
+            .eq('site_id', profile.site_id).eq('is_active', true);
+          setCheckpoints((data ?? []) as Checkpoint[]);
+        }
+      } finally {
+        setPatrolChecked(true);
       }
     })();
   }, [profile]);
@@ -115,23 +125,26 @@ export default function Scan() {
 
   function reset() { setResult(null); lock.current = false; }
 
+  // Until the patrol check finishes, render a blank backdrop. Picking either
+  // branch (scanner OR empty state) before we know would briefly flash the
+  // wrong UI to whichever group of users the initial state doesn't fit.
+  if (!patrolChecked) {
+    return <View style={styles.container} />;
+  }
+
   if (!patrol) {
     return (
       <View style={styles.center}>
         <Ionicons name="walk-outline" size={48} color={theme.textMuted} />
         <Text style={styles.info}>Start a patrol before scanning checkpoints.</Text>
-        <Button title="Back" variant="secondary" onPress={() => router.back()} />
+        <Button title="Back" variant="ghost" onPress={() => router.back()} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}><Ionicons name="close" size={28} color={theme.text} /></TouchableOpacity>
-        <Text style={styles.title}>Scan Checkpoint</Text>
-        <View style={{ width: 28 }} />
-      </View>
+      <ScreenHeader title="Scan Checkpoint" variant="close" />
 
       <View style={styles.modes}>
         {(['qr', 'nfc', 'gps'] as Mode[]).map((m) => (
@@ -150,9 +163,13 @@ export default function Scan() {
             <Ionicons name={result.ok ? 'checkmark-circle' : 'alert-circle'} size={72}
               color={result.ok ? theme.success : theme.danger} />
             <Text style={styles.resultText}>{result.message}</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: spacing.lg }}>
-              <Button title="Scan Another" onPress={reset} />
-              <Button title="Done" variant="secondary" onPress={() => router.back()} />
+            <View style={styles.resultActions}>
+              <View style={styles.resultBtn}>
+                <Button title="Scan Another" onPress={reset} />
+              </View>
+              <View style={styles.resultBtn}>
+                <Button title="Done" variant="ghost" onPress={() => router.back()} />
+              </View>
             </View>
           </View>
         ) : mode === 'qr' ? (
@@ -189,10 +206,8 @@ export default function Scan() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.bg, paddingTop: spacing.xl * 2 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
-  title: { color: theme.text, fontSize: 18, fontWeight: '700' },
-  modes: { flexDirection: 'row', gap: 8, paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
+  container: { flex: 1, backgroundColor: theme.bg },
+  modes: { flexDirection: 'row', gap: 8, paddingHorizontal: spacing.lg, marginBottom: spacing.lg, marginTop: spacing.sm },
   modeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: radius.md, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
   modeActive: { backgroundColor: theme.brand, borderColor: theme.brand },
   modeText: { color: theme.textMuted, fontWeight: '700', fontSize: 13 },
@@ -203,4 +218,12 @@ const styles = StyleSheet.create({
   hint: { position: 'absolute', bottom: 24, color: '#fff', fontSize: 14, textAlign: 'center', paddingHorizontal: 20 },
   info: { color: theme.text, fontSize: 15, textAlign: 'center', lineHeight: 22 },
   resultText: { color: theme.text, fontSize: 16, textAlign: 'center', fontWeight: '600', marginTop: spacing.md },
+  resultActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    width: '100%',
+    paddingHorizontal: spacing.md,
+  },
+  resultBtn: { flex: 1 },
 });

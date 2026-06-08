@@ -17,36 +17,51 @@ export function Button({
   title, onPress, loading, disabled, variant = 'primary', icon,
 }: {
   title: string; onPress: () => void; loading?: boolean; disabled?: boolean;
-  variant?: 'primary' | 'secondary' | 'danger' | 'success'; icon?: ReactNode;
+  variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'ghost'; icon?: ReactNode;
 }) {
+  // Ghost = text-only, no background. Use for secondary actions in empty
+  // states where a filled pill would feel heavy.
+  const isGhost = variant === 'ghost';
   const bg = {
-    primary: theme.brand, secondary: theme.surfaceAlt, danger: theme.danger, success: theme.success,
+    primary: theme.brand,
+    secondary: theme.surfaceAlt,
+    danger: theme.danger,
+    success: theme.success,
+    ghost: 'transparent',
   }[variant];
+  const fg = isGhost ? theme.textSecondary : '#fff';
   return (
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.8}
-      style={[styles.btn, { backgroundColor: bg, opacity: disabled ? 0.5 : 1 }]}
+      activeOpacity={isGhost ? 0.55 : 0.8}
+      style={[
+        styles.btn,
+        { backgroundColor: bg, opacity: disabled ? 0.5 : 1 },
+        isGhost && { paddingVertical: 10 },
+      ]}
     >
-      {loading ? <ActivityIndicator color="#fff" /> : (
+      {loading ? <ActivityIndicator color={isGhost ? theme.brand : '#fff'} /> : (
         <View style={styles.btnRow}>
           {icon}
-          <Text style={styles.btnText}>{title}</Text>
+          <Text style={[styles.btnText, { color: fg }]}>{title}</Text>
         </View>
       )}
     </TouchableOpacity>
   );
 }
 
-export function Field({ label, ...props }: { label: string } & TextInputProps) {
+export function Field({ label, style, ...props }: { label: string } & TextInputProps) {
+  // IMPORTANT: merge the caller's style on top of styles.input, don't let it
+  // replace the base styles. Otherwise color/background/border vanish and the
+  // typed text becomes invisible on the dark surface.
   return (
     <View style={{ marginBottom: spacing.md }}>
-      <Text style={styles.label}>{label}</Text>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
       <TextInput
         placeholderTextColor={theme.textMuted}
-        style={styles.input}
         {...props}
+        style={[styles.input, style]}
       />
     </View>
   );
@@ -70,7 +85,16 @@ export function Muted({ children }: { children: ReactNode }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bg, padding: spacing.lg },
   card: { backgroundColor: theme.surface, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: theme.border, marginBottom: spacing.md },
-  btn: { borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  btn: {
+    borderRadius: radius.md,
+    paddingVertical: 14,
+    paddingHorizontal: 24, // generous breathing room around the label so
+                           // buttons read cleanly when they're sized to
+                           // their content (e.g. action rows after a scan).
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 96,          // safety net for one- or two-word labels.
+  },
   btnRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   label: { color: theme.textMuted, fontSize: 13, marginBottom: 6, fontWeight: '600' },

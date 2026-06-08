@@ -6,8 +6,13 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
 import { ImageGallery } from '@/components/occurrences/image-gallery';
 import { OccurrenceActions } from '@/components/occurrences/occurrence-actions';
+import { AssignmentCard } from '@/components/occurrences/assignment-card';
+import { CommentsThread } from '@/components/occurrences/comments-thread';
 import { formatDateTime } from '@/lib/utils';
-import type { Occurrence, OccurrenceUpdate, OccurrenceReport, OccurrenceImage } from '@digilog/shared';
+import type {
+  Occurrence, OccurrenceUpdate, OccurrenceReport, OccurrenceImage,
+  OccurrenceComment, AppRole,
+} from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,15 +34,26 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
   if (!occ) notFound();
   const o = occ as Occurrence;
 
-  const [{ data: updates }, { data: report }, { data: images }] = await Promise.all([
+  const [{ data: updates }, { data: report }, { data: images }, commentsRes, assignablesRes] = await Promise.all([
     supabase.from('occurrence_updates').select('*').eq('occurrence_id', o.id).order('created_at', { ascending: false }),
     supabase.from('occurrence_reports').select('*').eq('occurrence_id', o.id).maybeSingle(),
     supabase.from('occurrence_images').select('*').eq('occurrence_id', o.id).order('captured_at', { ascending: false }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('occurrence_comments').select('*').eq('occurrence_id', o.id).order('created_at', { ascending: true }).then(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (r: any) => r, () => ({ data: [] }),
+    ),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('profiles').select('id, full_name, email, role')
+      .in('role', ['admin', 'manager', 'control_room', 'supervisor'])
+      .order('full_name'),
   ]);
 
   const upd = (updates ?? []) as OccurrenceUpdate[];
   const rep = report as OccurrenceReport | null;
   const imgs = (images ?? []) as OccurrenceImage[];
+  const comments = (commentsRes?.data ?? []) as OccurrenceComment[];
+  const assignables = (assignablesRes.data ?? []) as { id: string; full_name: string | null; email: string | null; role: AppRole }[];
 
   return (
     <>
@@ -97,6 +113,16 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
           </Card>
         </div>
 
+        <div className="space-y-5">
+          <AssignmentCard
+            occurrenceId={o.id}
+            // @ts-expect-error column added by 20260603000005 migration
+            currentAssigneeId={o.assigned_to ?? null}
+            // @ts-expect-error column added by 20260603000005 migration
+            currentAssigneeName={o.assigned_to_name ?? null}
+            assignables={assignables}
+          />
+
         <Card className="h-fit">
           <CardHeader><CardTitle>Update Timeline</CardTitle></CardHeader>
           <CardContent>
@@ -119,6 +145,15 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
             )}
           </CardContent>
         </Card>
+
+        <CommentsThread
+          occurrenceId={o.id}
+          obNumber={o.ob_number}
+          initial={comments}
+          authorId={profile.id}
+          authorName={profile.full_name ?? profile.email ?? 'Unknown'}
+        />
+        </div>
       </div>
     </>
   );

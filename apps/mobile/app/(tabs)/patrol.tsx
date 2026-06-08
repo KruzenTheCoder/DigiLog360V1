@@ -1,10 +1,11 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { getActivePatrol, startPatrol, endPatrol, scannedCheckpointIds } from '@/lib/patrol';
+import { startLocationReporting, stopLocationReporting } from '@/lib/location-reporter';
 import { Button, Card, H1, Muted, Badge } from '@/components/ui';
 import { theme, spacing, radius } from '@/lib/theme';
 import type { Patrol, PatrolRoute, Checkpoint } from '@digilog/shared';
@@ -43,6 +44,19 @@ export default function PatrolScreen() {
   }, [profile]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Live location reporting while on an active patrol.
+  useEffect(() => {
+    if (!profile || !patrol) { stopLocationReporting(); return; }
+    let cancel: (() => void) | null = null;
+    startLocationReporting({
+      guardId: profile.id,
+      guardName: profile.full_name ?? profile.email ?? null,
+      siteId: profile.site_id ?? null,
+      onlyWhileOnPatrol: true,
+    }).then((c) => { cancel = c; });
+    return () => { if (cancel) cancel(); stopLocationReporting(); };
+  }, [profile, patrol]);
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
   async function onStart() {

@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck (shared + admin + mobile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install workspace deps
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck shared
+        run: npx tsc -p packages/shared/tsconfig.json --noEmit
+
+      - name: Typecheck admin
+        run: npx tsc -p apps/admin/tsconfig.json --noEmit
+
+      - name: Install mobile deps
+        working-directory: apps/mobile
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+
+      - name: Typecheck mobile
+        working-directory: apps/mobile
+        run: npx tsc --noEmit
+
+  build:
+    name: Build admin
+    runs-on: ubuntu-latest
+    needs: typecheck
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run admin:build

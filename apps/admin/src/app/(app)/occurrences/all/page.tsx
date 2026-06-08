@@ -1,24 +1,119 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
 import { PageHeader } from '@/components/page-header';
-import { OccurrencesTable } from '@/components/occurrences/occurrences-table';
-import type { Occurrence } from '@digilog/shared';
+import { OccurrencesExplorer } from '@/components/occurrences/occurrences-explorer';
+import {
+  parseOccurrencesFilter, clampPage, clampPageSize, type Occurrence, type SavedView,
+} from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AllOccurrencesPage() {
-  await requireProfile();
+interface PageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function AllOccurrencesPage({ searchParams }: PageProps) {
+  const profile = await requireProfile();
+  const params = await searchParams;
+
+  const filter = parseOccurrencesFilter(params);
+  const page = clampPage(typeof params.page === 'string' ? params.page : '1');
+  const pageSize = clampPageSize(typeof params.pageSize === 'string' ? params.pageSize : undefined);
+  const sort = (typeof params.sort === 'string' ? params.sort : 'incident_at') || 'incident_at';
+  const dir = (typeof params.dir === 'string' ? params.dir : 'desc') === 'asc' ? 'asc' : 'desc';
+
   const supabase = await createClient();
-  const { data } = await supabase
+
+  // ---------- build the query ----------
+  let q = supabase
     .from('occurrences')
-    .select('*')
-    .order('incident_at', { ascending: false })
-    .limit(1000);
+    .select('*', { count: 'exact' })
+    .order(sort, { ascending: dir === 'asc' });
+
+  if (filter.q) {
+    // Fuzzy match across ob_number / type / description (gin_trgm indices).
+    const needle = filter.q.replace(/[%_]/g, '\\$&');
+    q = q.or(
+      [
+        `ob_number.ilike.%${needle}%`,
+        `occurrence_type.ilike.%${needle}%`,
+        `description.ilike.%${needle}%`,
+        `logged_by_name.ilike.%${needle}%`,
+      ].join(','),
+    );
+  }
+  if (filter.status) q = q.eq('status', filter.status);
+  if (filter.severity) q = q.eq('severity', filter.severity);
+  if (filter.site_id) q = q.eq('site_id', filter.site_id);
+  if (filter.site_name) q = q.eq('site_name', filter.site_name);
+  if (filter.type) q = q.eq('occurrence_type', filter.type);
+  if (filter.logged_by) q = q.eq('logged_by', filter.logged_by);
+  if (filter.is_patrol === 'true') q = q.eq('is_patrol', true);
+  if (filter.is_patrol === 'false') q = q.eq('is_patrol', false);
+  if (filter.from) q = q.gte('incident_at', new Date(filter.from).toISOString());
+  if (filter.to) {
+    // "to" is inclusive — bump to the end of that day.
+    const end = new Date(filter.to);
+    end.setUTCHours(23, 59, 59, 999);
+    q = q.lte('incident_at', end.toISOString());
+  }
+
+  const offset = (page - 1) * pageSize;
+  q = q.range(offset, offset + pageSize - 1);
+
+  const { data, count } = await q;
+
+  // ---------- sites + distinct types pickers + assignables ----------
+  const { data: sites } = await supabase.from('sites').select('id, name').order('name');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: assignables } = await (supabase as any)
+    .from('profiles').select('id, full_name, email, role')
+    .in('role', ['admin', 'manager', 'control_room', 'supervisor'])
+    .order('full_name');
+  // PostgREST has no DISTINCT — sample a window and unique client-side.
+  const { data: typeRows } = await supabase
+    .from('occurrences')
+    .select('occurrence_type')
+    .limit(2000);
+  const distinctTypes = Array.from(
+    new Set((typeRows ?? []).map((t) => t.occurrence_type).filter(Boolean) as string[]),
+  ).sort();
+
+  // ---------- saved views (graceful if migration not deployed yet) ----------
+  let views: unknown[] | null = [];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await (supabase as any)
+      .from('saved_views')
+      .select('*')
+      .eq('scope', 'occurrences')
+      .order('is_pinned', { ascending: false })
+      .order('updated_at', { ascending: false });
+    if (!res.error) views = res.data ?? [];
+  } catch { /* table not deployed yet */ }
 
   return (
     <>
-      <PageHeader title="All Occurrences" description="Complete occurrence book — live and closed." />
-      <OccurrencesTable rows={(data ?? []) as Occurrence[]} />
+      <PageHeader
+        title="All Occurrences"
+        description="Complete occurrence book — search, filter and export."
+      />
+      <OccurrencesExplorer
+        rows={(data ?? []) as Occurrence[]}
+        total={count ?? 0}
+        page={page}
+        pageSize={pageSize}
+        sort={sort}
+        dir={dir}
+        filter={filter}
+        sites={(sites ?? []) as { id: string; name: string }[]}
+        types={distinctTypes}
+        savedViews={(views ?? []) as unknown as SavedView[]}
+        currentUserId={profile.id}
+        currentUserName={profile.full_name ?? profile.email ?? 'Unknown'}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        assignables={(assignables ?? []) as any}
+      />
     </>
   );
 }

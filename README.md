@@ -2,655 +2,1053 @@
 
 # DigiLog 360
 
-### Security Operations Platform — Infrastructure & Solution Architecture
+### Multi-Tenant Security Operations Platform
 
 **Proprietary & Confidential — © 2026 Kruz Naidoo. All Rights Reserved.**
 
 </div>
 
-> This document is the authoritative engineering reference for DigiLog 360: the
-> problem it solves, its technology stack, system architecture, data model,
-> business logic, access-control model, and operational runbook.
+> This document is the authoritative engineering reference for **DigiLog 360**:
+> the problem it solves, its technology stack, system architecture, data model,
+> business logic, access-control model, role-based capability matrix, and
+> operational runbook.
 >
-> The software is proprietary intellectual property of **Kruz Naidoo**. See
-> [`LICENSE`](LICENSE). Unauthorized use, reproduction, or distribution is prohibited.
+> The software is the proprietary intellectual property of **Kruz Naidoo**. See
+> [`LICENSE`](LICENSE). Unauthorized use, reproduction, modification, or
+> distribution is prohibited. Third-party open-source components used by this
+> platform remain subject to their respective licenses.
+
+---
+
+## Quick Start
+
+Operators shipping to production should read [`PRODUCTION.md`](PRODUCTION.md)
+for the runbook (deployment, secret rotation, monitoring, backups, pre-release
+checklist). The rest of this README is the engineering reference.
+
+```powershell
+# 1. Apply migrations + regenerate types
+npx supabase db push
+npm run db:types
+
+# 2. Deploy edge functions
+npx supabase functions deploy `
+  pin-login pin-set `
+  admin-create-org admin-create-user admin-update-user `
+  admin-api-token admin-role-capability `
+  send-email webhook-deliver `
+  patrol-watcher sla-monitor `
+  transcribe-audio health-check
+
+# 3. Seed a demo tenant + super user
+npm install
+node --env-file=.env scripts/seed-accounts.mjs
+
+# 4. Run the apps
+npm run admin     # Next.js admin console
+npm run mobile    # Expo dev server (Guard / Supervisor)
+```
 
 ---
 
 ## Table of Contents
 
-1. [Overview](#1-overview)
-2. [Technology Stack](#2-technology-stack)
-3. [System Architecture](#3-system-architecture)
-4. [Monorepo Layout](#4-monorepo-layout)
-5. [Database Schema (ERD)](#5-database-schema-erd)
-6. [Enumerations](#6-enumerations)
-7. [Business Logic — Triggers & Functions](#7-business-logic--triggers--functions)
-8. [SLA Engine](#8-sla-engine)
-9. [Access Control (RLS / UAC)](#9-access-control-rls--uac)
-10. [Realtime, Storage & Edge Functions](#10-realtime-storage--edge-functions)
-11. [Key Workflows (Sequence Diagrams)](#11-key-workflows-sequence-diagrams)
-12. [Application Surfaces](#12-application-surfaces)
-13. [Checkpoint Scanning (QR / NFC / GPS)](#13-checkpoint-scanning-qr--nfc--gps)
-14. [Security Posture](#14-security-posture)
-15. [Deployment & Operations Runbook](#15-deployment--operations-runbook)
-16. [Accounts](#16-accounts)
-17. [License](#17-license)
+1. [What DigiLog 360 Is](#1-what-digilog-360-is)
+2. [Roles & Capabilities](#2-roles--capabilities)
+3. [Technology Stack](#3-technology-stack)
+4. [System Architecture](#4-system-architecture)
+5. [Monorepo Layout](#5-monorepo-layout)
+6. [Database Schema](#6-database-schema)
+7. [Multi-Tenancy & Tenant Isolation](#7-multi-tenancy--tenant-isolation)
+8. [Access Control — RLS + Capability Matrix](#8-access-control--rls--capability-matrix)
+9. [SLA Engine](#9-sla-engine)
+10. [Edge Functions](#10-edge-functions)
+11. [Realtime & Storage](#11-realtime--storage)
+12. [Admin Console — Surfaces & Workflows](#12-admin-console--surfaces--workflows)
+13. [Mobile App — Surfaces & Workflows](#13-mobile-app--surfaces--workflows)
+14. [Authentication Flows (Web Password / Mobile PIN)](#14-authentication-flows-web-password--mobile-pin)
+15. [Checkpoint Scanning (QR / NFC / GPS)](#15-checkpoint-scanning-qr--nfc--gps)
+16. [Offline Resilience](#16-offline-resilience)
+17. [Notifications & Push Deep-Links](#17-notifications--push-deep-links)
+18. [Security Posture](#18-security-posture)
+19. [Production Hardening Summary](#19-production-hardening-summary)
+20. [Deployment & Operations](#20-deployment--operations)
+21. [Demo Accounts](#21-demo-accounts)
+22. [License](#22-license)
 
 ---
 
-## 1. Overview
+## 1. What DigiLog 360 Is
 
-DigiLog 360 is a ground-up rebuild of the legacy ASP.NET MVC *OccurrenceBook*
-application into a modern, real-time, role-based security operations platform.
+DigiLog 360 is a **multi-tenant security operations platform** for SA-style
+security companies that need to run a control room, a manager review pipeline,
+mobile-app-equipped field guards, gate-house operations, patrols with checkpoint
+verification, and supervisor oversight — across multiple sites and multiple
+client organisations from a single deployment.
 
-It digitises the security "Occurrence Book" — the logbook guards and control rooms
-use to record incidents — and adds **live SLA tracking**, **rich reporting**, and a
-brand-new **mobile patrol + checkpoint-scanning** capability that the legacy system
-lacked (its "patrol" was only a start/stop timer).
+The platform is split into three first-party surfaces:
 
-| Surface | Audience | Purpose |
-| --- | --- | --- |
-| **Admin Console** (web) | Admin, Control Room, Supervisor | Command center: dashboards, live SLA board, reporting, user/site/checkpoint administration, patrol oversight |
-| **Mobile App** | Guard, Supervisor | Field operations: log occurrences with photos, run patrols, scan checkpoints (QR/NFC/GPS) |
-| **Backend** | — | Postgres data model, auth, row-level security, realtime, storage, scheduled jobs |
+| Surface | Built with | Primary users |
+|---|---|---|
+| **Admin console** | Next.js 15 (App Router) | super_user · admin · manager · control_room · supervisor |
+| **Mobile app** | Expo / React Native | guard · supervisor (PIN-only sign-in) |
+| **Backend** | Supabase (Postgres + Auth + Storage + Realtime + Edge Functions) | All clients |
 
-**Core domain entities:** Sites · Profiles (users) · Occurrences (incidents, "OB"
-numbered) · Occurrence Updates · Occurrence Reports · Occurrence Images · Patrol
-Routes · Checkpoints · Patrols · Checkpoint Scans.
+What it replaces / improves on the legacy ASP.NET MVC `OccurenceBook` app:
 
----
-
-## 2. Technology Stack
-
-### Admin Console (`apps/admin`)
-| Concern | Technology |
-| --- | --- |
-| Framework | Next.js 15 (App Router, React Server Components) |
-| UI runtime | React 19 |
-| Language | TypeScript 5.6 (strict) |
-| Styling | Tailwind CSS 3.4 + CSS variables (light/dark) |
-| Auth/session (SSR) | `@supabase/ssr` 0.10 (cookie-based) |
-| Data client | `@supabase/supabase-js` 2 |
-| Charts | Recharts |
-| Icons | lucide-react |
-| QR generation | qrcode.react |
-| Utilities | date-fns, clsx, tailwind-merge, class-variance-authority |
-
-### Mobile App (`apps/mobile`)
-| Concern | Technology |
-| --- | --- |
-| Framework | Expo SDK 52 (managed) + React Native 0.76 |
-| Navigation | expo-router 4 (file-based) |
-| Language | TypeScript 5.6 (strict) |
-| Auth/session | `@supabase/supabase-js` + AsyncStorage persistence |
-| Camera / QR | expo-camera |
-| Location / geofence | expo-location |
-| NFC | react-native-nfc-manager (dev build) |
-| Push | expo-notifications |
-| Secure storage | expo-secure-store |
-
-### Backend (`supabase/`)
-| Concern | Technology |
-| --- | --- |
-| Database | PostgreSQL 15 (Supabase) |
-| Auth | Supabase Auth (GoTrue), JWT |
-| Data API | PostgREST (auto REST over Postgres) |
-| Realtime | Supabase Realtime (logical replication) |
-| Object storage | Supabase Storage (S3-backed) |
-| Serverless | Supabase Edge Functions (Deno) |
-| Scheduling | pg_cron + pg_net |
-
-### Shared & Tooling
-| Concern | Technology |
-| --- | --- |
-| Shared code | `@digilog/shared` — TS types, constants, zod schemas, SLA helpers |
-| Monorepo | npm workspaces |
-| Validation | zod |
-| Runtime | Node.js ≥ 20 |
+- True multi-tenant architecture (one Supabase project hosts many client orgs)
+- Super user role that delegates tenancy and permissions
+- Six-role hierarchy with multi-role support and a configurable capability matrix
+- Real checkpoint scanning (QR + NFC + GPS) rather than a start/end timer
+- Mobile PIN login with employee-number identity + brute-force lockout
+- Realtime SLA board, live guard map, push + email notifications
+- Offline queue on mobile so guards can log without signal
+- Webhooks + API tokens for client integrations
+- Comprehensive audit trail
+- Per-org SLA matrix, custom occurrence types, branding
+- Voice notes (Whisper transcription) and OCR (Tesseract.js) for evidence capture
 
 ---
 
-## 3. System Architecture
+## 2. Roles & Capabilities
 
-```mermaid
-flowchart TB
-  subgraph Clients
-    A["Admin Console<br/>Next.js 15 / React 19<br/>(Admin · Control Room · Supervisor)"]
-    M["Mobile App<br/>Expo / React Native<br/>(Guard · Supervisor)"]
-  end
+The `app_role` enum is the security floor; the capability matrix sits on top
+and is fully editable by `super_user` per organisation.
 
-  subgraph Shared["@digilog/shared"]
-    S["Types · Constants · zod · SLA helpers"]
-  end
+### Six built-in roles (ranked)
 
-  subgraph Supabase["Supabase Cloud"]
-    AUTH["Auth (GoTrue)<br/>JWT + roles"]
-    REST["PostgREST<br/>Data API"]
-    RT["Realtime<br/>(logical replication)"]
-    ST["Storage<br/>occurrence-images (private)"]
-    EF["Edge Functions (Deno)<br/>admin-create-user<br/>admin-update-user<br/>sla-monitor"]
-    DB[("PostgreSQL 15<br/>Tables · Views · Triggers<br/>Row Level Security")]
-    CRON["pg_cron → sla-monitor"]
-  end
+| Rank | Role | Scope | Primary surface |
+|------|---|---|---|
+| 100 | **super_user** | Cross-org god mode | Admin web |
+| 80 | **admin** | One organisation | Admin web |
+| 60 | **manager** | One organisation | Admin web |
+| 50 | **control_room** | One site or org | Admin web |
+| 40 | **supervisor** | One site | Admin web + mobile |
+| 20 | **guard** | One site | Mobile only |
 
-  EXPO["Expo Push Service"]
+### Multi-role assignment
 
-  A -->|cookie session| AUTH
-  M -->|bearer JWT| AUTH
-  A --> REST
-  M --> REST
-  A -. subscribe .-> RT
-  A --> ST
-  M --> ST
-  A --> EF
-  M --> EF
-  REST --> DB
-  RT --- DB
-  EF --> DB
-  CRON --> EF
-  EF -->|SLA alerts| EXPO
-  EXPO -->|push| M
-  A --- S
-  M --- S
+A user can hold **any subset** of these roles. `profiles.roles app_role[]`
+stores the full set; `profiles.role` is kept in sync as the "primary" (used
+for default landing and display fallbacks). A trigger guarantees both stay
+consistent regardless of which column the caller writes to.
 
-  RLS{{"Row Level Security<br/>enforced on every table"}}
-  DB --- RLS
+Examples of valid combinations:
+
+- `{control_room, manager}` — operator who also reviews incidents
+- `{admin, supervisor}` — manager covering shifts as supervisor
+- `{guard, supervisor}` — field officer who runs other guards
+
+### Capability matrix (super-user editable)
+
+47 built-in capability keys cover every feature the platform exposes. The
+super user opens **Super User → Permissions**, picks an organisation, and
+toggles a `role × capability` grid. The change takes effect immediately.
+
+Capability areas:
+
+| Area | Keys (excerpt) |
+|---|---|
+| Dashboard | `dashboard.view`, `dashboard.cross_org` |
+| Occurrences | `occurrences.view_all`, `occurrences.log`, `occurrences.update_status`, `occurrences.assign`, `occurrences.delete`, `occurrences.bulk_actions`, `occurrences.comment`, `occurrences.export_csv` |
+| Reports | `reports.view`, `reports.create`, `reports.export_pdf` |
+| Manager | `manager.acknowledge`, `manager.escalate`, `manager.reviewed_logs` |
+| Patrols | `patrols.view`, `patrols.run`, `patrols.end_remote`, `patrols.schedule_manage`, `checkpoints.manage` |
+| Field ops | `team.view`, `visitors.manage`, `keys.manage`, `shifts.view_all`, `shifts.clock`, `guards.map_view` |
+| Users | `users.view`, `users.create`, `users.edit`, `users.deactivate`, `users.reset_pin` |
+| Sites | `sites.manage` |
+| Settings | `org.edit_branding`, `org.edit_sla`, `org.edit_types`, `webhooks.manage`, `api_tokens.manage`, `audit.view` |
+| Personal | `notifications.view_own`, `preferences.manage`, `security.manage_2fa` |
+| Super user | `super.orgs_manage`, `super.users_cross_org`, `super.platform_health`, `super.permissions_manage` |
+
+Super user can also **add custom capability keys** for documentation or
+future feature gating. Removing a built-in capability is blocked.
+
+### My Access page
+
+Every user can open `/my-access` to audit their effective access: roles held,
+deduped capability list with `via {role}` provenance per capability, and the
+nav surfaces they can actually open.
+
+---
+
+## 3. Technology Stack
+
+### Backend (Supabase)
+
+- **Postgres 15** with `pgcrypto`, `uuid-ossp`, `pg_trgm` extensions
+- **Supabase Auth** — JWT sessions, MFA (TOTP) for web, magic-link minting for mobile PIN flow
+- **Supabase Storage** — private buckets for occurrence images and voice notes, public bucket for org branding
+- **Supabase Realtime** — Postgres replication → WebSocket pushes to web + mobile
+- **Supabase Edge Functions** — Deno runtime (TypeScript)
+- **pg_cron** — schedules SLA monitor and patrol watcher
+
+### Admin web (`apps/admin`)
+
+- **Next.js 15** App Router with **React 19**
+- **TypeScript 5.6** strict mode
+- **Tailwind CSS 3.4** + custom dark mode
+- **@supabase/ssr** — server-side cookie-based auth
+- **lucide-react** icons · **recharts** dashboards · **qrcode.react** checkpoint labels
+- **react-leaflet** + **leaflet** — live guard map
+- **tesseract.js** — client-side OCR for log-occurrence form
+- **@sentry/nextjs** — opt-in error monitoring
+- **@formatjs**-style minimal i18n (en / af / zu / xh)
+- **next/headers** custom CSP / HSTS / X-Frame-Options: DENY
+
+### Mobile (`apps/mobile`)
+
+- **Expo SDK 52** managed workflow
+- **React Native 0.76** with the new architecture
+- **expo-router 4** — file-based navigation
+- **expo-camera** — QR scanner + photo capture
+- **expo-location** — GPS scan + live guard position reporting
+- **expo-av** — voice note recording
+- **react-native-nfc-manager** — NFC tag reads (dev build required)
+- **expo-notifications** — push registration + tap deep-linking
+- **expo-secure-store** + **AsyncStorage** — session + offline queue
+- **react-native-svg** — signature canvas, charts
+
+### Shared package (`packages/shared`)
+
+- Common TypeScript types (generated from DB + manual extensions)
+- Zod schemas for cross-app form validation
+- SLA helpers, role/capability constants and predicates
+- URL filter serialisers for the admin's server-side filtered tables
+- i18n dictionaries
+
+### Tooling
+
+- **npm workspaces** (admin + shared; mobile sits outside to avoid React dual-version issues)
+- **GitHub Actions CI** — typecheck (shared + admin + mobile) + admin build smoke test on PR
+
+---
+
+## 4. System Architecture
+
+```
+                   ┌────────────────────────────────────────────┐
+                   │             Supabase (Postgres)            │
+                   │                                            │
+                   │  domain tables (org_id-scoped)             │
+                   │   ┌─ organizations  profiles    sites      │
+                   │   ┌─ occurrences   occurrence_updates      │
+                   │   ┌─ occurrence_reports occurrence_images  │
+                   │   ┌─ occurrence_comments                   │
+                   │   ┌─ patrols  patrol_routes  checkpoints   │
+                   │   ┌─ checkpoint_scans  patrol_schedules    │
+                   │   ┌─ expected_patrols  guard_positions     │
+                   │   ┌─ shifts  shift_handovers               │
+                   │   ┌─ visitors  keys  key_handovers         │
+                   │   ┌─ manager_acknowledgements              │
+                   │   ┌─ saved_views  notifications            │
+                   │   ┌─ audit_log  pin_attempts               │
+                   │   ┌─ org_sla_overrides  org_occurrence_types │
+                   │   ┌─ org_webhooks  webhook_deliveries      │
+                   │   ┌─ api_tokens                            │
+                   │   ┌─ capabilities  role_capabilities       │
+                   │                                            │
+                   │  RLS on every table — super_user bypass    │
+                   │  Triggers for SLA, audit, sync_primary_role│
+                   │  Views: occurrences_live, my_capabilities, │
+                   │         guard_positions_latest, ...        │
+                   └─────▲────────────────▲─────────────▲───────┘
+              REST/RPC + Realtime         │   service_role        Postgres logical replication
+              (anon key, RLS enforced)    │   (edge fns only)     to supabase_realtime publication
+                       │                  │                       │
+        ┌──────────────┴───┐  ┌───────────┴──────────────┐  ┌─────┴──────────┐
+        │ Admin web        │  │  Edge functions (Deno)   │  │  Mobile app    │
+        │ (Next.js 15)     │  │  pin-login pin-set       │  │  (Expo / RN)   │
+        │                  │  │  admin-create-org/user   │  │                │
+        │  super_user      │  │  admin-update-user       │  │  guard         │
+        │  admin           │  │  admin-api-token         │  │  supervisor    │
+        │  manager         │  │  admin-role-capability   │  │                │
+        │  control_room    │  │  send-email              │  │  PIN-only      │
+        │  supervisor      │  │  webhook-deliver         │  │  Offline queue │
+        │                  │  │  patrol-watcher          │  │  Push deep     │
+        │  Web sessions    │  │  sla-monitor             │  │  -linking      │
+        │  via @supabase/  │  │  transcribe-audio        │  │                │
+        │  ssr cookies     │  │  health-check            │  │                │
+        └──────────────────┘  └──────────────────────────┘  └────────────────┘
+                  │                       │                       │
+                  └───────────── outbound webhooks + emails ──────┘
+                                          │
+                                  client integrations:
+                                  Slack, monitoring,
+                                  ticketing, Resend, OpenAI
 ```
 
-**Principle:** the database is the single source of truth and the security
-boundary. Every table has Row Level Security; clients talk directly to PostgREST
-with the user's JWT, and Postgres decides what each role may read or write.
-Privileged operations (creating users) run in Edge Functions with the service role.
-
 ---
 
-## 4. Monorepo Layout
+## 5. Monorepo Layout
 
 ```
 NewDigiLog/
 ├── apps/
-│   ├── admin/                 # Next.js admin console (web)
-│   │   ├── src/app/           # App Router routes
-│   │   │   ├── (app)/         # authenticated shell + pages
-│   │   │   ├── login/         # auth
-│   │   │   └── print/         # printable report (PDF via browser)
-│   │   ├── src/components/    # UI kit + feature components
-│   │   ├── src/lib/           # supabase clients, auth guard, utils
-│   │   └── src/middleware.ts  # session refresh + route protection
-│   └── mobile/                # Expo guard app
-│       ├── app/               # expo-router screens (tabs, scan, detail)
-│       └── src/lib/           # supabase, auth context, patrol/scan helpers
+│   ├── admin/                  Next.js 15 admin console
+│   │   ├── src/app/(app)/      Authenticated routes (server components)
+│   │   │   ├── dashboard/      KPI dashboard with site filter
+│   │   │   ├── occurrences/
+│   │   │   │   ├── all/        Server-side paginated explorer + saved views
+│   │   │   │   ├── new/        Log incident form (with OCR)
+│   │   │   │   ├── history/    Closed + completed patrols
+│   │   │   │   └── [id]/       Detail: report, comments, assignment, updates
+│   │   │   ├── my-queue/       Assigned to me
+│   │   │   ├── manager/        Acknowledgement queue + reviewed logs
+│   │   │   ├── patrols/        + schedules subroute
+│   │   │   ├── checkpoints/    QR/NFC/GPS checkpoint CRUD
+│   │   │   ├── team/           Team status
+│   │   │   ├── visitors/       Visitor log
+│   │   │   ├── keys/           Key register
+│   │   │   ├── shifts/         Shift roll-up
+│   │   │   ├── guards-map/     Live leaflet map of on-patrol guards
+│   │   │   ├── reports/        Reports list + PDF print route
+│   │   │   ├── users/          User CRUD with multi-role checkbox grid
+│   │   │   ├── sites/          Sites CRUD
+│   │   │   ├── notifications/  In-app inbox
+│   │   │   ├── my-access/      Capability audit (any user)
+│   │   │   ├── settings/
+│   │   │   │   ├── organization/  Branding + contact
+│   │   │   │   ├── sla/        Per-org SLA override matrix
+│   │   │   │   ├── types/      Custom occurrence types
+│   │   │   │   ├── notifications/ Personal notification preferences
+│   │   │   │   ├── security/   Self-service TOTP enrollment
+│   │   │   │   ├── webhooks/   Outbound webhooks
+│   │   │   │   ├── api-tokens/ Personal access tokens
+│   │   │   │   └── audit/      Immutable action trail
+│   │   │   └── super/
+│   │   │       ├── organizations/ Cross-org tenant CRUD
+│   │   │       ├── users/      Cross-org user list
+│   │   │       ├── health/     Platform health
+│   │   │       └── permissions/ Role × capability matrix editor
+│   │   ├── src/components/     UI primitives, page bodies
+│   │   ├── src/lib/            auth, supabase clients, csv, utils
+│   │   ├── src/middleware.ts   Auth gate for /(app)/*
+│   │   ├── next.config.mjs     CSP / HSTS / Permissions-Policy
+│   │   ├── sentry.client.config.ts (opt-in via env)
+│   │   └── public/img/         Logos copied from legacy wwwroot
+│   │
+│   └── mobile/                 Expo / React Native app
+│       ├── app/
+│       │   ├── _layout.tsx     Root stack + push deep-linking
+│       │   ├── login.tsx       PIN-only login
+│       │   ├── (tabs)/         Home · Patrol · Log · My Logs
+│       │   ├── scan.tsx        QR / NFC / GPS scanner
+│       │   ├── occurrence/[id].tsx  Detail with status update sheet
+│       │   ├── shift.tsx       Clock in / out with live counter
+│       │   ├── handovers.tsx   Shift handover inbox + new
+│       │   ├── inbox.tsx       Notifications
+│       │   ├── settings.tsx    Profile + PIN change + sign out
+│       │   ├── gate/
+│       │   │   ├── visitors.tsx  Visitor sign-in/out
+│       │   │   └── keys.tsx    Key hand-over register
+│       │   └── supervisor/
+│       │       ├── board.tsx   Live site SLA board with realtime
+│       │       └── team.tsx    Who's on shift / patrol
+│       ├── src/lib/            auth, supabase, patrol, storage,
+│       │                       location-reporter, offline-queue,
+│       │                       push, voice-note, theme
+│       ├── src/components/     primitives.tsx (Sheet, Toast, …),
+│       │                       signature-canvas.tsx, ui.tsx
+│       └── assets/branding/    Logos
+│
 ├── packages/
-│   └── shared/                # @digilog/shared — cross-platform TS
+│   └── shared/                 @digilog/shared — types, constants,
+│                               schemas, sla, filters, capabilities, i18n
+│
 ├── supabase/
-│   ├── migrations/            # ordered SQL (schema → triggers → RLS → storage → views)
-│   ├── functions/             # edge functions (Deno)
-│   ├── seed.sql               # sites + sample checkpoints/route
-│   ├── _deploy_all.sql        # all migrations + seed, pre-assembled
-│   └── schedule_sla_monitor.sql
+│   ├── migrations/             14 incremental migrations (see §6)
+│   ├── functions/              12 edge functions (see §10)
+│   ├── _deploy_all.sql         Single-file bundle for SQL editor paste
+│   ├── seed.sql                Demo sites + sample patrol route
+│   ├── schedule_sla_monitor.sql Sample pg_cron schedule for the SLA monitor
+│   └── config.toml
+│
 ├── scripts/
-│   └── seed-accounts.mjs      # provisions login accounts (service role)
-├── LICENSE                    # proprietary license — Kruz Naidoo
-└── README.md                  # this document
-```
-
-> `apps/mobile` is intentionally **outside** npm workspaces to avoid React
-> dual-version conflicts between Next.js and Expo; it consumes `@digilog/shared`
-> via metro `watchFolders` + babel module-resolver aliases.
-
----
-
-## 5. Database Schema (ERD)
-
-```mermaid
-erDiagram
-  AUTH_USERS ||--|| PROFILES : "1:1 (trigger)"
-  SITES ||--o{ PROFILES : "assigns"
-  SITES ||--o{ OCCURRENCES : "scopes"
-  SITES ||--o{ PATROL_ROUTES : "owns"
-  SITES ||--o{ CHECKPOINTS : "owns"
-  SITES ||--o{ PATROLS : "scopes"
-  PROFILES ||--o{ OCCURRENCES : "logs"
-  OCCURRENCES ||--o{ OCCURRENCE_UPDATES : "has"
-  OCCURRENCES ||--|| OCCURRENCE_REPORTS : "has (1:1)"
-  OCCURRENCES ||--o{ OCCURRENCE_IMAGES : "has"
-  OCCURRENCES |o--|| PATROLS : "patrol occurrence"
-  PATROL_ROUTES ||--o{ ROUTE_CHECKPOINTS : "includes"
-  CHECKPOINTS ||--o{ ROUTE_CHECKPOINTS : "in"
-  PATROL_ROUTES ||--o{ PATROLS : "guides"
-  PROFILES ||--o{ PATROLS : "performs"
-  PATROLS ||--o{ CHECKPOINT_SCANS : "records"
-  CHECKPOINTS ||--o{ CHECKPOINT_SCANS : "scanned at"
-
-  SITES {
-    uuid id PK
-    text name UK
-    text code UK
-    text address
-    text timezone
-    bool is_active
-  }
-  PROFILES {
-    uuid id PK "FK to auth.users"
-    text email
-    text full_name
-    app_role role
-    uuid site_id FK
-    bool is_active
-    text expo_push_token
-  }
-  OCCURRENCES {
-    bigint id PK
-    text ob_number UK "OB0001…"
-    text occurrence_type
-    severity_level severity
-    text description
-    timestamptz incident_at
-    uuid site_id FK
-    uuid logged_by FK
-    occurrence_status status
-    bool is_patrol
-    int sla_hours
-    timestamptz sla_due_at
-    timestamptz last_sla_update_at
-    timestamptz closed_at
-  }
-  OCCURRENCE_UPDATES {
-    bigint id PK
-    bigint occurrence_id FK
-    text notes
-    occurrence_status status
-    uuid updated_by FK
-    timestamptz created_at
-  }
-  OCCURRENCE_REPORTS {
-    bigint id PK
-    bigint occurrence_id FK "unique, 1:1"
-    text description
-    text personnel
-    text responding_officer
-    text emergency_services
-    text cctv
-    text property_damage
-    text immediate_actions
-    text next_steps
-    occurrence_status status
-  }
-  OCCURRENCE_IMAGES {
-    bigint id PK
-    bigint occurrence_id FK
-    text storage_path
-    uuid captured_by FK
-    timestamptz captured_at
-  }
-  PATROL_ROUTES {
-    uuid id PK
-    uuid site_id FK
-    text name
-    int expected_duration_minutes
-    bool is_active
-  }
-  CHECKPOINTS {
-    uuid id PK
-    uuid site_id FK
-    text name
-    text code
-    text qr_token UK
-    text nfc_tag_id UK
-    float latitude
-    float longitude
-    int geofence_radius_m
-    int sort_order
-  }
-  ROUTE_CHECKPOINTS {
-    uuid id PK
-    uuid route_id FK
-    uuid checkpoint_id FK
-    int sort_order
-  }
-  PATROLS {
-    bigint id PK
-    uuid guard_id FK
-    uuid site_id FK
-    uuid route_id FK
-    bigint occurrence_id FK
-    patrol_status status
-    timestamptz started_at
-    timestamptz ended_at
-    numeric duration_minutes
-    int checkpoints_total
-    int checkpoints_scanned
-  }
-  CHECKPOINT_SCANS {
-    bigint id PK
-    bigint patrol_id FK
-    uuid checkpoint_id FK
-    uuid guard_id FK
-    scan_method method
-    timestamptz scanned_at
-    float latitude
-    float longitude
-    float distance_m
-    bool is_verified
-  }
-```
-
-**Views** (security-invoker, so RLS of the caller still applies):
-- `occurrences_live` — open occurrences enriched with computed `is_sla_breached`,
-  `is_sla_update_due`, `minutes_remaining`, `has_report`.
-- `patrols_detailed` — patrols joined with route name, site name, and scan count.
-
----
-
-## 6. Enumerations
-
-| Enum | Values |
-| --- | --- |
-| `app_role` | `admin`, `control_room`, `supervisor`, `guard` |
-| `severity_level` | `critical`, `high`, `medium`, `low` |
-| `occurrence_status` | `open`, `acknowledged`, `in_progress`, `on_patrol`, `resolved`, `closed` |
-| `patrol_status` | `active`, `completed`, `abandoned` |
-| `scan_method` | `qr`, `nfc`, `gps`, `manual` |
-
----
-
-## 7. Business Logic — Triggers & Functions
-
-All domain invariants are enforced **in the database**, so they hold regardless
-of which client writes the data.
-
-| Object | Type | Behaviour |
-| --- | --- | --- |
-| `set_ob_number()` | BEFORE INSERT on `occurrences` | Assigns the next `OB0001`-style number from `ob_number_seq` |
-| `apply_occurrence_sla()` | BEFORE INSERT/UPDATE on `occurrences` | Computes `sla_hours`/`sla_due_at` from severity; stamps `last_sla_update_at`; sets `closed_at` on terminal status; recomputes deadline if severity changes |
-| `compute_patrol_metrics()` | BEFORE UPDATE on `patrols` | On `ended_at`, computes `duration_minutes` and flips `active → completed` |
-| `bump_patrol_scan_count()` | AFTER INSERT on `checkpoint_scans` | Increments `patrols.checkpoints_scanned` |
-| `handle_new_user()` | AFTER INSERT on `auth.users` | Creates the matching `profiles` row from signup metadata (role/site/name) |
-| `prevent_profile_privilege_escalation()` | BEFORE UPDATE on `profiles` | Blocks non-admins from changing their own `role` or `site_id` |
-| `set_updated_at()` | BEFORE UPDATE | Maintains `updated_at` on all mutable tables |
-| `haversine_m()` | function | Great-circle distance (m) for GPS checkpoint verification |
-| `current_app_role()`, `current_site_id()`, `is_admin()`, `has_any_role()`, `can_access_site()` | SECURITY DEFINER | RLS helper functions (bypass RLS to avoid recursion) |
-
----
-
-## 8. SLA Engine
-
-SLAs are derived from incident severity, enforced by the database, and surfaced
-live in the admin console and via push notifications.
-
-| Severity | Resolve within | Update cadence |
-| --- | --- | --- |
-| **Critical** | 1 hour | every 30 min |
-| **High** | 4 hours | every 60 min |
-| **Medium** | 24 hours | every 6 hours |
-| **Low** | 7 days (168h) | every 24 hours |
-
-- On insert, `sla_due_at = now() + sla_hours`.
-- An occurrence is **breached** when `now() > sla_due_at` and not terminal.
-- An **update is due** when `now() ≥ last_sla_update_at + update_interval`.
-- Posting an update or report stamps `last_sla_update_at`, resetting the cadence.
-- The `occurrences_live` view computes these flags server-side; the live board
-  refreshes them on realtime events and on a 60-second timer; `sla-monitor`
-  pushes alerts for breaches/overdue updates.
-
-The same thresholds are mirrored client-side in `@digilog/shared` (`SLA_CONFIG`,
-`sla.ts`) for instant UI feedback.
-
----
-
-## 9. Access Control (RLS / UAC)
-
-Row Level Security is enabled on **every** table. Policies use SECURITY DEFINER
-helper functions that read the caller's profile without recursing through RLS.
-
-```mermaid
-flowchart LR
-  U["Authenticated request<br/>(JWT → auth.uid())"] --> R{current_app_role}
-  R -->|admin| ALL["All sites · all records"]
-  R -->|control_room / supervisor| SITE["Records WHERE site_id = current_site_id()"]
-  R -->|guard| OWN["Own occurrences + own site's checkpoints<br/>scans tied to own active patrol"]
-```
-
-| Table | admin | control_room / supervisor | guard |
-| --- | --- | --- | --- |
-| `sites` | full | read | read |
-| `profiles` | full | read same-site | read/update **self** |
-| `occurrences` | full | CRUD same-site | create own · read own/site |
-| `occurrence_updates` | full | create (same-site parent) | read visible |
-| `occurrence_reports` | full | create/update | read visible |
-| `occurrence_images` | full | read · delete | insert own · read visible |
-| `patrol_routes` / `checkpoints` | full | manage same-site | read same-site |
-| `patrols` | full | read/end same-site | create/run own |
-| `checkpoint_scans` | full | read same-site | insert for **own active patrol** |
-
-Additional guarantees:
-- A trigger prevents non-admins from escalating `role` or moving `site_id`.
-- A partial unique index enforces **one active patrol per guard**.
-- `checkpoint_scans` are insert-only for guards (immutable proof-of-presence).
-- The **service-role** key (Edge Functions, account seeding) bypasses RLS by design.
-- Surface separation: the web console rejects guard-only roles; the mobile app
-  rejects web-only roles.
-
----
-
-## 10. Realtime, Storage & Edge Functions
-
-**Realtime** (replaces the legacy SignalR hub): the tables `occurrences`,
-`occurrence_updates`, `occurrence_reports`, `patrols`, and `checkpoint_scans` are
-published to `supabase_realtime`. The admin **Live Occurrences** board subscribes
-to `occurrences` changes and re-renders instantly when guards log incidents.
-
-**Storage** (replaces Azure Blob): a **private** bucket `occurrence-images`
-(5 MB limit, JPEG/PNG/WebP) holds photo evidence. Path convention
-`occurrence-images/<OB_NUMBER>/<uuid>.jpg`. Clients read via short-lived
-**signed URLs**; storage policies restrict writes to the authenticated owner.
-
-**Edge Functions** (Deno):
-
-| Function | Auth | Purpose |
-| --- | --- | --- |
-| `admin-create-user` | Admin JWT | Creates an auth user + profile (role/site/name) |
-| `admin-update-user` | Admin JWT | Updates role/site/name, resets password, activates/deactivates (ban) |
-| `sla-monitor` | service / cron | Scans `occurrences_live`, pushes SLA alerts to affected sites' control room via Expo |
-
----
-
-## 11. Key Workflows (Sequence Diagrams)
-
-### 11.1 Guard logs an occurrence (mobile)
-
-```mermaid
-sequenceDiagram
-  participant G as Guard (mobile)
-  participant DB as Postgres (RLS)
-  participant ST as Storage
-  participant RT as Realtime
-  participant CR as Control Room (web)
-
-  G->>DB: INSERT occurrences (type, severity, description, site)
-  Note over DB: trigger set_ob_number → OB0007<br/>trigger apply_occurrence_sla → sla_due_at
-  DB-->>G: { id, ob_number }
-  G->>ST: upload photo → occurrence-images/OB0007/uuid.jpg
-  G->>DB: INSERT occurrence_images (storage_path)
-  DB-->>RT: change event (occurrences INSERT)
-  RT-->>CR: live board shows OB0007 with SLA timer
-```
-
-### 11.2 Patrol with checkpoint scan
-
-```mermaid
-sequenceDiagram
-  participant G as Guard (mobile)
-  participant DB as Postgres (RLS)
-
-  G->>DB: startPatrol() → INSERT occurrence(is_patrol) + INSERT patrols(active)
-  Note over DB: one-active-patrol-per-guard enforced by unique index
-  loop each checkpoint
-    G->>G: scan QR / tap NFC / check GPS
-    G->>DB: INSERT checkpoint_scans(method, coords, distance_m)
-    Note over DB: trigger bump_patrol_scan_count → checkpoints_scanned++
-  end
-  G->>DB: endPatrol() → UPDATE patrols(ended_at)
-  Note over DB: trigger compute_patrol_metrics → duration, status=completed
-```
-
-### 11.3 Authentication & profile provisioning
-
-```mermaid
-sequenceDiagram
-  participant C as Client
-  participant AUTH as Supabase Auth
-  participant DB as Postgres
-
-  C->>AUTH: signInWithPassword(email, pw)
-  AUTH-->>C: JWT (sub = auth.uid())
-  C->>DB: SELECT profiles WHERE id = auth.uid()
-  DB-->>C: { role, site_id, is_active }
-  Note over C: web allows admin/control/supervisor;<br/>mobile allows guard/supervisor
+│   ├── seed-accounts.mjs       Bootstrap demo super user + org + roles
+│   ├── seed-new.mjs            Import legacy AspNetUsers
+│   └── import-occurrences.mjs  Bulk import historical CSV
+│
+├── .github/workflows/ci.yml    Typecheck + build on PR
+├── LICENSE                     Proprietary, governed by SA law
+├── PRODUCTION.md               Deploy / rotate / monitor runbook
+└── README.md                   This file
 ```
 
 ---
 
-## 12. Application Surfaces
+## 6. Database Schema
 
-### Admin Console — feature map
-- **Dashboard** — KPIs, 6-month trend, type/severity breakdown, top sites, SLA alerts.
-- **Live Occurrences** — realtime SLA board (breached → due → on-track), inline updates.
-- **All Occurrences** — filterable/searchable master table.
-- **History** — resolved occurrences + completed patrols.
-- **Log Incident** — create occurrence (site-scoped to the operator).
-- **Reports** — create detailed report; print-to-PDF view.
-- **Occurrence detail** — info, update timeline, report, photo gallery (signed URLs).
-- **Patrols** — active patrol monitor + checkpoint progress + end-patrol.
-- **Checkpoints** — CRUD + printable QR labels, NFC tag IDs, GPS/geofence.
-- **Team Status** — field staff availability + on-patrol state.
-- **Users** *(admin)* — create/edit, roles, site assignment, password reset, activate/deactivate.
-- **Sites** *(admin)* — site CRUD.
+The schema lives entirely in Postgres. Each migration is forward-only and
+idempotent (`create table if not exists`, `drop policy if exists`, etc.) so
+the bundled `_deploy_all.sql` can be re-run safely.
 
-### Mobile App — feature map
-- Sign in (guard/supervisor), persistent session.
-- Home dashboard (my open, logged-today, active-patrol shortcut).
-- Log occurrence with multi-photo capture → Storage.
-- My logs + occurrence detail.
-- Patrol: start (optional route), scan checkpoints, live progress, end.
-- Push registration (stores Expo token on profile for SLA alerts).
+### Migration timeline
 
----
+| # | File | What |
+|---|---|---|
+| 01 | `20260527000001_extensions_and_enums.sql` | `pgcrypto`, `pg_trgm`, `app_role` enum, severity/status/patrol_status/scan_method enums |
+| 02 | `20260527000002_core_schema.sql` | `sites`, `profiles`, `occurrences`, `occurrence_updates`, `occurrence_reports`, `occurrence_images`, `ob_number_seq` |
+| 03 | `20260527000003_patrols_checkpoints.sql` | `patrol_routes`, `checkpoints` (QR/NFC/GPS), `route_checkpoints`, `patrols`, `checkpoint_scans` |
+| 04 | `20260527000004_functions_and_triggers.sql` | `set_ob_number`, `apply_occurrence_sla`, `compute_patrol_metrics`, `bump_patrol_scan_count`, `handle_new_user`, RLS helpers |
+| 05 | `20260527000005_rls_policies.sql` | RLS per table (admin / control_room / supervisor / guard scopes) |
+| 06 | `20260527000006_storage_and_realtime.sql` | Private `occurrence-images` bucket, realtime publication |
+| 07 | `20260527000007_views_and_helpers.sql` | `haversine_m()`, `occurrences_live`, `patrols_detailed` |
+| 08 | `20260603000000_app_role_values.sql` | Adds `super_user` and `manager` enum values (own transaction) |
+| 09 | `20260603000001_multi_tenant_and_pin.sql` | `organizations`, `org_id` on every domain table, RLS rewrite for org isolation + super_user bypass, PIN columns on profiles, `manager_acknowledgements` |
+| 10 | `20260603000002_org_defaults.sql` | `default current_org_id()` on org_id everywhere — client inserts stay simple |
+| 11 | `20260603000003_production_hardening.sql` | `audit_log`, `pin_attempts`, `notifications`, soft-delete columns, composite (org_id,…) indexes, storage RLS rewrite by `<org_slug>/` path prefix |
+| 12 | `20260603000004_saved_views.sql` | `saved_views`, trigram indexes for occurrence search |
+| 13 | `20260603000005_assignment_and_comments.sql` | `occurrences.assigned_to`, `occurrence_comments` |
+| 14 | `20260603000006_org_settings.sql` | `org_sla_overrides`, `org_occurrence_types`, per-user notification prefs |
+| 15 | `20260603000007_webhooks_and_tokens.sql` | `org_webhooks`, `webhook_deliveries`, `api_tokens` |
+| 16 | `20260603000008_visitors_and_keys.sql` | `visitors`, `keys`, `key_handovers` |
+| 17 | `20260603000009_shifts.sql` | `shifts` (one-open-per-user), `shift_handovers` |
+| 18 | `20260603000010_patrol_schedules.sql` | `patrol_schedules`, `expected_patrols`, `generate_expected_patrols()` |
+| 19 | `20260603000011_guard_locations.sql` | `guard_positions` + `guard_positions_latest` view |
+| 20 | `20260603000012_voice_and_ocr.sql` | Private `occurrence-voice-notes` storage bucket |
+| 21 | `20260603000013_multi_role_profiles.sql` | `profiles.roles app_role[]`, sync trigger, array-based RLS helpers |
+| 22 | `20260603000014_capability_registry.sql` | `capabilities`, `role_capabilities`, `my_capabilities` view, `has_capability(text)` SQL helper |
 
-## 13. Checkpoint Scanning (QR / NFC / GPS)
+### Entity relationship (core)
 
-A genuinely new capability versus the legacy timer-only "patrol". Each checkpoint
-supports three independent verification methods:
-
-| Method | How it works | Data captured |
-| --- | --- | --- |
-| **QR** | Camera scans a label encoding `DIGILOG-CP:<qr_token>`; matched against `checkpoints.qr_token` | `method=qr`, verified |
-| **NFC** | Phone taps a tag; UID matched against `checkpoints.nfc_tag_id` (requires dev build) | `method=nfc`, verified |
-| **GPS** | Device location compared to checkpoint lat/long via haversine vs `geofence_radius_m` | `method=gps`, `distance_m`, `is_verified` = within radius |
-
-Each scan inserts an immutable `checkpoint_scans` row tied to the guard's active
-patrol, and the `bump_patrol_scan_count` trigger advances patrol progress.
-
----
-
-## 14. Security Posture
-
-- **Defense at the data layer** — RLS on every table; the API cannot leak rows a
-  role shouldn't see, regardless of client bugs.
-- **Privilege-escalation guard** — DB trigger blocks self role/site changes.
-- **Least privilege** — anon/service keys never embedded in clients; only the
-  anon key ships to apps; service role lives server-side (Edge Functions, scripts).
-- **Private storage** — evidence photos are non-public; access via signed URLs only.
-- **HTTP hardening** — admin sets `X-Frame-Options`, `X-Content-Type-Options`,
-  `Referrer-Policy`, `Permissions-Policy`; `X-Powered-By` disabled.
-- **Fail-fast config** — both apps throw clear errors if Supabase env is missing.
-- **Auditability** — updates and scans are append-only; OB numbers are immutable.
-- **Secrets** — all `.env*` files are git-ignored; rotate keys before production.
-
----
-
-## 15. Deployment & Operations Runbook
-
-### Prerequisites
-- Node.js ≥ 20, npm ≥ 10
-- A Supabase project + (optionally) the Supabase CLI
-- Mobile: Expo Go (QR/GPS) or an EAS dev build (NFC)
-
-### Install
-```bash
-npm install                      # root + admin + shared
-cd apps/mobile && npm install    # mobile (separate from workspaces)
+```
+organizations 1───────* sites
+       │      1───────* profiles ─ * (auth.users)
+       │      1───────* occurrences ─ * occurrence_updates
+       │                                ─ ? occurrence_reports
+       │                                ─ * occurrence_images
+       │                                ─ * occurrence_comments
+       │                                ─ ? manager_acknowledgements
+       │      1───────* patrol_routes ─ * route_checkpoints ─ checkpoints
+       │      1───────* patrols ─ * checkpoint_scans
+       │      1───────* patrol_schedules ─ * expected_patrols
+       │      1───────* guard_positions
+       │      1───────* shifts  shift_handovers
+       │      1───────* visitors  keys  key_handovers
+       │      1───────* notifications
+       │      1───────* audit_log
+       │      1───────* org_sla_overrides  org_occurrence_types
+       │      1───────* org_webhooks  webhook_deliveries  api_tokens
+       │      1───────* role_capabilities
+       │
+       └─ capabilities (system-wide catalog)
 ```
 
-### Deploy the backend
-**Option A — Supabase CLI** (needs the DB password when linking):
-```bash
-supabase link --project-ref <YOUR_PROJECT_REF>
-supabase db push
-supabase db execute --file supabase/seed.sql
-supabase functions deploy admin-create-user admin-update-user sla-monitor
-```
-**Option B — no CLI:** run `supabase/_deploy_all.sql` (all migrations + seed,
-pre-assembled) in the Supabase SQL editor. Edge functions still require the CLI;
-only the in-app "Add User" form depends on them.
+---
 
-### Seed login accounts
-```bash
+## 7. Multi-Tenancy & Tenant Isolation
+
+DigiLog is **truly multi-tenant**. One Supabase project hosts any number of
+client organisations. The platform is engineered so that:
+
+- Every domain table carries `org_id NOT NULL` (default = `current_org_id()`)
+- Every SELECT/UPDATE/DELETE policy filters by `org_id = current_org_id()` OR `is_super_user()`
+- Storage paths are namespaced by `<org_slug>/` and an RLS policy enforces it
+- `super_user` is the only role that can read across tenants (and is the only role that can create or move users between orgs)
+- Even cross-org auth user emails are unique globally (Supabase Auth constraint) — accept this as a known trade-off
+
+Onboarding a new tenant takes one POST to `admin-create-org` (super_user only),
+which also bootstraps the first admin and seeds the default role × capability
+grants via the `trg_seed_org_caps` trigger.
+
+---
+
+## 8. Access Control — RLS + Capability Matrix
+
+### Layer 1: Postgres RLS (security floor)
+
+Every table has RLS enabled. The base helpers:
+
+| Function | Behaviour |
+|---|---|
+| `current_app_roles()` | Returns the full role array of the caller |
+| `current_app_role()` | Primary role (= `roles[1]`) |
+| `current_org_id()` | Caller's org |
+| `current_site_id()` | Caller's primary site |
+| `has_any_role(_roles)` | Array overlap |
+| `is_super_user()` | `'super_user' = ANY(current_app_roles())` |
+| `is_admin()` | super_user OR admin |
+| `is_manager()` | super_user OR admin OR manager |
+| `can_access_site(_site)` | Site is in caller's org AND (caller is admin/manager/control_room OR is caller's primary site) |
+| `has_capability(_cap)` | super_user OR capability granted to one of caller's roles in their org |
+
+### Layer 2: Capability matrix (super-user editable)
+
+UI/feature gating sits on top of RLS. Each nav item / button / page can carry
+a `capability` key. When the user visits the app shell:
+
+1. `loadMyCapabilities()` reads `public.my_capabilities` (view).
+2. Super users get `Set(['*'])` and bypass capability filtering.
+3. Everyone else gets the exact set the matrix grants their roles in their org.
+4. Nav items and gated actions check via `hasCapability()`.
+
+This means: the super user can hide features per role per org, **and only the
+features the role's RLS already allows**. The system is fail-safe: revoking
+a capability hides UI, but a malicious caller still can't bypass RLS.
+
+### Privilege-escalation guard
+
+The `prevent_profile_privilege_escalation` trigger blocks:
+
+- Granting `super_user` unless the caller is super_user
+- Moving a user between orgs unless the caller is super_user
+- Changing role/site/org by anyone who isn't admin/super_user
+- Removing the last role (would lock the user out)
+
+---
+
+## 9. SLA Engine
+
+### Default matrix
+
+| Severity | Resolve within | Update every |
+|---|---|---|
+| Critical | 1 h | 30 min |
+| High | 4 h | 60 min |
+| Medium | 24 h | 6 h |
+| Low | 168 h (7 d) | 24 h |
+
+### Per-org override
+
+`org_sla_overrides (org_id, severity, resolve_hours, update_minutes)` lets
+admins tighten or loosen the matrix per organisation. The helper functions
+`severity_sla_hours()` and `severity_update_interval_minutes()` consult the
+override table first and fall back to the defaults.
+
+### Computation
+
+The trigger `apply_occurrence_sla` runs `BEFORE INSERT OR UPDATE` on
+`occurrences`:
+
+- Sets `sla_hours` from severity
+- Stamps `sla_due_at` if null
+- Updates `last_sla_update_at` to `now()` on insert
+- Recomputes `sla_due_at` if severity changes on update
+- Stamps `closed_at` when entering `resolved` or `closed`
+
+### Live view
+
+`public.occurrences_live` (security_invoker view) projects each open
+occurrence with:
+
+- `is_sla_breached` — past `sla_due_at` and not closed
+- `is_sla_update_due` — no update for `update_interval_minutes`
+- `minutes_remaining` — friendly countdown
+- `has_report`
+
+### SLA monitor edge function
+
+Scheduled by `pg_cron` every 5 minutes. For each affected site:
+
+1. Reads `occurrences_live` and bucketises into breached / update-due
+2. Resolves recipients (control_room / supervisor / manager / admin at that site)
+3. Inserts `notifications` rows for the in-app inbox (with `data.occurrence_id`)
+4. Sends Expo push messages (respecting per-user `push_notifications` flag)
+5. Sends email summaries via Resend (respecting per-user `email_notifications` flag) for breach events
+
+### Patrol watcher edge function
+
+- `generate_expected_patrols()` seeds upcoming slots for the next 6 h based on `patrol_schedules`
+- Marks overdue, unsatisfied, unalerted slots
+- Sends push + creates `patrol.late` notifications for site supervisors
+- Marks the slot `late_alert_sent_at` so it doesn't re-spam
+
+---
+
+## 10. Edge Functions
+
+| Function | Purpose | Auth |
+|---|---|---|
+| `pin-login` | Verifies bcrypt PIN, mints magic-link token, applies brute-force lockout (5 fails / 15 min → 15 min lock) | Public POST |
+| `pin-set` | Set / reset PIN (self with current_pin OR admin reset) | Bearer (signed-in) |
+| `admin-create-user` | Create auth user + profile with roles[], optional PIN, optional employee# | admin OR super_user |
+| `admin-update-user` | Mutate profile fields + roles + PIN. Org admins can't reassign org | admin OR super_user |
+| `admin-create-org` | Super-user-only tenant provisioning with optional first-admin bootstrap | super_user |
+| `admin-api-token` | Mint / revoke org-scoped API tokens (SHA-256 stored hash, plaintext shown once) | admin OR super_user |
+| `admin-role-capability` | grant/revoke/bulk on `role_capabilities`, add/remove custom capability keys | super_user |
+| `send-email` | Resend wrapper; falls back to console log if `RESEND_API_KEY` unset | Internal key OR admin |
+| `webhook-deliver` | Fan out an event to org_webhooks with HMAC-SHA256 signature, records `webhook_deliveries` | Internal key OR admin |
+| `patrol-watcher` | Seeds expected_patrols + alerts overdue ones | Cron (service role) |
+| `sla-monitor` | Inbox + push + email for SLA events | Cron (service role) |
+| `transcribe-audio` | OpenAI Whisper proxy; attaches transcript as a comment on the occurrence | Bearer (signed-in) |
+| `health-check` | Public uptime probe (DB connectivity + counts) | None |
+
+All functions live under `supabase/functions/` and are deployed with
+`npx supabase functions deploy <name>`.
+
+---
+
+## 11. Realtime & Storage
+
+### Realtime publication
+
+These tables stream change events over the `supabase_realtime` publication:
+
+`occurrences`, `occurrence_updates`, `occurrence_reports`, `patrols`,
+`checkpoint_scans`, `organizations`, `manager_acknowledgements`,
+`occurrence_comments`, `notifications`.
+
+Used by:
+
+- Admin **Live Occurrences** board — flash banner on new OB, refresh on any change
+- Admin **Guard Map** — animate markers as `guard_positions` rows arrive
+- Mobile **Supervisor Board** — auto-refresh on changes to the site's occurrences
+- Mobile **Occurrence Detail** — live status and comment updates
+- Admin **Notifications bell** — live unread counter
+
+### Storage
+
+| Bucket | Visibility | Path convention | RLS |
+|---|---|---|---|
+| `occurrence-images` | Private | `<org_slug>/<OB>/<uuid>.<ext>` | Read/write only if path's first segment matches caller's org_slug; super_user bypass |
+| `occurrence-voice-notes` | Private | `<org_slug>/<OB>/<uuid>.m4a` | Same as above |
+| `org-branding` | Public | `<org_slug>/<file>` | Read public; write requires admin in matching org |
+
+All buckets enforce file-size caps and MIME-type allowlists.
+
+---
+
+## 12. Admin Console — Surfaces & Workflows
+
+### Layout
+
+A two-pane shell with a collapsible sidebar grouped by section: **Overview,
+Occurrences, Field Operations, Manager, Administration, Super User**.
+Sections and items render based on the user's roles AND capabilities.
+
+The header carries:
+
+- Site context indicator
+- Live unread notification bell
+- Theme toggle (persisted to `localStorage.digilog.theme`)
+- Avatar + sign out
+
+### Dashboard
+
+KPI cards (incidents 30d / open / breached / resolution rate), monthly trend
+chart, type breakdown, severity pie, top sites. **Filterable by site** via
+chip selector (`?site=` query param).
+
+### Live Occurrences
+
+Realtime grid of open occurrences with SLA badge animation on breach. Each
+card has Update + Add Report actions and a flash banner appears on new OB.
+
+### All Occurrences
+
+Server-side paginated + filtered explorer. Filters: free-text search across
+OB/type/description/logger (uses `pg_trgm`), status, severity, site, type,
+date range, patrol toggle. URL-driven, so every filter combination is
+shareable. **Saved views** let users (or admins, shared with org) name a
+filter set, pin it, and one-click apply. **Bulk actions** bar appears on
+multi-select: acknowledge, close (with timeline note), assign. **Export CSV**
+exports the visible page.
+
+### Occurrence detail
+
+Severity + status badges, details grid, description, optional report card,
+photo gallery, **assignment card** (pick a reviewer; auto-notifies them),
+**comments thread** (realtime, edit/delete own), update timeline.
+
+### Log incident
+
+Type/severity/site/incident-at form. OCR drop-zone lets reviewers drop a
+photo of a handwritten note — Tesseract.js extracts text into the description.
+
+### Reports
+
+List of reports with one-click PDF print route at `/print/report/[ob]`. The
+print route renders a polished page styled for A4 with auto-print on load.
+
+### Manager
+
+- **Acknowledgements** — queue of un-acknowledged occurrences; modal lets the manager pick a decision (Acknowledge / Escalate / Reject) + notes; writes to `manager_acknowledgements`, mirrors status onto occurrence, drops a timeline update.
+- **Reviewed Logs** — historical decisions.
+
+### Field Operations
+
+- **Patrols** — active + recent with route progress
+- **Checkpoints** — CRUD with QR/NFC/GPS, printable QR labels
+- **Team Status** — field-staff availability + active-patrol indicator
+- **Visitor Log** — currently-on-site + recent
+- **Key Register** — held vs available
+- **Shifts** — KPI strip + roll-up
+- **Patrol Schedules** — recurring expectations
+- **Guard Map** — live leaflet map with marker per on-patrol guard, accuracy circle, OSM tiles, lazy-loaded chunk
+
+### Administration
+
+- **Users** — table with role chips, multi-role checkbox dialog (rank-clamped), employee number, PIN reset, CSV export
+- **Sites** — CRUD per org
+- **Organisation** — branding, contact, plan (read-only for org admins)
+- **SLA Matrix** — per-severity override form, reset-to-default per row
+- **Occurrence Types** — register/disable custom types, default severity
+- **My Preferences** — per-user push/email/assignment/breach toggles
+- **Security (2FA)** — Supabase Auth TOTP enrollment with QR
+- **Webhooks** — register URL + events + secret; signed `X-DigiLog-Signature: hmac-sha256` deliveries; last_status badge
+- **API Tokens** — mint + revoke; shown plaintext once; SHA-256 hashed at rest; scopes list
+- **Audit Log** — color-coded action chips, actor name + role, target table#id, IP
+
+### Super User
+
+- **Organisations** — table with per-tenant counts; new-org dialog with optional first-admin bootstrap
+- **All Users** — cross-org user list with per-org strip
+- **Platform Health** — aggregate KPIs and recent activity across all tenants
+- **Permissions** — role × capability matrix editor (the entire point of the capability layer)
+
+### My Access
+
+Self-service page anyone can open: roles held with primary chip, live capability set chips, area-grouped capability matrix with `via {role}` provenance per capability, list of pages they can actually open.
+
+---
+
+## 13. Mobile App — Surfaces & Workflows
+
+### Authentication — PIN only
+
+Mobile has **no password mode**. On the first launch a user opens the
+"Switch account" sheet, enters org slug + employee number (saved to
+AsyncStorage), then types their PIN.
+
+### Home (tab 1)
+
+- Greeting + multi-role chips + site name
+- Shift card — tap to clock in/out
+- KPI strip — my open / logged today / (visitors OR breached for supervisors)
+- Handover prompt if any are waiting on the user
+- Active-patrol callout
+- Quick action tiles — Log occurrence · Patrol · Scan · Visitors · Keys · My shift
+- Supervisor section (only if user holds supervisor) — Site Board · Team
+- "My logs · today" summary card
+- Floating "+" log-occurrence FAB
+
+### Patrol (tab 2)
+
+Route picker (or ad-hoc) → Start. While active: live status card, scan
+checkpoint button, route checkpoint list with done/not-done state. While
+active, the location reporter posts a `guard_positions` row every 30 s.
+
+### Scan (modal)
+
+Three modes — **QR** (expo-camera, decodes `DIGILOG-CP:<token>`), **NFC**
+(NFC Manager — requires dev build), **GPS** (Location → nearest checkpoint
++ haversine distance against geofence). Each commit writes a
+`checkpoint_scans` row with method, coordinates, distance, verified flag.
+
+### Log incident (tab 3 / FAB)
+
+Type chips (org-custom first, defaults fallback) → severity chips → multi-line
+description → photos (camera or library, up to 6) → Submit. On success,
+toast + auto-navigate to detail. On no network, queued to AsyncStorage and
+flushed automatically on reconnect.
+
+### My Logs (tab 4)
+
+Searchable, filterable by status (All / Open / Closed). Realtime updates if
+status changes from the web side.
+
+### Occurrence detail (deep-linkable)
+
+Header with OB + type, badges, details grid, description, photo strip,
+comments thread, update timeline. **Sticky bottom action bar** for reviewers
+(supervisor / manager / control_room / admin / super_user) opens a status
+update sheet with chip-grid + notes field. Realtime subscriptions update all
+panels while open.
+
+### Gate-house
+
+- **Visitors** — currently-on-site list with one-tap "Out" button. Add sheet with full name, ID, company, vehicle reg, visiting contact. Recent history below.
+- **Keys** — held vs available. Hand-over sheet captures recipient name + ID. Return-to-supervisor flow.
+
+### Shift
+
+Live elapsed counter (`Hh Mm`, updates every 30 s). Closing notes textarea.
+Clock Out with confirmation. Recent shifts list with computed durations.
+
+### Handovers
+
+Inbox of waiting handovers (acknowledge button) + history. New-handover
+sheet captures summary, open issues, and a **signature** drawn with
+`react-native-svg`.
+
+### Supervisor surfaces (gated)
+
+- **Site Board** — realtime SLA bucketed by Breached / Update Due / On Track. Tap any card → bottom sheet with status chip grid + notes → Post. Page updates without nav.
+- **Team** — live who's-on-patrol / on-shift / off, end-patrol-remotely action, tap-to-call.
+
+### Inbox
+
+Mark-read / mark-all / delete. Kinds with custom icon + colour: `sla.breach`,
+`sla.update_due`, `manager.*`, `occurrence.assigned`, `patrol.late`,
+`handover.waiting`, `system`.
+
+### Settings
+
+Profile (avatar, multi-role chips, employee#, PIN status), Change PIN with
+live mismatch feedback + show/hide toggle, shortcuts to Inbox + Handovers,
+Sign Out with confirmation.
+
+---
+
+## 14. Authentication Flows (Web Password / Mobile PIN)
+
+### Web
+
+Standard Supabase Auth email + password via `signInWithPassword`. Optional
+TOTP MFA via `/settings/security`. Auth gated by middleware on `/(app)/*`
+routes. Web roles: super_user, admin, manager, control_room, supervisor.
+
+### Mobile PIN
+
+The mobile app intentionally has **no password** flow. The sequence:
+
+```
+1. User taps PIN keypad (4 digits)
+2. App POSTs { org_slug, employee_number, pin } to `pin-login` edge fn
+3. Edge fn:
+   - Look up org by slug, profile by (org_id, employee_number)
+   - Check `locked_until` — if set and in future, 423 + locked_until
+   - Read profile.pin_hash, bcrypt-compare
+   - Register attempt to public.pin_attempts (success or failure)
+   - If failure count >= 5 in last 15 min, set profile.locked_until = now() + 15 min
+   - On success: mint magiclink token via supabase.auth.admin.generateLink
+   - Return { token_hash, email, role }
+4. App calls supabase.auth.verifyOtp({ token_hash, type: 'magiclink' })
+5. Supabase returns a real session; app enforces MOBILE_ROLES on the profile
+```
+
+### Brute-force protection
+
+- bcrypt(10) PIN storage
+- Constant-time response normalisation (250 ms minimum) avoids enumeration timing
+- Account lockout: 5 failures in 15 min → 15-min lock, audit-logged
+- All attempts written to `pin_attempts` for forensic review
+
+---
+
+## 15. Checkpoint Scanning (QR / NFC / GPS)
+
+Each `checkpoint` row carries:
+
+- `qr_token` (auto, used as the QR payload prefixed with `DIGILOG-CP:`)
+- `nfc_tag_id` (operator-set; matched case-insensitively, colons ignored)
+- `latitude`, `longitude`, `geofence_radius_m`
+
+When a guard scans:
+
+- **QR** — decode payload → token lookup → write `checkpoint_scans (method='qr')`
+- **NFC** — read tag id → checkpoint lookup → `(method='nfc')`
+- **GPS** — get current position → find nearest checkpoint with GPS → compute haversine distance → `(method='gps', verified=distance ≤ radius)`
+
+The `bump_patrol_scan_count` trigger increments
+`patrols.checkpoints_scanned` on each insert. The patrol view shows progress
+against `checkpoints_total`.
+
+Printable QR labels are rendered in the admin **Checkpoints** page via
+`QRCodeSVG`.
+
+---
+
+## 16. Offline Resilience
+
+### Mobile offline queue
+
+A guard logging an incident with no signal is mission-critical. The flow:
+
+1. `isOnline()` checks via `@react-native-community/netinfo`
+2. If offline (or the insert fails mid-flight), the occurrence + base64 photos are written to AsyncStorage at `digilog.offline_queue.v1`
+3. `startAutoFlush()` listens for connectivity changes; on reconnect it iterates the queue
+4. Each item is retried up to 8 times; dropped if it still fails (poison-row protection)
+5. The home + log screens surface a "N pending sync" banner so guards know the state
+
+The PIN itself is never persisted to AsyncStorage.
+
+### Web
+
+Server-rendered Next.js pages tolerate connection blips naturally. The
+notifications bell and live board both gracefully degrade when realtime
+disconnects.
+
+---
+
+## 17. Notifications & Push Deep-Links
+
+### Channels
+
+- **In-app inbox** — `public.notifications` table; realtime subscription drives the bell badge on web + home badge on mobile
+- **Push** — Expo Push API, via the SLA monitor / patrol watcher / occurrence assignment trigger; respects per-user `push_notifications`
+- **Email** — Resend via `send-email` edge function; respects per-user `email_notifications`
+
+### Mobile deep-linking
+
+The root `_layout.tsx` wires both `getLastNotificationResponseAsync()` (cold
+start) and `addNotificationResponseReceivedListener` (warm). Payload routing:
+
+| Payload | Destination |
+|---|---|
+| `{ occurrence_id }` (any kind) | `/occurrence/{id}` |
+| `{ type: 'patrol_late' }` | `/supervisor/board` |
+| `{ type: 'handover' }` | `/handovers` |
+| `{ type: 'sla' }` (no occurrence_id) | `/supervisor/board` |
+| Anything else | `/inbox` |
+
+---
+
+## 18. Security Posture
+
+### Code-level
+
+- **RLS on every table** including `auth.users` indirectly via Supabase Auth
+- **Storage RLS** validates the `<org_slug>/` path prefix per request
+- **Privilege escalation triggers** on `profiles`
+- **CSP** on the admin app (Supabase URL inlined from env, OSM + unpkg whitelisted only for the guard map)
+- **HSTS 2y w/ subdomains**, **X-Frame-Options: DENY**, **COOP same-origin**, restrictive **Permissions-Policy**
+- **CSRF** — Supabase JWT in HttpOnly cookies via `@supabase/ssr`; no separate token needed
+- **PIN brute-force lockout**
+- **Audit log** triggered on profile/org/manager-ack changes + written by edge functions
+
+### Operational
+
+- **Service-role key** lives only in edge functions and the seed script
+- **API tokens** stored only as SHA-256 hashes — recoverable plaintext exists exactly once at creation time
+- **MFA (TOTP)** available for any web user via self-service
+- **Soft delete** on profiles / sites / occurrences / organizations — `deleted_at` filter in select policies
+- **Health check** at `/functions/v1/health-check` for monitoring without auth
+
+### Known trade-offs (documented intentionally)
+
+- Auth user emails are globally unique (Supabase Auth constraint) — accepted because email collisions across tenants are rare and the org_slug + employee# is the primary mobile identity
+- NFC reads require a dev build (Expo Go can't read NFC)
+
+---
+
+## 19. Production Hardening Summary
+
+The features that distinguish DigiLog 360 from a demo:
+
+- ✅ True multi-tenant schema with `org_id` on every domain row and RLS bypass only via `super_user`
+- ✅ PIN auth on mobile (employee# + 4-digit PIN), bcrypt(10), brute-force lockout, lockout audit
+- ✅ Multi-role profiles (`roles app_role[]`) with primary-role sync trigger and array-based RLS helpers
+- ✅ Capability matrix per org (super-user editable; UI + nav + page-level gates)
+- ✅ Audit log on every sensitive action (auth + user + role + org + PIN + capability + manager-ack)
+- ✅ Soft delete on profiles / sites / occurrences / organizations
+- ✅ Storage RLS isolates `<org_slug>/…` per tenant
+- ✅ CSP + HSTS + X-Frame-Options: DENY on the admin console
+- ✅ Notifications inbox (web + mobile) driven by SLA monitor + patrol watcher + manual triggers
+- ✅ Mobile offline queue for occurrences
+- ✅ Mobile push deep-linking
+- ✅ CSV export on occurrences and users
+- ✅ Public `/functions/v1/health-check` for uptime monitoring
+- ✅ Outbound webhooks with HMAC-SHA256 signatures and delivery history
+- ✅ API tokens (org-scoped, hash-at-rest)
+- ✅ Per-org SLA matrix and custom occurrence types
+- ✅ Voice notes (OpenAI Whisper) + OCR (Tesseract.js)
+- ✅ Live guard map (Leaflet + OSM)
+- ✅ Realtime live SLA board (web + mobile supervisor)
+- ✅ Self-service 2FA (TOTP)
+- ✅ GitHub Actions CI (typecheck + admin build)
+- ✅ Sentry opt-in error monitoring
+
+---
+
+## 20. Deployment & Operations
+
+See [`PRODUCTION.md`](PRODUCTION.md) for the full runbook including secret
+rotation cadence, monitoring setup, backup/DR, pre-release checklist, and
+common ops. The headline flow:
+
+```powershell
+# 1. Provision a Supabase project; grab URL + anon + service_role
+# 2. Fill the three .env files:
+#    - .env                       (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+#    - apps/admin/.env.local      (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY)
+#    - apps/mobile/.env           (EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY)
+
+# 3. Apply migrations
+npx supabase db push
+# OR paste supabase/_deploy_all.sql into the SQL editor
+
+# 4. Regenerate typed DB client
+npm run db:types
+
+# 5. Deploy edge functions
+npx supabase functions deploy `
+  pin-login pin-set `
+  admin-create-org admin-create-user admin-update-user `
+  admin-api-token admin-role-capability `
+  send-email webhook-deliver `
+  patrol-watcher sla-monitor `
+  transcribe-audio health-check
+
+# 6. Schedule cron jobs (in SQL editor, see supabase/schedule_sla_monitor.sql)
+#    SLA monitor:     */5 * * * *
+#    Patrol watcher:  */5 * * * *
+
+# 7. Seed demo accounts
 node --env-file=.env scripts/seed-accounts.mjs
+
+# 8. Production hosting
+#    - Admin → Vercel (root: apps/admin)
+#    - Mobile → Expo EAS for iOS + Android builds
 ```
 
-### Schedule the SLA watchdog (optional)
-Fill in `supabase/schedule_sla_monitor.sql` and run it (uses `pg_cron` + `pg_net`,
-every 5 min).
+### Secret rotation schedule
 
-### Run the apps
-```bash
-# Admin (http://localhost:3000) — needs apps/admin/.env.local
-npm run admin
-
-# Mobile — needs apps/mobile/.env
-cd apps/mobile && npm start
-```
-
-### Environment variables
-| File | Keys |
-| --- | --- |
-| `apps/admin/.env.local` | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
-| `apps/mobile/.env` | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` |
-| `.env` (root) | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` |
-
-### Regenerate DB types after schema changes
-```bash
-npm run db:types   # supabase gen types → packages/shared/src/database.types.ts
-```
+| Secret | Rotate |
+|---|---|
+| `SUPABASE_SERVICE_ROLE_KEY` | Every 90 days or on any suspected leak |
+| `SUPABASE_ANON_KEY` | Every 180 days or on RLS audit findings |
+| `RESEND_API_KEY`, `OPENAI_API_KEY`, `INTERNAL_FN_KEY` | Every 180 days |
+| Demo / seed passwords + PINs | Once, before go-live; never reused |
+| Org admin / guard PINs | When the employee leaves |
 
 ---
 
-## 16. Accounts
+## 21. Demo Accounts
 
-Seeded by `scripts/seed-accounts.mjs` (change passwords before production):
+After running `scripts/seed-accounts.mjs`, the following accounts exist on
+the `digilog-demo` org plus one cross-org super user:
 
-| Role | Email | Password | Site | Surface |
-| --- | --- | --- | --- | --- |
-| admin | `admin@digilog360.com` | `Admin123!` | HQ Central | web |
-| control_room | `control@digilog360.com` | `Control123!` | HQ Central | web |
-| supervisor | `supervisor@digilog360.com` | `Supervisor123!` | HQ Central | web + mobile |
-| guard | `guard@digilog360.com` | `Guard123!` | HQ Central | mobile |
-| control_room | `sandton.control@digilog360.com` | `Control123!` | Sandton | web |
-| guard | `sandton.guard@digilog360.com` | `Guard123!` | Sandton | mobile |
+| Surface | Email | Password | Role(s) |
+|---|---|---|---|
+| Web (super) | `super@digilog360.com` | `Super123!` | super_user |
+| Web (admin) | `admin@digilog360.com` | `Admin123!` | admin |
+| Web (manager) | `manager@digilog360.com` | `Manager123!` | manager |
+| Web (control) | `control@digilog360.com` | `Control123!` | control_room |
+| Web (supervisor) | `supervisor@digilog360.com` | `Supervisor123!` | supervisor |
+| Mobile (guard HQ) | org `digilog-demo` · emp `GRD001` | PIN `123456` | guard |
+| Mobile (guard Sandton) | org `digilog-demo` · emp `GRD002` | PIN `234561` | guard |
+| Mobile (supervisor) | org `digilog-demo` · emp `SUP001` | PIN `601234` | supervisor |
 
-The Sandton accounts exist to validate site-level RLS isolation.
+**Rotate all of these before going to production.** They exist exclusively for
+exercising the platform during development and demos.
 
 ---
 
-## 17. License
+## 22. License
 
-**Proprietary — © 2026 Kruz Naidoo. All Rights Reserved.**
+DigiLog 360 is **proprietary software** owned by **Kruz Naidoo**.
 
-This software and all associated materials are the exclusive intellectual
-property of Kruz Naidoo. No use, reproduction, modification, or distribution is
-permitted without express prior written authorization. See [`LICENSE`](LICENSE)
-for the full terms.
-#   D i g i L o g 3 6 0 V 1  
- 
+- See [`LICENSE`](LICENSE) for the full terms.
+- Copyright © 2026 Kruz Naidoo. All Rights Reserved.
+- Governed by the laws of the Republic of South Africa.
+- **No license, right, or permission to use, copy, modify, distribute,
+  sublicense, lease, sell, reverse-engineer, or otherwise exploit the
+  Software is granted to any person or entity** except by express prior
+  written permission of the Owner.
+- The Software incorporates third-party open-source components subject to
+  their respective licenses. Those licenses apply only to the third-party
+  components and not to the Software as a whole.
+
+For licensing inquiries, contact the Owner: **Kruz Naidoo**.
+
+---
+
+<div align="center">
+
+**DigiLog 360**
+Multi-Tenant Security Operations Platform
+© 2026 Kruz Naidoo. Proprietary & Confidential. All Rights Reserved.
+
+</div>

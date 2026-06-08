@@ -58,6 +58,7 @@ export interface Database {
           logged_by: string | null; logged_by_name: string | null; status: OccurrenceStatusEnum;
           is_patrol: boolean; sla_hours: number; sla_due_at: string | null;
           last_sla_update_at: string | null; closed_at: string | null;
+          category: string | null; subcategory: string | null;
           created_at: string; updated_at: string;
         };
         Insert: {
@@ -66,6 +67,7 @@ export interface Database {
           logged_by?: string | null; logged_by_name?: string | null; status?: OccurrenceStatusEnum;
           is_patrol?: boolean; sla_hours?: number; sla_due_at?: string | null;
           last_sla_update_at?: string | null; closed_at?: string | null;
+          category?: string | null; subcategory?: string | null;
           created_at?: string; updated_at?: string;
         };
         Update: Partial<Omit<Database['public']['Tables']['occurrences']['Insert'], 'id'>>;
@@ -93,7 +95,8 @@ export interface Database {
           responding_officer: string | null; emergency_services: string | null; external_case: string | null;
           cctv: string | null; cctv_times: string | null; property_damage: string | null;
           immediate_actions: string | null; next_steps: string | null; created_by: string | null;
-          created_by_name: string | null; status: OccurrenceStatusEnum; created_at: string; updated_at: string;
+          created_by_name: string | null; status: OccurrenceStatusEnum; auto_generated: boolean;
+          created_at: string; updated_at: string;
         };
         Insert: {
           id?: never; occurrence_id: number; ob_number?: string | null; severity?: SeverityEnum | null;
@@ -102,7 +105,8 @@ export interface Database {
           responding_officer?: string | null; emergency_services?: string | null; external_case?: string | null;
           cctv?: string | null; cctv_times?: string | null; property_damage?: string | null;
           immediate_actions?: string | null; next_steps?: string | null; created_by?: string | null;
-          created_by_name?: string | null; status?: OccurrenceStatusEnum; created_at?: string; updated_at?: string;
+          created_by_name?: string | null; status?: OccurrenceStatusEnum; auto_generated?: boolean;
+          created_at?: string; updated_at?: string;
         };
         Update: Partial<Omit<Database['public']['Tables']['occurrence_reports']['Insert'], 'id'>>;
         Relationships: [];
