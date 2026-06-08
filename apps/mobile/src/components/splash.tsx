@@ -12,18 +12,16 @@ import {
   Animated,
   ActivityIndicator,
   Easing,
-  Image,
   ImageBackground,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { theme, spacing } from '@/lib/theme';
+import { Logo } from '@/components/logo';
 import { BRAND } from '@digilog/shared';
 
 const bg = require('../../assets/splash-bg.png');
-const shield = require('../../assets/branding/digilog-logo.png');
-const wordmark = require('../../assets/branding/digilog-mark.png');
 
 export function BrandSplash({ status }: { status?: string }) {
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -60,9 +58,8 @@ export function BrandSplash({ status }: { status?: string }) {
         <Animated.View
           style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], alignItems: 'center' }}
         >
-          <Image source={shield} style={styles.shield} resizeMode="contain" />
-          <Image source={wordmark} style={styles.wordmark} resizeMode="contain" />
-          <Text style={styles.tagline} allowFontScaling={false}>
+          <Logo width={264} onDark />
+          <Text style={[styles.tagline, styles.taglineSpacing]} allowFontScaling={false}>
             {BRAND.tagline}
           </Text>
         </Animated.View>
@@ -86,12 +83,7 @@ export function BrandSplash({ status }: { status?: string }) {
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: theme.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  // Shield art is 391×280 (≈1.4:1); a 140×100 box keeps its true proportions
-  // so `contain` adds no letterbox padding.
-  shield: { width: 140, height: 100, marginBottom: spacing.lg },
-  // Wordmark art ("DigiLog360") is 534×94 (≈5.7:1). 252×44 matches that ratio
-  // so the name renders crisp and tightly lockups under the shield.
-  wordmark: { width: 252, height: 44, marginBottom: spacing.md },
+  taglineSpacing: { marginTop: spacing.md },
   tagline: {
     color: theme.textMuted,
     fontSize: 12,

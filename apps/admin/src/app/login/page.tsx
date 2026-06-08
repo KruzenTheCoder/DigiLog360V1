@@ -2,11 +2,11 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Image from 'next/image';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
+import { Logo } from '@/components/brand/logo';
 import { BRAND, WEB_ROLES } from '@digilog/shared';
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -70,15 +70,7 @@ function LoginForm() {
       {/* Brand panel */}
       <div className="relative hidden flex-col justify-between bg-brand-gradient p-12 text-white lg:flex">
         <div className="flex items-center gap-3">
-          <Image
-            src={BRAND.logo.monogram}
-            alt={`${BRAND.name} mark`}
-            width={48}
-            height={48}
-            className="rounded-md bg-white/10 p-1"
-            priority
-          />
-          <span className="text-2xl font-bold tracking-tight">{BRAND.name}</span>
+          <Logo className="text-3xl" onDark />
         </div>
         <div>
           <h1 className="text-4xl font-bold leading-tight">Security Operations Console</h1>
@@ -93,15 +85,8 @@ function LoginForm() {
       {/* Form */}
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-2 text-brand lg:hidden">
-            <Image
-              src={BRAND.logo.monogram}
-              alt={`${BRAND.name} mark`}
-              width={36}
-              height={36}
-              priority
-            />
-            <span className="text-xl font-bold">{BRAND.name}</span>
+          <div className="mb-8 flex items-center gap-2 lg:hidden">
+            <Logo className="text-2xl" />
           </div>
           <h2 className="text-2xl font-bold">Sign in</h2>
           <p className="mt-1 text-sm text-[hsl(var(--muted))]">Access the security console.</p>

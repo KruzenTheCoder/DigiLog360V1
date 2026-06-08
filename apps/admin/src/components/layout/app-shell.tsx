@@ -7,6 +7,7 @@ import * as Icons from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn, initials } from '@/lib/utils';
 import { visibleSections } from './nav-config';
+import { Logo } from '@/components/brand/logo';
 import { BRAND, ROLE_LABELS, type Profile } from '@digilog/shared';
 
 function Icon({ name, className }: { name: string; className?: string }) {
@@ -97,10 +98,9 @@ export function AppShell({
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="flex h-16 items-center gap-2 border-b px-5 text-brand">
-          <Icons.ShieldCheck className="h-7 w-7" />
-          <span className="text-lg font-bold tracking-tight">{BRAND.name}</span>
-        </div>
+        <Link href="/dashboard" className="flex h-16 items-center border-b px-5" aria-label={`${BRAND.name} home`}>
+          <Logo className="text-2xl" />
+        </Link>
         <nav className="flex h-[calc(100vh-4rem)] flex-col gap-5 overflow-y-auto scrollbar-thin p-3">
           {sections.map((section) => (
             <div key={section.title}>
