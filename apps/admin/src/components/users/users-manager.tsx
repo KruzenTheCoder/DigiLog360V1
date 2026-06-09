@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { Dialpad } from '@/components/ui/dialpad';
 import {
-  APP_ROLES, ROLE_LABELS, ROLE_DESCRIPTIONS, roleRank, profileRoles,
+  APP_ROLES, ROLE_LABELS, ROLE_COLORS, ROLE_DESCRIPTIONS, roleRank, profileRoles,
   type AppRole, type Profile, type Site,
 } from '@digilog/shared';
 
@@ -122,7 +122,12 @@ export function UsersManager({ users, sites, callerRoles, callerOrgId }: UsersMa
           >
             <Download className="h-4 w-4" /> Export CSV
           </Button>
-          <Button onClick={() => setAddOpen(true)}><UserPlus className="h-4 w-4" /> Add User</Button>
+          <Button
+            onClick={() => setAddOpen(true)}
+            className="bg-emerald-600 bg-none text-white shadow-sm hover:bg-emerald-700 hover:opacity-100"
+          >
+            <UserPlus className="h-4 w-4" /> Create New User
+          </Button>
         </div>
       </div>
 
@@ -141,8 +146,8 @@ export function UsersManager({ users, sites, callerRoles, callerOrgId }: UsersMa
                 <TD className="text-xs">{u.email}</TD>
                 <TD>
                   <div className="flex flex-wrap gap-1">
-                    {profileRoles(u).map((r, idx) => (
-                      <Badge key={r} color={idx === 0 ? '#667eea' : '#8b5cf6'}>
+                    {profileRoles(u).map((r) => (
+                      <Badge key={r} color={ROLE_COLORS[r]}>
                         {ROLE_LABELS[r]}
                       </Badge>
                     ))}

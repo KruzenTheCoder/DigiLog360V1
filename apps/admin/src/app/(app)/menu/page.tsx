@@ -1,9 +1,8 @@
-import { MapPin } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, loadMyCapabilities } from '@/lib/auth';
 import { visibleSections } from '@/components/layout/nav-config';
-import { MenuGrid } from '@/components/menu/menu-grid';
-import { profileRoles } from '@digilog/shared';
+import { RoleMenu, type RoleMenuData } from '@/components/menu/role-menu';
+import { profileRoles, type AppRole } from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,8 +24,25 @@ export default async function MenuPage() {
   const caps = await loadMyCapabilities();
   const supabase = await createClient();
 
-  const roles = profileRoles(profile);
-  const sections = visibleSections(roles.length > 0 ? roles : profile.role, caps);
+  // One menu per role the user holds, so multi-role users (e.g. Control Room +
+  // Manager) get a pill switcher. The role filter differentiates the tabs;
+  // common items appear under each. Fall back to the combined view if a single
+  // role resolves to nothing.
+  const roleList: AppRole[] = profileRoles(profile).length > 0 ? profileRoles(profile) : [profile.role];
+  const roleMenus: RoleMenuData[] = roleList
+    .map((role) => ({
+      role,
+      title: ROLE_MENU_TITLE[role] ?? 'Menu',
+      sections: visibleSections([role], caps),
+    }))
+    .filter((m) => m.sections.length > 0);
+  if (roleMenus.length === 0) {
+    roleMenus.push({
+      role: roleList[0],
+      title: ROLE_MENU_TITLE[roleList[0]] ?? 'Menu',
+      sections: visibleSections(roleList, caps),
+    });
+  }
 
   let siteName: string | null = null;
   if (profile.site_id && profile.role !== 'admin' && profile.role !== 'super_user') {
@@ -50,41 +66,5 @@ export default async function MenuPage() {
     { label: 'Critical', value: critical ?? 0, accent: 'bg-red-500' },
   ];
 
-  const title = ROLE_MENU_TITLE[profile.role] ?? 'Menu';
-
-  return (
-    <>
-      {/* Banner */}
-      <div className="mb-6 overflow-hidden rounded-2xl bg-brand-gradient p-6 text-white shadow-lg">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-            <p className="mt-1 text-sm text-white/85">Select a dashboard or action to proceed.</p>
-          </div>
-          {siteName && (
-            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium backdrop-blur-sm">
-              <MapPin className="h-4 w-4" />
-              {siteName}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* KPI strip */}
-      <div className="mb-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {kpis.map((k) => (
-          <div key={k.label} className="flex items-stretch overflow-hidden rounded-xl border bg-[hsl(var(--surface))] shadow-sm">
-            <span className={`w-1.5 shrink-0 ${k.accent}`} />
-            <div className="px-4 py-3">
-              <p className="text-2xl font-extrabold leading-tight">{k.value}</p>
-              <p className="text-xs text-[hsl(var(--muted))]">{k.label}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Action cards */}
-      <MenuGrid sections={sections} />
-    </>
-  );
+  return <RoleMenu roleMenus={roleMenus} kpis={kpis} siteName={siteName} />;
 }

@@ -16,6 +16,16 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   guard: 'Guard',
 };
 
+/** Per-role accent colours (hex) for badges/pills — web + native. */
+export const ROLE_COLORS: Record<AppRole, string> = {
+  super_user: '#4f46e5',  // indigo
+  admin: '#dc2626',       // red
+  manager: '#7c3aed',     // violet
+  control_room: '#d97706',// amber
+  supervisor: '#0891b2',  // cyan
+  guard: '#16a34a',       // green
+};
+
 export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
   super_user: 'Cross-organization owner. Manages all tenants, billing, impersonation.',
   admin: 'Full control of a single organization. Manages users, sites and settings.',
