@@ -67,8 +67,22 @@ export default async function ReviewedLogsPage() {
     occMap = new Map(((occs ?? []) as OccLite[]).map((o) => [o.id, o]));
   }
 
+  // Legacy acknowledgements (signed off before the bulk_id column existed)
+  // have no bulk_id, so a bulk sign-off shows up as individual rows. Rebuild
+  // the grouping for them: anything sharing the same reviewer + decision +
+  // notes + review minute was one sign-off action (DB now() / a single click),
+  // so collapse those into one bulk entry too.
+  const legacyKey = (a: AckWithBulk) =>
+    [
+      a.reviewed_by_name ?? '',
+      a.decision,
+      a.manager_notes ?? '',
+      new Date(a.reviewed_at).toISOString().slice(0, 16), // to the minute
+    ].join('|');
+
   const rows: RowEntry[] = [];
   const seenBulk = new Set<string>();
+  const seenLegacy = new Set<string>();
   for (const a of acks) {
     if (a.bulk_id) {
       if (seenBulk.has(a.bulk_id)) continue;
@@ -85,7 +99,24 @@ export default async function ReviewedLogsPage() {
         items: members,
       });
     } else {
-      rows.push({ kind: 'single', ack: a });
+      const key = legacyKey(a);
+      if (seenLegacy.has(key)) continue;
+      seenLegacy.add(key);
+      const members = acks.filter((x) => !x.bulk_id && legacyKey(x) === key);
+      if (members.length > 1) {
+        rows.push({
+          kind: 'bulk',
+          bulkId: `legacy:${key}`,
+          reviewedAt: a.reviewed_at,
+          reviewerName: a.reviewed_by_name,
+          decision: a.decision,
+          notes: a.manager_notes,
+          signature: a.signature_data_url ?? null,
+          items: members,
+        });
+      } else {
+        rows.push({ kind: 'single', ack: a });
+      }
     }
   }
 
