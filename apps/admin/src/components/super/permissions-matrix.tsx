@@ -48,6 +48,12 @@ export function PermissionsMatrix({
   function isGranted(role: AppRole, cap: string) { return granted.has(key(role, cap)); }
   function isPending(role: AppRole, cap: string) { return pending.has(key(role, cap)); }
 
+  // Super users may write role_capabilities directly (RLS policy
+  // `role_caps_write`), so we mutate the table from the client instead of going
+  // through the admin-role-capability edge function. That removes the flaky
+  // function-response round-trip that was surfacing "Failed to send a request
+  // to the Edge Function" even when the write had succeeded.
+
   async function toggle(role: AppRole, cap: string) {
     const k = key(role, cap);
     const wantGranted = !granted.has(k);
@@ -60,51 +66,30 @@ export function PermissionsMatrix({
     });
 
     const supabase = createClient();
-    const { error } = await supabase.functions.invoke('admin-role-capability', {
-      body: {
-        mode: wantGranted ? 'grant' : 'revoke',
-        org_id: selectedOrgId,
-        role,
-        capability_key: cap,
-      },
-    });
-
-    // The edge function can persist the change yet still surface a transport
-    // error to the browser (a CORS/relay hiccup on the *response* — the write
-    // already happened server-side). So don't trust the invoke result: read
-    // the row back and reconcile the checkbox to the real DB state. Only report
-    // a failure when the change genuinely didn't land.
-    let actuallyGranted = wantGranted;
-    // role_capabilities isn't in the generated types — cast like elsewhere.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: row, error: readErr } = await (supabase as any)
-      .from('role_capabilities')
-      .select('capability_key')
-      .eq('org_id', selectedOrgId)
-      .eq('role', role)
-      .eq('capability_key', cap)
-      .maybeSingle();
-    if (!readErr) {
-      actuallyGranted = !!row;
-    } else {
-      // Couldn't verify — fall back to whatever the invoke reported.
-      actuallyGranted = error ? !wantGranted : wantGranted;
-    }
+    const rc = (supabase as any).from('role_capabilities');
+    const { error } = wantGranted
+      ? await rc.upsert(
+          { org_id: selectedOrgId, role, capability_key: cap },
+          { onConflict: 'org_id,role,capability_key', ignoreDuplicates: true },
+        )
+      : await rc.delete()
+          .eq('org_id', selectedOrgId).eq('role', role).eq('capability_key', cap);
 
-    setGranted((prev) => {
-      const next = new Set(prev);
-      if (actuallyGranted) next.add(k); else next.delete(k);
-      return next;
-    });
     setPending((prev) => {
       const next = new Set(prev);
       next.delete(k);
       return next;
     });
 
-    if (actuallyGranted !== wantGranted) {
-      const detail = (error as { message?: string } | null)?.message;
-      alert(detail ? `Could not save: ${detail}` : 'Could not save the permission change. Please try again.');
+    if (error) {
+      // Genuine failure — roll back and report.
+      setGranted((prev) => {
+        const next = new Set(prev);
+        if (wantGranted) next.delete(k); else next.add(k);
+        return next;
+      });
+      alert(`Could not save: ${error.message}`);
     }
   }
 
@@ -127,13 +112,18 @@ export function PermissionsMatrix({
     });
 
     const supabase = createClient();
-    await supabase.functions.invoke('admin-role-capability', {
-      body: {
-        mode: 'bulk', org_id: selectedOrgId, role, action, capability_keys: visibleKeys,
-      },
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rc = (supabase as any).from('role_capabilities');
+    const { error } = action === 'grant'
+      ? await rc.upsert(
+          visibleKeys.map((kk) => ({ org_id: selectedOrgId, role, capability_key: kk })),
+          { onConflict: 'org_id,role,capability_key', ignoreDuplicates: true },
+        )
+      : await rc.delete()
+          .eq('org_id', selectedOrgId).eq('role', role).in('capability_key', visibleKeys);
 
     setPending(new Set());
+    if (error) alert(`Could not save: ${error.message}`);
     startTransition(() => router.refresh());
   }
 
