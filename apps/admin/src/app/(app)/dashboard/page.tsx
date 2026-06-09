@@ -5,7 +5,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { MonthlyTrendChart, CategoryDonut, PALETTE } from '@/components/dashboard/dashboard-charts';
 import { HeroKpi } from '@/components/dashboard/hero-kpi';
 import { SeverityCards } from '@/components/dashboard/severity-cards';
-import { isSlaBreached, isSlaUpdateDue, SEVERITIES } from '@digilog/shared';
+import { SlaComplianceReport } from '@/components/dashboard/sla-compliance';
+import { isSlaBreached, isSlaUpdateDue, SEVERITIES, SEVERITY_LABELS } from '@digilog/shared';
 import type { Occurrence } from '@digilog/shared';
 
 // Minimal projection — exactly the columns the dashboard aggregates over.
@@ -98,6 +99,53 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   occ30.forEach((o) => { const s = o.site_name ?? 'Unassigned'; siteMap.set(s, (siteMap.get(s) ?? 0) + 1); });
   const topSites = [...siteMap.entries()].map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count).slice(0, 5);
+
+  // ---- SLA breach analysis & compliance (last 30 days) ----
+  // An occurrence "breached" if its end time (close time, or now if still open)
+  // is past its SLA due time. Only occurrences with an SLA window are scored.
+  const slaEnd = (o: DashboardOcc) =>
+    (o.status === 'resolved' || o.status === 'closed') && o.closed_at
+      ? new Date(o.closed_at).getTime()
+      : now.getTime();
+  const breachedEver = (o: DashboardOcc) =>
+    !!o.sla_due_at && slaEnd(o) > new Date(o.sla_due_at).getTime();
+
+  const slaScoped = occ30.filter((o) => o.sla_due_at);
+  const slaTotal = slaScoped.length;
+  const slaBreaches = slaScoped.filter(breachedEver);
+  const slaBreachCount = slaBreaches.length;
+  const slaWithin = slaTotal - slaBreachCount;
+  const complianceRate = slaTotal ? Math.round((slaWithin / slaTotal) * 100) : 100;
+  const avgOverageHrs = slaBreachCount
+    ? Math.round(
+        (slaBreaches.reduce((sum, o) => sum + (slaEnd(o) - new Date(o.sla_due_at as string).getTime()), 0)
+          / slaBreachCount) / 36e5 * 10,
+      ) / 10
+    : 0;
+
+  const slaBySeverity = SEVERITIES.map((sev) => {
+    const rows = slaScoped.filter((o) => o.severity === sev);
+    const br = rows.filter(breachedEver).length;
+    return {
+      key: sev, label: SEVERITY_LABELS[sev], total: rows.length, breached: br,
+      compliance: rows.length ? Math.round(((rows.length - br) / rows.length) * 100) : 100,
+    };
+  }).filter((s) => s.total > 0);
+
+  const slaSiteMap = new Map<string, { total: number; breached: number }>();
+  slaScoped.forEach((o) => {
+    const s = o.site_name ?? 'Unassigned';
+    const cur = slaSiteMap.get(s) ?? { total: 0, breached: 0 };
+    cur.total++; if (breachedEver(o)) cur.breached++;
+    slaSiteMap.set(s, cur);
+  });
+  const slaBySite = [...slaSiteMap.entries()]
+    .map(([name, v]) => ({
+      name, total: v.total, breached: v.breached,
+      compliance: v.total ? Math.round(((v.total - v.breached) / v.total) * 100) : 100,
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
 
   // Monthly trend (6 months)
   const monthMap = new Map<string, { count: number; breached: number }>();
@@ -274,6 +322,19 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           Severity Distribution
         </h2>
         <SeverityCards counts={severityCounts} />
+      </div>
+
+      {/* SLA breach analysis & compliance tracking */}
+      <div className="mt-5">
+        <SlaComplianceReport
+          complianceRate={complianceRate}
+          within={slaWithin}
+          breached={slaBreachCount}
+          total={slaTotal}
+          avgOverageHrs={avgOverageHrs}
+          bySeverity={slaBySeverity}
+          bySite={slaBySite}
+        />
       </div>
     </>
   );
