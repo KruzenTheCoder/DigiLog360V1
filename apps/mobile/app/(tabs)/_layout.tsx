@@ -8,6 +8,8 @@ import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/lib/theme';
 import { haptic } from '@/components/primitives';
+import { useAuth } from '@/lib/auth';
+import { hasAnyCapability, type CapabilityKey } from '@digilog/shared';
 
 // React-Navigation listener that fires a haptic on every tab tap (including
 // re-taps of the current tab). Shared across all four tab screens so the
@@ -22,8 +24,18 @@ export default function TabsLayout() {
   // tab icons and labels — especially obvious on gesture-nav Android devices
   // where the OS draws a translucent pill across the bottom of the screen.
   const insets = useSafeAreaInsets();
+  const { capabilities } = useAuth();
   const baseHeight = 60;
   const basePaddingBottom = 8;
+
+  // A tab is shown if the user holds any of its capabilities. While caps are
+  // still loading (`null`), show optimistically so the bar doesn't flash empty;
+  // once resolved, ungranted tabs disappear. Passing `href: null` removes the
+  // tab from the bar (the route stays reachable only by explicit deep link).
+  const allow = (keys: CapabilityKey[]) =>
+    capabilities === null || hasAnyCapability(capabilities, keys);
+  const hideUnless = (keys: CapabilityKey[]) => (allow(keys) ? undefined : { href: null as null });
+
   return (
     <Tabs
       screenOptions={{
@@ -54,6 +66,7 @@ export default function TabsLayout() {
         options={{
           title: 'Patrol',
           tabBarIcon: ({ color, size }) => <Ionicons name="walk" size={size} color={color} />,
+          ...hideUnless(['patrols.run', 'patrols.view']),
         }}
       />
       <Tabs.Screen
@@ -67,6 +80,7 @@ export default function TabsLayout() {
               <Ionicons name="add-circle" size={size + 6} color={color} />
             </View>
           ),
+          ...hideUnless(['occurrences.log']),
         }}
       />
       <Tabs.Screen
@@ -75,6 +89,7 @@ export default function TabsLayout() {
         options={{
           title: 'My Logs',
           tabBarIcon: ({ color, size }) => <Ionicons name="list" size={size} color={color} />,
+          ...hideUnless(['occurrences.view_assigned', 'occurrences.view_all']),
         }}
       />
     </Tabs>

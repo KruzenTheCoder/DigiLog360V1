@@ -33,7 +33,7 @@ const ZERO_STATS: Stats = {
 };
 
 export default function Home() {
-  const { profile } = useAuth();
+  const { profile, can } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<Stats>(ZERO_STATS);
   const [loading, setLoading] = useState(true);
@@ -117,6 +117,15 @@ export default function Home() {
   const firstName = (profile.full_name ?? profile.email ?? 'Guard').split(/\s+/)[0];
   const myRoles = profileRoles(profile);
 
+  // Capability gates for the quick-action tiles. Toggled by the super-user
+  // permissions matrix; a role without the grant never sees the tile.
+  const canLog = can('occurrences.log');
+  const canPatrol = can('patrols.run') || can('patrols.view');
+  const canVisitors = can('visitors.manage');
+  const canKeys = can('keys.manage');
+  const canShift = can('shifts.clock');
+  const canTeam = can('team.view');
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <ScrollView
@@ -198,20 +207,32 @@ export default function Home() {
         {/* ----- Quick actions ----- */}
         <SectionTitle>Quick actions</SectionTitle>
         <View style={styles.tilesGrid}>
-          <IconTile icon="document-text" label="Log occurrence" onPress={() => router.push('/(tabs)/new')} />
-          <IconTile icon="walk" label="Patrol" onPress={() => router.push('/(tabs)/patrol')}
-            tint={stats.activePatrol ? theme.success : theme.brand}
-            badge={stats.activePatrol ? '●' : undefined} />
-          <IconTile icon="qr-code" label="Scan" onPress={() => router.push('/scan')} tint={theme.info} />
-          <IconTile icon="people" label="Visitors" onPress={() => router.push('/gate/visitors')} tint={theme.warning}
-            badge={stats.onSiteVisitors || undefined} />
-          <IconTile icon="key" label="Keys" onPress={() => router.push('/gate/keys')} tint={theme.brand} />
-          <IconTile icon="time" label="My shift" onPress={() => router.push('/shift')}
-            tint={stats.onShift ? theme.success : theme.brand} />
+          {canLog && (
+            <IconTile icon="document-text" label="Log occurrence" onPress={() => router.push('/(tabs)/new')} />
+          )}
+          {canPatrol && (
+            <IconTile icon="walk" label="Patrol" onPress={() => router.push('/(tabs)/patrol')}
+              tint={stats.activePatrol ? theme.success : theme.brand}
+              badge={stats.activePatrol ? '●' : undefined} />
+          )}
+          {(canPatrol || canLog) && (
+            <IconTile icon="qr-code" label="Scan" onPress={() => router.push('/scan')} tint={theme.info} />
+          )}
+          {canVisitors && (
+            <IconTile icon="people" label="Visitors" onPress={() => router.push('/gate/visitors')} tint={theme.warning}
+              badge={stats.onSiteVisitors || undefined} />
+          )}
+          {canKeys && (
+            <IconTile icon="key" label="Keys" onPress={() => router.push('/gate/keys')} tint={theme.brand} />
+          )}
+          {canShift && (
+            <IconTile icon="time" label="My shift" onPress={() => router.push('/shift')}
+              tint={stats.onShift ? theme.success : theme.brand} />
+          )}
         </View>
 
         {/* ----- Supervisor extras ----- */}
-        {isSupervisor && (
+        {isSupervisor && canTeam && (
           <>
             <SectionTitle>Supervisor</SectionTitle>
             <View style={styles.tilesGrid}>

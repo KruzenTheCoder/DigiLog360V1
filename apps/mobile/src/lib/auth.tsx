@@ -4,7 +4,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
-import { MOBILE_ROLES, type Profile } from '@digilog/shared';
+import { MOBILE_ROLES, hasCapability, type CapabilityKey, type Profile } from '@digilog/shared';
 
 interface PinLoginInput {
   org_slug: string;
@@ -15,6 +15,14 @@ interface AuthState {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  /**
+   * The capability keys this user holds, resolved from the super-user
+   * permissions matrix (`public.my_capabilities`). `null` means "still
+   * loading"; a set containing `'*'` means super-user (everything).
+   */
+  capabilities: Set<string> | null;
+  /** Convenience gate — true if the user holds `key` (or is super-user). */
+  can: (key: CapabilityKey | string) => boolean;
   signInWithPin: (input: PinLoginInput) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -23,16 +31,39 @@ interface AuthState {
 const AuthContext = createContext<AuthState>({} as AuthState);
 export const useAuth = () => useContext(AuthContext);
 
+// Resolve the capability set for a profile. Mirrors the web's
+// loadMyCapabilities: super-user short-circuits to everything; everyone else
+// reads the grants the super-user toggled for their role + org.
+async function resolveCapabilities(prof: Profile | null): Promise<Set<string>> {
+  if (!prof) return new Set();
+  const roles = Array.isArray(prof.roles) && prof.roles.length > 0 ? prof.roles : [prof.role];
+  if (roles.includes('super_user')) return new Set(['*']);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any).from('my_capabilities').select('key');
+  const set = new Set<string>();
+  for (const r of (data ?? []) as { key: string }[]) set.add(r.key);
+  return set;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [capabilities, setCapabilities] = useState<Set<string> | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadProfile = useCallback(async (userId: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-    setProfile((data as unknown as Profile) ?? null);
-    return data as unknown as Profile | null;
+    const prof = (data as unknown as Profile) ?? null;
+    setProfile(prof);
+    // Resolve capabilities alongside the profile so views gate correctly.
+    setCapabilities(await resolveCapabilities(prof));
+    return prof;
   }, []);
+
+  const can = useCallback(
+    (key: CapabilityKey | string) => hasCapability(capabilities, key),
+    [capabilities],
+  );
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -44,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       if (newSession?.user) loadProfile(newSession.user.id);
-      else setProfile(null);
+      else { setProfile(null); setCapabilities(null); }
     });
 
     return () => sub.subscription.unsubscribe();
@@ -109,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setProfile(null);
+    setCapabilities(null);
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -117,7 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, profile, loading, signInWithPin, signOut, refreshProfile }}
+      value={{ session, profile, loading, capabilities, can, signInWithPin, signOut, refreshProfile }}
     >
       {children}
     </AuthContext.Provider>
