@@ -7,7 +7,48 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { SEVERITY_COLORS } from '@digilog/shared';
 
-const PALETTE = ['#667eea', '#764ba2', '#0ea5e9', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6'];
+export const PALETTE = ['#667eea', '#764ba2', '#0ea5e9', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+export function CategoryDonut({ data }: { data: { name: string; count: number }[] }) {
+  const total = data.reduce((s, d) => s + d.count, 0);
+  return (
+    <Card className="h-full">
+      <CardHeader><CardTitle>Incident Breakdown by Category</CardTitle></CardHeader>
+      <CardContent>
+        <div className="flex flex-col items-center gap-5 sm:flex-row">
+          <div className="relative h-52 w-52 shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={data} dataKey="count" nameKey="name" innerRadius={62} outerRadius={88} paddingAngle={2}>
+                  {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-3xl font-extrabold">{total}</span>
+              <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--muted))]">Total incidents</span>
+            </div>
+          </div>
+          <ul className="flex-1 space-y-2 self-center">
+            {data.length === 0 && <li className="text-sm text-[hsl(var(--muted))]">No data yet.</li>}
+            {data.map((d, i) => {
+              const pct = total ? Math.round((d.count / total) * 100) : 0;
+              return (
+                <li key={d.name} className="flex items-center gap-2 text-sm">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} />
+                  <span className="flex-1 truncate">{d.name}</span>
+                  <span className="text-[hsl(var(--muted))]">{d.count}</span>
+                  <span className="w-9 text-right font-semibold">{pct}%</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function MonthlyTrendChart({ data }: { data: { month: string; count: number; breached: number }[] }) {
   return (

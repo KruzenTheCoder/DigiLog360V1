@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
 import { PageHeader } from '@/components/page-header';
-import { StatCard } from '@/components/stat-card';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { MonthlyTrendChart, TypeBreakdownChart, SeverityPie } from '@/components/dashboard/dashboard-charts';
-import { isSlaBreached, isSlaUpdateDue, SEVERITIES, SEVERITY_LABELS } from '@digilog/shared';
+import { MonthlyTrendChart, CategoryDonut, PALETTE } from '@/components/dashboard/dashboard-charts';
+import { HeroKpi } from '@/components/dashboard/hero-kpi';
+import { SeverityCards } from '@/components/dashboard/severity-cards';
+import { isSlaBreached, isSlaUpdateDue, SEVERITIES } from '@digilog/shared';
 import type { Occurrence } from '@digilog/shared';
 
 // Minimal projection — exactly the columns the dashboard aggregates over.
@@ -51,19 +52,38 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
 
   const occ = (data ?? []) as DashboardOcc[];
   const now = new Date();
-  const todayStr = now.toDateString();
   const last30 = new Date(now.getTime() - 30 * 864e5);
-  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
-
+  const last60 = new Date(now.getTime() - 60 * 864e5);
   const occ30 = occ.filter((o) => new Date(o.incident_at) >= last30);
   const total30 = occ30.length;
-  const today = occ30.filter((o) => new Date(o.incident_at).toDateString() === todayStr).length;
-  const thisWeek = occ30.filter((o) => new Date(o.incident_at) >= weekStart).length;
   const open = occ30.filter((o) => o.status === 'open').length;
   const resolved = occ30.filter((o) => o.status === 'resolved' || o.status === 'closed').length;
   const resolutionRate = total30 ? Math.round((resolved / total30) * 100) : 0;
   const breached = occ.filter((o) => isSlaBreached(o, now)).length;
   const updateDue = occ.filter((o) => isSlaUpdateDue(o, now) && !isSlaBreached(o, now)).length;
+
+  // Previous 30-day window (days 31–60) for the trend delta on the hero card.
+  const prevTotal = occ.filter((o) => {
+    const d = new Date(o.incident_at);
+    return d >= last60 && d < last30;
+  }).length;
+  const trendPct = prevTotal ? Math.round(((total30 - prevTotal) / prevTotal) * 1000) / 10 : null;
+
+  // Average time-to-close (hours) over occurrences closed in the last 30 days.
+  const closed30 = occ30.filter((o) => o.closed_at);
+  const avgResolutionHrs = closed30.length
+    ? Math.round(
+        (closed30.reduce((sum, o) =>
+          sum + (new Date(o.closed_at as string).getTime() - new Date(o.incident_at).getTime()), 0)
+          / closed30.length) / 36e5,
+      )
+    : 0;
+
+  // Severity counts for all four levels (including zeros) for the distribution row.
+  const severityCounts = SEVERITIES.reduce((acc, key) => {
+    acc[key] = occ30.filter((o) => o.severity === key).length;
+    return acc;
+  }, {} as Record<(typeof SEVERITIES)[number], number>);
 
   // Type breakdown (top 7)
   const typeMap = new Map<string, number>();
@@ -72,11 +92,6 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 7);
-
-  // Severity mix
-  const severityMix = SEVERITIES.map((key) => ({
-    key, name: SEVERITY_LABELS[key], value: occ30.filter((o) => o.severity === key).length,
-  })).filter((s) => s.value > 0);
 
   // Top sites
   const siteMap = new Map<string, number>();
@@ -104,8 +119,8 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   return (
     <>
       <PageHeader
-        title="Dashboard"
-        description={`Operational overview — last 30 days${activeSite ? ` · ${activeSite.name}` : profile.role === 'admin' ? ' · all sites' : ''}`}
+        title="Performance Dashboard"
+        description={`Real-time analytics & key performance indicators — last 30 days${activeSite ? ` · ${activeSite.name}` : profile.role === 'admin' ? ' · all sites' : ''}`}
       />
 
       {(allSites ?? []).length > 1 && (
@@ -144,22 +159,94 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Incidents (30d)" value={total30} icon="ClipboardList" hint={`${today} today · ${thisWeek} this week`} tone="brand" />
-        <StatCard label="Open" value={open} icon="FolderOpen" tone="default" />
-        <StatCard label="SLA Breached" value={breached} icon="AlertTriangle" tone="danger" />
-        <StatCard label="Resolution Rate" value={`${resolutionRate}%`} icon="CheckCircle2" hint={`${resolved} resolved`} tone="success" />
+      {/* Hero KPIs */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <HeroKpi
+          tone="red"
+          icon="TriangleAlert"
+          label="Total Incidents"
+          sublabel="Last 30 days"
+          value={total30}
+          footer={
+            trendPct === null
+              ? <span>No prior period</span>
+              : trendPct === 0
+                ? <span>No change vs previous period</span>
+                : <span>{trendPct < 0 ? '↓' : '↑'} {Math.abs(trendPct)}% vs previous period</span>
+          }
+        />
+        <HeroKpi
+          tone="blue"
+          icon="ShieldAlert"
+          label="Highest Risk"
+          sublabel="Category"
+          value={typeBreakdown[0]?.name ?? '—'}
+          footer={`${typeBreakdown[0]?.count ?? 0} incidents logged`}
+        />
+        <HeroKpi
+          tone="green"
+          icon="Clock"
+          label="Avg Resolution"
+          sublabel="Time to close"
+          value={`${avgResolutionHrs} Hrs`}
+          footer="Target: < 4 hours"
+        />
       </div>
 
+      {/* Quick operational counters */}
+      <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {[
+          { label: 'Open / Live', value: open, accent: 'bg-amber-400' },
+          { label: 'Resolved / Closed', value: resolved, accent: 'bg-emerald-400' },
+          { label: 'SLA Breached', value: breached, accent: 'bg-red-400' },
+          { label: 'Resolution Rate', value: `${resolutionRate}%`, accent: 'bg-brand' },
+        ].map((c) => (
+          <Card key={c.label} className="flex items-stretch overflow-hidden p-0">
+            <span className={`w-1.5 shrink-0 ${c.accent}`} />
+            <div className="px-4 py-3">
+              <p className="text-2xl font-extrabold leading-tight">{c.value}</p>
+              <p className="text-xs text-[hsl(var(--muted))]">{c.label}</p>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Category breakdown + high-frequency incidents */}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <MonthlyTrendChart data={monthly} />
-        <TypeBreakdownChart data={typeBreakdown} />
+        <CategoryDonut data={typeBreakdown} />
+        <Card className="h-full">
+          <CardHeader><CardTitle>High-Frequency Incidents</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            {typeBreakdown.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
+            {typeBreakdown.map((t, i) => {
+              const pct = total30 ? Math.round((t.count / total30) * 100) : 0;
+              const color = PALETTE[i % PALETTE.length];
+              return (
+                <div key={t.name}>
+                  <div className="mb-1 flex items-center justify-between text-sm">
+                    <span className="font-medium">{t.name}</span>
+                    <span
+                      className="rounded-md px-1.5 py-0.5 text-xs font-semibold text-white"
+                      style={{ background: color }}
+                    >
+                      {pct}%
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                  </div>
+                  <p className="mt-1 text-xs text-[hsl(var(--muted))]">{t.count} total incidents</p>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">
-        <SeverityPie data={severityMix} />
-        <Card className="lg:col-span-2">
-          <CardHeader><CardTitle>Top Sites</CardTitle></CardHeader>
+      {/* Volume by site + monthly trend */}
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <Card className="h-full">
+          <CardHeader><CardTitle>Occurrence Volume by Site</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {topSites.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
             {topSites.map((s) => {
@@ -170,7 +257,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
                     <span>{s.name}</span>
                     <span className="text-[hsl(var(--muted))]">{s.count} ({pct}%)</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                     <div className="h-full rounded-full bg-brand-gradient" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
@@ -178,6 +265,15 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
             })}
           </CardContent>
         </Card>
+        <MonthlyTrendChart data={monthly} />
+      </div>
+
+      {/* Severity distribution */}
+      <div className="mt-5">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
+          Severity Distribution
+        </h2>
+        <SeverityCards counts={severityCounts} />
       </div>
     </>
   );
