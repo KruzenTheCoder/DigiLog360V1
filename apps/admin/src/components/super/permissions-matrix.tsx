@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Plus, Search, Trash2, CheckSquare, Square } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -35,45 +35,76 @@ export function PermissionsMatrix({
     return s;
   });
 
+  // Re-sync from the server whenever the grants prop changes (after a
+  // router.refresh from a bulk action / capability delete), so the checkboxes
+  // always reflect the persisted DB state.
+  useEffect(() => {
+    const s = new Set<string>();
+    for (const g of grants) s.add(`${g.role}::${g.capability_key}`);
+    setGranted(s);
+  }, [grants]);
+
   function key(role: AppRole, cap: string) { return `${role}::${cap}`; }
   function isGranted(role: AppRole, cap: string) { return granted.has(key(role, cap)); }
   function isPending(role: AppRole, cap: string) { return pending.has(key(role, cap)); }
 
   async function toggle(role: AppRole, cap: string) {
     const k = key(role, cap);
-    const hadIt = granted.has(k);
+    const wantGranted = !granted.has(k);
     setPending((prev) => new Set(prev).add(k));
     // Optimistic update
     setGranted((prev) => {
       const next = new Set(prev);
-      if (hadIt) next.delete(k); else next.add(k);
+      if (wantGranted) next.add(k); else next.delete(k);
       return next;
     });
 
     const supabase = createClient();
     const { error } = await supabase.functions.invoke('admin-role-capability', {
       body: {
-        mode: hadIt ? 'revoke' : 'grant',
+        mode: wantGranted ? 'grant' : 'revoke',
         org_id: selectedOrgId,
         role,
         capability_key: cap,
       },
     });
 
+    // The edge function can persist the change yet still surface a transport
+    // error to the browser (a CORS/relay hiccup on the *response* — the write
+    // already happened server-side). So don't trust the invoke result: read
+    // the row back and reconcile the checkbox to the real DB state. Only report
+    // a failure when the change genuinely didn't land.
+    let actuallyGranted = wantGranted;
+    // role_capabilities isn't in the generated types — cast like elsewhere.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: row, error: readErr } = await (supabase as any)
+      .from('role_capabilities')
+      .select('capability_key')
+      .eq('org_id', selectedOrgId)
+      .eq('role', role)
+      .eq('capability_key', cap)
+      .maybeSingle();
+    if (!readErr) {
+      actuallyGranted = !!row;
+    } else {
+      // Couldn't verify — fall back to whatever the invoke reported.
+      actuallyGranted = error ? !wantGranted : wantGranted;
+    }
+
+    setGranted((prev) => {
+      const next = new Set(prev);
+      if (actuallyGranted) next.add(k); else next.delete(k);
+      return next;
+    });
     setPending((prev) => {
       const next = new Set(prev);
       next.delete(k);
       return next;
     });
 
-    if (error) {
-      // Roll back
-      setGranted((prev) => {
-        const next = new Set(prev);
-        if (hadIt) next.add(k); else next.delete(k);
-        return next;
-      });
-      alert(error.message);
+    if (actuallyGranted !== wantGranted) {
+      const detail = (error as { message?: string } | null)?.message;
+      alert(detail ? `Could not save: ${detail}` : 'Could not save the permission change. Please try again.');
     }
   }
 
