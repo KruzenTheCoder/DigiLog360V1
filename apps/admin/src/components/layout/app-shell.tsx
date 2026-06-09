@@ -37,10 +37,14 @@ export function AppShell({
   const sections = visibleSections(roleList, caps);
 
   // Admin / Manager / Control Room navigate from the /menu hub (full card
-  // grid), so the sidebar is redundant for them. Hide it when every role the
-  // user holds is one of those — super_user / supervisor keep the sidebar.
+  // grid), so the sidebar is redundant for them. Hide it when the user holds
+  // any of those roles — even alongside another non-super role (e.g. a control
+  // room operator who is also a supervisor). The super_user keeps the sidebar
+  // since it's the platform-wide admin surface.
   const SIDEBARLESS_ROLES = ['admin', 'manager', 'control_room'];
-  const hideSidebar = roleList.length > 0 && roleList.every((r) => SIDEBARLESS_ROLES.includes(r));
+  const hideSidebar =
+    !roleList.includes('super_user') &&
+    roleList.some((r) => SIDEBARLESS_ROLES.includes(r));
 
   // Restore persisted theme on mount. Uses prefers-color-scheme as default
   // before any user choice has been saved.
