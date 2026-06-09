@@ -18,7 +18,20 @@
     "db:types": "supabase gen types typescript --linked > packages/shared/src/database.types.ts",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset",
-    "functions:deploy": "supabase functions deploy"
+    "functions:deploy": "supabase functions deploy",
+    "functions:deploy:admin-api-token": "supabase functions deploy admin-api-token",
+    "functions:deploy:admin-create-org": "supabase functions deploy admin-create-org",
+    "functions:deploy:admin-create-user": "supabase functions deploy admin-create-user",
+    "functions:deploy:admin-role-capability": "supabase functions deploy admin-role-capability",
+    "functions:deploy:admin-update-user": "supabase functions deploy admin-update-user",
+    "functions:deploy:health-check": "supabase functions deploy health-check",
+    "functions:deploy:patrol-watcher": "supabase functions deploy patrol-watcher",
+    "functions:deploy:pin-login": "supabase functions deploy pin-login",
+    "functions:deploy:pin-set": "supabase functions deploy pin-set",
+    "functions:deploy:send-email": "supabase functions deploy send-email",
+    "functions:deploy:sla-monitor": "supabase functions deploy sla-monitor",
+    "functions:deploy:transcribe-audio": "supabase functions deploy transcribe-audio",
+    "functions:deploy:webhook-deliver": "supabase functions deploy webhook-deliver"
   },
   "engines": {
     "node": ">=20"
