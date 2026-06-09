@@ -29,20 +29,27 @@ export const metadata: Metadata = {
     shortcut: BRAND.logo.monogram,
     apple: BRAND.logo.monogram,
   },
-  // Performance hints for browsers
-  other: {
-    'dns-prefetch': process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    'preconnect': process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  },
+  // Performance hints for browsers (only emitted when a URL is configured —
+  // see the conditional <link>s below).
+  ...(process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? {
+        other: {
+          'dns-prefetch': process.env.NEXT_PUBLIC_SUPABASE_URL,
+          'preconnect': process.env.NEXT_PUBLIC_SUPABASE_URL,
+        },
+      }
+    : {}),
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
-        {/* Preconnect to critical origins */}
-        <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL || ''} />
-        <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_SUPABASE_URL || ''} />
+        {/* Preconnect to critical origins — skipped when no URL is set so we
+            never emit an empty href (which React warns about). */}
+        {supabaseUrl && <link rel="preconnect" href={supabaseUrl} />}
+        {supabaseUrl && <link rel="dns-prefetch" href={supabaseUrl} />}
         {/* Preload critical CSS */}
         <style dangerouslySetInnerHTML={{ __html: `
           /* Critical CSS - Inline for fastest paint */
