@@ -98,7 +98,7 @@ export function AppShell({
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <Link href="/dashboard" className="flex h-16 items-center border-b px-5" aria-label={`${BRAND.name} home`}>
+        <Link href="/menu" className="flex h-16 items-center border-b px-5" aria-label={`${BRAND.name} home`}>
           <Logo className="text-2xl" />
         </Link>
         <nav className="flex h-[calc(100vh-4rem)] flex-col gap-5 overflow-y-auto scrollbar-thin p-3">
@@ -159,10 +159,10 @@ export function AppShell({
               label="Forward"
             />
             <NavBtn
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push('/menu')}
               icon={<Icons.Home className="h-5 w-5" />}
-              label="Home (dashboard)"
-              active={pathname === '/dashboard'}
+              label="Home (menu)"
+              active={pathname === '/menu'}
             />
           </div>
 

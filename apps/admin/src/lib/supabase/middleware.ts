@@ -112,7 +112,7 @@ export async function updateSession(request: NextRequest) {
   // Handle login page
   if (pathname === '/login') {
     if (user && !userError) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return NextResponse.redirect(new URL('/menu', request.url));
     }
     return supabaseResponse;
   }

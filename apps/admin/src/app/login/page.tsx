@@ -61,7 +61,7 @@ function LoginForm() {
       return;
     }
 
-    router.replace(params.get('next') || '/dashboard');
+    router.replace(params.get('next') || '/menu');
     router.refresh();
   }
 
