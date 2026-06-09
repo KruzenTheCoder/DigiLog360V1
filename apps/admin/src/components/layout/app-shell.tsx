@@ -31,12 +31,16 @@ export function AppShell({
   const [dark, setDark] = useState(false);
   const [unread, setUnread] = useState(0);
   const caps = new Set<string>(capabilities);
-  const sections = visibleSections(
-    Array.isArray(profile.roles) && profile.roles.length > 0
-      ? profile.roles
-      : profile.role,
-    caps,
-  );
+  const roleList = Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : [profile.role];
+  const sections = visibleSections(roleList, caps);
+
+  // Admin / Manager / Control Room navigate from the /menu hub (full card
+  // grid), so the sidebar is redundant for them. Hide it when every role the
+  // user holds is one of those — super_user / supervisor keep the sidebar.
+  const SIDEBARLESS_ROLES = ['admin', 'manager', 'control_room'];
+  const hideSidebar = roleList.length > 0 && roleList.every((r) => SIDEBARLESS_ROLES.includes(r));
 
   // Restore persisted theme on mount. Uses prefers-color-scheme as default
   // before any user choice has been saved.
@@ -91,6 +95,8 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen">
+      {!hideSidebar && (
+      <>
       {/* Sidebar */}
       <aside
         className={cn(
@@ -136,13 +142,21 @@ export function AppShell({
       {open && (
         <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setOpen(false)} />
       )}
+      </>
+      )}
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-[hsl(var(--surface))]/80 px-4 backdrop-blur lg:px-6">
-          <button className="lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
-            <Icons.Menu className="h-6 w-6" />
-          </button>
+          {hideSidebar ? (
+            <Link href="/menu" className="flex items-center" aria-label={`${BRAND.name} home`}>
+              <Logo className="text-xl" />
+            </Link>
+          ) : (
+            <button className="lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
+              <Icons.Menu className="h-6 w-6" />
+            </button>
+          )}
 
           {/* History navigation — Back / Forward / Home. Mirrors the browser
               chrome inside the app so users don't have to reach for the
