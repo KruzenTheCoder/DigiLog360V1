@@ -15,22 +15,24 @@ export function CategoryDonut({ data }: { data: { name: string; count: number }[
     <Card className="h-full">
       <CardHeader><CardTitle>Incident Breakdown by Category</CardTitle></CardHeader>
       <CardContent>
-        <div className="flex flex-col items-center gap-5 sm:flex-row">
-          <div className="relative h-52 w-52 shrink-0">
+        <div className="flex flex-col items-center gap-6">
+          {/* Large donut that scales with the container width (percentage
+              radii) so it nearly fills the card. */}
+          <div className="relative mx-auto aspect-square w-full max-w-[26rem]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={data} dataKey="count" nameKey="name" innerRadius={62} outerRadius={88} paddingAngle={2}>
+                <Pie data={data} dataKey="count" nameKey="name" innerRadius="62%" outerRadius="92%" paddingAngle={2}>
                   {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
                 </Pie>
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-extrabold">{total}</span>
-              <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--muted))]">Total incidents</span>
+              <span className="text-5xl font-extrabold">{total}</span>
+              <span className="text-xs uppercase tracking-wider text-[hsl(var(--muted))]">Total incidents</span>
             </div>
           </div>
-          <ul className="flex-1 space-y-2 self-center">
+          <ul className="grid w-full grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
             {data.length === 0 && <li className="text-sm text-[hsl(var(--muted))]">No data yet.</li>}
             {data.map((d, i) => {
               const pct = total ? Math.round((d.count / total) * 100) : 0;
