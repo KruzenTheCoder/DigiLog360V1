@@ -121,6 +121,7 @@ export default function Home() {
   // permissions matrix; a role without the grant never sees the tile.
   const canLog = can('occurrences.log');
   const canPatrol = can('patrols.run') || can('patrols.view');
+  const canScan = can('patrols.scan');
   const canVisitors = can('visitors.manage');
   const canKeys = can('keys.manage');
   const canShift = can('shifts.clock');
@@ -215,7 +216,7 @@ export default function Home() {
               tint={stats.activePatrol ? theme.success : theme.brand}
               badge={stats.activePatrol ? '●' : undefined} />
           )}
-          {(canPatrol || canLog) && (
+          {canScan && (
             <IconTile icon="qr-code" label="Scan" onPress={() => router.push('/scan')} tint={theme.info} />
           )}
           {canVisitors && (

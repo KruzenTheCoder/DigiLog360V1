@@ -30,6 +30,7 @@ export const CAPABILITY_KEYS = [
   // Patrols
   'patrols.view',
   'patrols.run',
+  'patrols.scan',
   'patrols.end_remote',
   'patrols.schedule_manage',
   'checkpoints.manage',
