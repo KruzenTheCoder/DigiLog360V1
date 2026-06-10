@@ -33,7 +33,7 @@ const ZERO_STATS: Stats = {
 };
 
 export default function Home() {
-  const { profile, can, refreshProfile } = useAuth();
+  const { profile, can } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<Stats>(ZERO_STATS);
   const [loading, setLoading] = useState(true);
@@ -109,15 +109,9 @@ export default function Home() {
     setLoading(false);
   }, [profile, isSupervisor]);
 
-  // Re-sync stats AND capabilities on focus, so permission changes a super-user
-  // makes in the matrix take effect here without a full re-login.
-  useFocusEffect(useCallback(() => { load(); refreshProfile(); }, [load, refreshProfile]));
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await Promise.all([load(), refreshProfile()]);
-    setRefreshing(false);
-  };
+  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
   if (!profile) return <View style={{ flex: 1, backgroundColor: theme.bg }} />;
   const firstName = (profile.full_name ?? profile.email ?? 'Guard').split(/\s+/)[0];
