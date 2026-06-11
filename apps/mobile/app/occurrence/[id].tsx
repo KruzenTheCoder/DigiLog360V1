@@ -154,14 +154,14 @@ export default function OccurrenceDetail() {
             )}
 
             <SectionTitle
-              right={canUpdate ? (
+              right={(
                 <TouchableOpacity onPress={() => setCommentSheetOpen(true)} hitSlop={10}>
                   <Ionicons name="add-circle-outline" size={20} color={theme.brand} />
                 </TouchableOpacity>
-              ) : undefined}
-            >Comments · {comments.length}</SectionTitle>
+              )}
+            >Notes · {comments.length}</SectionTitle>
             {comments.length === 0 ? (
-              <Text style={type.muted}>No comments yet.</Text>
+              <Text style={type.muted}>No notes yet. Tap + to add the first one.</Text>
             ) : comments.map((c) => (
               <View key={c.id} style={styles.comment}>
                 <Text style={styles.commentAuthor}>{c.author_name ?? 'Unknown'}</Text>
@@ -186,14 +186,32 @@ export default function OccurrenceDetail() {
         )}
       </ScrollView>
 
-      {/* Sticky action bar */}
-      {occ && canUpdate && (
+      {/* Sticky action bar — anyone who can see the occurrence can add a note;
+          reviewers additionally get the status update action. */}
+      {occ && (
         <View style={styles.actionBar}>
-          <Button
-            title="Update status"
-            onPress={() => setStatusSheetOpen(true)}
-            icon={<Ionicons name="refresh" size={18} color="#fff" />}
-          />
+          {canUpdate ? (
+            <>
+              <Button
+                title="Update status"
+                onPress={() => setStatusSheetOpen(true)}
+                icon={<Ionicons name="refresh" size={18} color="#fff" />}
+              />
+              <View style={{ height: spacing.xs }} />
+              <Button
+                title="Add note"
+                variant="ghost"
+                onPress={() => setCommentSheetOpen(true)}
+                icon={<Ionicons name="create-outline" size={18} color={theme.brand} />}
+              />
+            </>
+          ) : (
+            <Button
+              title="Add note"
+              onPress={() => setCommentSheetOpen(true)}
+              icon={<Ionicons name="create-outline" size={18} color="#fff" />}
+            />
+          )}
         </View>
       )}
 
@@ -212,7 +230,7 @@ export default function OccurrenceDetail() {
             obNumber={occ.ob_number}
             currentUserId={profile?.id ?? ''}
             currentUserName={profile?.full_name ?? profile?.email ?? 'User'}
-            onDone={() => { setCommentSheetOpen(false); load(); toast.show('Comment posted', 'ok'); }}
+            onDone={() => { setCommentSheetOpen(false); load(); toast.show('Note added', 'ok'); }}
           />
         </>
       )}
@@ -335,21 +353,21 @@ function AddCommentSheet({
   }
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Add comment">
+    <Sheet visible={visible} onClose={onClose} title="Add note">
       <Field
         label=""
         value={body}
         onChangeText={setBody}
         multiline numberOfLines={5}
-        placeholder="Share details, ask a question, or flag something"
+        placeholder="Add a note to the timeline — what happened, what you did, anything to flag…"
         style={{ minHeight: 110, textAlignVertical: 'top' }}
       />
       <Button
-        title="Post"
+        title="Add note"
         onPress={save}
         loading={busy}
         disabled={!body.trim()}
-        icon={<Ionicons name="chatbubble-ellipses" size={18} color="#fff" />}
+        icon={<Ionicons name="create-outline" size={18} color="#fff" />}
       />
     </Sheet>
   );
