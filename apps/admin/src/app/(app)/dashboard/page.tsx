@@ -6,7 +6,10 @@ import { MonthlyTrendChart, CategoryDonut, PALETTE } from '@/components/dashboar
 import { HeroKpi } from '@/components/dashboard/hero-kpi';
 import { SeverityCards } from '@/components/dashboard/severity-cards';
 import { SlaComplianceReport } from '@/components/dashboard/sla-compliance';
-import { isSlaBreached, isSlaUpdateDue, SEVERITIES, SEVERITY_LABELS } from '@digilog/shared';
+import {
+  isSlaBreached, isSlaUpdateDue, SEVERITIES, SEVERITY_LABELS,
+  OCCURRENCE_STATUSES, STATUS_LABELS, STATUS_COLORS,
+} from '@digilog/shared';
 import type { Occurrence } from '@digilog/shared';
 
 // Minimal projection — exactly the columns the dashboard aggregates over.
@@ -85,6 +88,12 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
     acc[key] = occ30.filter((o) => o.severity === key).length;
     return acc;
   }, {} as Record<(typeof SEVERITIES)[number], number>);
+
+  // Status pipeline — where occurrences currently sit in their lifecycle.
+  const statusCounts = OCCURRENCE_STATUSES.map((s) => ({
+    key: s, label: STATUS_LABELS[s], color: STATUS_COLORS[s],
+    count: occ30.filter((o) => o.status === s).length,
+  })).filter((s) => s.count > 0);
 
   // Type breakdown (top 7)
   const typeMap = new Map<string, number>();
@@ -232,12 +241,12 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           footer={`${typeBreakdown[0]?.count ?? 0} incidents logged`}
         />
         <HeroKpi
-          tone="green"
+          tone={avgResolutionHrs <= 4 ? 'green' : 'red'}
           icon="Clock"
           label="Avg Resolution"
           sublabel="Time to close"
           value={`${avgResolutionHrs} Hrs`}
-          footer="Target: < 4 hours"
+          footer={avgResolutionHrs <= 4 ? '✓ Within 4h target' : '⚠ Over 4h target'}
         />
       </div>
 
@@ -259,31 +268,70 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
         ))}
       </div>
 
+      {/* Status pipeline */}
+      {statusCounts.length > 0 && (
+        <Card className="mt-5">
+          <CardHeader><CardTitle>Status Pipeline</CardTitle></CardHeader>
+          <CardContent>
+            <div className="flex h-3.5 w-full overflow-hidden rounded-full">
+              {statusCounts.map((s) => (
+                <div
+                  key={s.key}
+                  style={{ width: `${(s.count / total30) * 100}%`, background: s.color }}
+                  title={`${s.label}: ${s.count}`}
+                />
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+              {statusCounts.map((s) => {
+                const pct = total30 ? Math.round((s.count / total30) * 100) : 0;
+                return (
+                  <span key={s.key} className="flex items-center gap-1.5 text-xs">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
+                    {s.label}
+                    <span className="font-semibold text-[hsl(var(--foreground))]">{s.count}</span>
+                    <span className="text-[hsl(var(--muted))]">({pct}%)</span>
+                  </span>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Category breakdown + high-frequency incidents */}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <CategoryDonut data={typeBreakdown} />
         <Card className="h-full">
           <CardHeader><CardTitle>High-Frequency Incidents</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3.5">
             {typeBreakdown.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
             {typeBreakdown.map((t, i) => {
               const pct = total30 ? Math.round((t.count / total30) * 100) : 0;
               const color = PALETTE[i % PALETTE.length];
               return (
-                <div key={t.name}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium">{t.name}</span>
-                    <span
-                      className="rounded-md px-1.5 py-0.5 text-xs font-semibold text-white"
-                      style={{ background: color }}
-                    >
-                      {pct}%
-                    </span>
+                <div key={t.name} className="flex items-center gap-3">
+                  {/* Rank badge */}
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm"
+                    style={{ background: color }}
+                  >
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                      <span className="truncate font-medium">{t.name}</span>
+                      <span className="shrink-0 text-xs text-[hsl(var(--muted))]">
+                        <span className="font-semibold text-[hsl(var(--foreground))]">{t.count}</span> · {pct}%
+                      </span>
+                    </div>
+                    <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${Math.max(pct, 2)}%`, background: `linear-gradient(90deg, ${color}bb, ${color})` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
-                  </div>
-                  <p className="mt-1 text-xs text-[hsl(var(--muted))]">{t.count} total incidents</p>
                 </div>
               );
             })}
