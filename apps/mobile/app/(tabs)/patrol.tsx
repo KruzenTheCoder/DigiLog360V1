@@ -11,7 +11,7 @@ import { theme, spacing, radius } from '@/lib/theme';
 import type { Patrol, PatrolRoute, Checkpoint } from '@digilog/shared';
 
 export default function PatrolScreen() {
-  const { profile } = useAuth();
+  const { profile, can } = useAuth();
   const router = useRouter();
   const [patrol, setPatrol] = useState<Patrol | null>(null);
   const [routes, setRoutes] = useState<PatrolRoute[]>([]);
@@ -127,9 +127,13 @@ export default function PatrolScreen() {
             <Muted>Started {new Date(patrol.started_at).toLocaleTimeString()}</Muted>
           </Card>
 
-          <Button title="Scan Checkpoint" onPress={() => router.push('/scan')}
-            icon={<Ionicons name="scan" size={18} color="#fff" />} />
-          <View style={{ height: spacing.md }} />
+          {can('patrols.scan') && (
+            <>
+              <Button title="Scan Checkpoint" onPress={() => router.push('/scan')}
+                icon={<Ionicons name="scan" size={18} color="#fff" />} />
+              <View style={{ height: spacing.md }} />
+            </>
+          )}
 
           {checkpoints.length > 0 && (
             <>
