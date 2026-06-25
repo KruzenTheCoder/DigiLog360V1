@@ -9,6 +9,7 @@ import { cn, initials } from '@/lib/utils';
 import { visibleSections } from './nav-config';
 import { Logo } from '@/components/brand/logo';
 import { NetstreamLogo } from '@/components/brand/netstream-logo';
+import { TaskAssignmentToast } from '@/components/tasks/task-assignment-toast';
 import { BRAND, ROLE_LABELS, type Profile } from '@digilog/shared';
 
 function Icon({ name, className }: { name: string; className?: string }) {
@@ -18,13 +19,15 @@ function Icon({ name, className }: { name: string; className?: string }) {
 }
 
 export function AppShell({
-  profile, siteName, children, capabilities = [],
+  profile, siteName, children, capabilities = [], showNetstreamLogo = true,
 }: {
   profile: Profile;
   siteName: string | null;
   children: React.ReactNode;
   /** Capability keys the user holds. `['*']` means super_user (everything). */
   capabilities?: string[];
+  /** Per-org toggle from organizations.show_netstream_logo. */
+  showNetstreamLogo?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -167,10 +170,13 @@ export function AppShell({
               avoids competing with the surrounding flex items for spacing,
               and `pointer-events-none` lets clicks fall through to whatever
               sits under the centre (typically dead space). Hidden on small
-              screens where the bar is already tight. */}
-          <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 md:block">
-            <NetstreamLogo height={40} />
-          </div>
+              screens where the bar is already tight, and on per-org request
+              via the super_user toggle at /super/branding. */}
+          {showNetstreamLogo && (
+            <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 md:block">
+              <NetstreamLogo height={40} />
+            </div>
+          )}
 
 
           {/* History navigation — Back / Forward / Home. Mirrors the browser
@@ -233,6 +239,12 @@ export function AppShell({
 
         <main className="flex-1 p-4 lg:p-6 animate-fade-in">{children}</main>
       </div>
+
+      {/* Realtime task-assignment toast — listens for INSERT/UPDATE on
+          tasks where assigned_to = me and shows a corner popup with
+          Open / Dismiss actions. Mounted at the root of the app so it
+          works on every authenticated page. */}
+      <TaskAssignmentToast userId={profile.id} userName={profile.full_name ?? profile.email ?? 'You'} />
     </div>
   );
 }

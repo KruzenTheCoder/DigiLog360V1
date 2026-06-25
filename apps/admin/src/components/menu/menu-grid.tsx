@@ -49,6 +49,7 @@ const DESCRIPTIONS: Record<string, string> = {
   '/super/users': 'Manage users across every organisation.',
   '/super/health': 'Platform health and diagnostics.',
   '/super/permissions': 'Toggle what each role can see and do.',
+  '/super/branding': 'Toggle the parent-company logo per organisation.',
 };
 
 function Icon({ name, className }: { name: string; className?: string }) {

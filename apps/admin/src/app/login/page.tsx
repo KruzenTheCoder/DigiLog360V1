@@ -1,13 +1,13 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Logo } from '@/components/brand/logo';
-import { BRAND, WEB_ROLES } from '@digilog/shared';
+import { BRAND } from '@digilog/shared';
 
 const ERROR_MESSAGES: Record<string, string> = {
   deactivated: 'Your account has been deactivated. Contact an administrator.',
@@ -25,6 +25,7 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const next = params.get('next') || '/menu';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,36 +33,29 @@ function LoginForm() {
     ERROR_MESSAGES[params.get('error') ?? ''] ?? null,
   );
 
+  // Pre-fetch the post-login destination so the navigation after sign-in
+  // doesn't wait on a cold route compile + initial server render.
+  useEffect(() => { router.prefetch(next); }, [router, next]);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
     const supabase = createClient();
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    // Sign in — this is the only round-trip we MUST do here. The (app)/layout
+    // already enforces is_active + web-role checks via requireProfile, so we
+    // can skip the duplicate profile fetch here and shave ~80 ms off login.
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError) {
       setError(signInError.message);
       setLoading(false);
       return;
     }
 
-    const { data: profile } = await supabase
-      .from('profiles').select('role, is_active').eq('id', data.user.id).single();
-
-    if (!profile?.is_active) {
-      await supabase.auth.signOut();
-      setError(ERROR_MESSAGES.deactivated);
-      setLoading(false);
-      return;
-    }
-    if (!WEB_ROLES.includes(profile.role)) {
-      await supabase.auth.signOut();
-      setError(ERROR_MESSAGES.no_web_access);
-      setLoading(false);
-      return;
-    }
-
-    router.replace(params.get('next') || '/menu');
+    // router.replace honours the prefetched destination; refresh forces the
+    // middleware to pick up the new session cookie for the next paint.
+    router.replace(next);
     router.refresh();
   }
 

@@ -81,6 +81,7 @@ export const NAV: NavSection[] = [
       { label: 'All Users', href: '/super/users', icon: 'Users2', roles: ['super_user'], capability: 'super.users_cross_org' },
       { label: 'Platform Health', href: '/super/health', icon: 'Activity', roles: ['super_user'], capability: 'super.platform_health' },
       { label: 'Permissions', href: '/super/permissions', icon: 'SlidersHorizontal', roles: ['super_user'], capability: 'super.permissions_manage' },
+      { label: 'Branding', href: '/super/branding', icon: 'Palette', roles: ['super_user'] },
     ],
   },
 ];

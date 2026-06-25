@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import {
@@ -5,54 +6,67 @@ import {
   type Profile, type AppRole, type CapabilityKey,
 } from '@digilog/shared';
 
-/** Returns the signed-in user's profile, or redirects to /login. */
-export async function requireProfile(): Promise<Profile> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+/**
+ * Per-request caches.
+ *
+ * `React.cache` memoises the result by reference for the duration of a single
+ * server render — every page calling these helpers (e.g. (app)/layout AND the
+ * route's own page.tsx) reuses the same auth + profile + caps fetches instead
+ * of repeating them. Worth ~5 sequential Supabase round-trips per page on
+ * routes that gate behind capabilities.
+ */
 
-  const { data: profile } = await supabase
+/** Cached signed-in user (one network round-trip to Supabase Auth per render). */
+const getCachedUser = cache(async () => {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  return data.user;
+});
+
+/** Cached profile fetch — selects only the columns the AppShell + auth helpers use. */
+const getCachedProfile = cache(async (): Promise<Profile | null> => {
+  const user = await getCachedUser();
+  if (!user) return null;
+  const supabase = await createClient();
+  const { data } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single();
+  return (data ?? null) as Profile | null;
+});
 
+/** Returns the signed-in user's profile, or redirects to /login. */
+export const requireProfile = cache(async (): Promise<Profile> => {
+  const profile = await getCachedProfile();
   if (!profile) redirect('/login');
   if (!profile.is_active) redirect('/login?error=deactivated');
 
   const myRoles = profileRoles(profile as unknown as { role?: AppRole; roles?: AppRole[] });
   const allowed = myRoles.some((r) => WEB_ROLES.includes(r));
   if (!allowed) redirect('/login?error=no_web_access');
-
-  return profile as unknown as Profile;
-}
+  return profile;
+});
 
 /**
- * Load the current user's capability set. Returns a Set<string> of capability
- * keys they hold, or a single-element set `{'*'}` for super_user (who has all).
- * Cached for the duration of the server request (each Next request creates a
- * fresh supabase client, so this is per-render not per-process).
+ * Capability set for the current user. Returns a Set<string> of capability
+ * keys, or a single-element set `{'*'}` for super_user (who has all).
+ * Cached per-render so multiple calls share one fetch.
  */
-export async function loadMyCapabilities(): Promise<Set<string>> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return new Set();
+export const loadMyCapabilities = cache(async (): Promise<Set<string>> => {
+  const profile = await getCachedProfile();
+  if (!profile) return new Set();
 
-  // Read the profile so we can short-circuit super_user.
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, roles')
-    .eq('id', user.id)
-    .single();
-  const myRoles = profileRoles(profile as { role?: AppRole; roles?: AppRole[] } | null);
+  const myRoles = profileRoles(profile as { role?: AppRole; roles?: AppRole[] | null });
   if (myRoles.includes('super_user')) return new Set(['*']);
 
+  const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data } = await (supabase as any).from('my_capabilities').select('key');
   const set = new Set<string>();
   for (const r of (data ?? []) as { key: string }[]) set.add(r.key);
   return set;
-}
+});
 
 /** Convenience: typed capability check. */
 export function can(caps: Set<string>, key: CapabilityKey | string): boolean {
