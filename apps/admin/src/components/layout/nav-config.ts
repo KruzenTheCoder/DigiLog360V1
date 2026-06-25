@@ -21,7 +21,6 @@ export const NAV: NavSection[] = [
   {
     title: 'Overview',
     items: [
-      { label: 'Menu', href: '/menu', icon: 'LayoutGrid' },
       { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
       { label: 'Live Occurrences', href: '/occurrences', icon: 'Radio' },
       { label: 'Notifications', href: '/notifications', icon: 'Bell' },

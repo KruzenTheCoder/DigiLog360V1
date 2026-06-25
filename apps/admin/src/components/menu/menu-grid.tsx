@@ -16,6 +16,7 @@ const ACCENTS = [
 const DESCRIPTIONS: Record<string, string> = {
   '/dashboard': 'View operational KPIs and trends.',
   '/occurrences': 'View and filter live occurrences.',
+  // '/menu' deliberately omitted — it's the landing hub, not a destination.
   '/notifications': 'Alerts and messages addressed to you.',
   '/occurrences/all': 'Browse every occurrence on record.',
   '/occurrences/new': 'Manually log an incident.',
