@@ -1,4 +1,6 @@
-// Shared exports inlined for EAS builds
+// ============================================================================
+// DigiLog 360 — shared package barrel
+// ============================================================================
 export * from './database.types';
 export * from './types';
 export * from './constants';

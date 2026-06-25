@@ -118,6 +118,7 @@ function RootNavigator() {
       <Stack.Screen name="gate/keys" options={{ presentation: 'card' }} />
       <Stack.Screen name="supervisor/board" options={{ presentation: 'card' }} />
       <Stack.Screen name="supervisor/team" options={{ presentation: 'card' }} />
+      <Stack.Screen name="tasks" options={{ presentation: 'card' }} />
     </Stack>
   );
 }

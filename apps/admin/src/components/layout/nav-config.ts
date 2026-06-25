@@ -35,6 +35,7 @@ export const NAV: NavSection[] = [
       { label: 'Reports', href: '/reports', icon: 'FileText', roles: REVIEWERS, capability: 'reports.view' },
       { label: 'History', href: '/occurrences/history', icon: 'Archive', capability: 'occurrences.view_all' },
       { label: 'Assigned to Me', href: '/my-queue', icon: 'Inbox', roles: REVIEWERS, capability: 'occurrences.view_assigned' },
+      { label: 'Tasks', href: '/tasks', icon: 'CheckCircle' },
     ],
   },
   {
@@ -55,6 +56,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: 'Acknowledgements', href: '/manager/acknowledgements', icon: 'CheckSquare', roles: ['manager', 'admin', 'super_user'], capability: 'manager.acknowledge' },
       { label: 'Reviewed Logs', href: '/manager/reviewed', icon: 'History', roles: ['manager', 'admin', 'super_user'], capability: 'manager.reviewed_logs' },
+      { label: 'Staff Reports', href: '/manager/staff-reports', icon: 'BarChart3', roles: ['manager', 'admin', 'super_user'] },
     ],
   },
   {

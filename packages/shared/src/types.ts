@@ -95,6 +95,68 @@ export const OCCURRENCE_FILTER_KEYS: (keyof OccurrencesFilter)[] = [
   'from', 'to', 'logged_by', 'is_patrol',
 ];
 
+// ----------------------------------------------------------------------------
+// Tasks (mirrors public.tasks)
+// ----------------------------------------------------------------------------
+export type TaskStatus = 'open' | 'in_progress' | 'blocked' | 'done' | 'cancelled';
+export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
+
+export interface Task {
+  id: number;
+  org_id: string;
+  title: string;
+  description: string | null;
+  priority: TaskPriority;
+  status: TaskStatus;
+  assigned_to: string | null;
+  assigned_to_name: string | null;
+  assigned_by: string | null;
+  assigned_by_name: string | null;
+  occurrence_id: number | null;
+  ob_number: string | null;
+  due_at: string | null;
+  completed_at: string | null;
+  completed_by: string | null;
+  completion_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskUpdate {
+  id: number;
+  task_id: number;
+  previous_status: TaskStatus | null;
+  new_status: TaskStatus;
+  notes: string | null;
+  updated_by: string | null;
+  updated_by_name: string | null;
+  created_at: string;
+}
+
+export const TASK_STATUSES: TaskStatus[] = ['open','in_progress','blocked','done','cancelled'];
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  open: 'Open',
+  in_progress: 'In Progress',
+  blocked: 'Blocked',
+  done: 'Done',
+  cancelled: 'Cancelled',
+};
+export const TASK_STATUS_COLORS: Record<TaskStatus, string> = {
+  open: '#3b82f6',
+  in_progress: '#0ea5e9',
+  blocked: '#dc2626',
+  done: '#16a34a',
+  cancelled: '#64748b',
+};
+
+export const TASK_PRIORITIES: TaskPriority[] = ['low','normal','high','urgent'];
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent',
+};
+export const TASK_PRIORITY_COLORS: Record<TaskPriority, string> = {
+  low: '#64748b', normal: '#3b82f6', high: '#ea580c', urgent: '#dc2626',
+};
+
 export interface OccurrenceComment {
   id: number;
   org_id: string | null;
