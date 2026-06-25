@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { requireProfile } from '@/lib/auth';
+import { requireProfile, loadMyCapabilities, can } from '@/lib/auth';
 import { PageHeader } from '@/components/page-header';
 import { LogIncidentForm } from '@/components/occurrences/log-incident-form';
 import type { Site } from '@digilog/shared';
@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 export default async function NewOccurrencePage() {
   const profile = await requireProfile();
   const supabase = await createClient();
+  const caps = await loadMyCapabilities();
 
   // RLS only lets non-admins log occurrences for their own site, so only offer that.
   let sitesQuery = supabase.from('sites').select('*').eq('is_active', true).order('name');
@@ -24,10 +25,42 @@ export default async function NewOccurrencePage() {
     reporters = (data ?? []).map((r) => ({ id: r.id, name: r.full_name ?? r.email ?? 'Unknown' }));
   }
 
+  // Assignable users — only fetched when the caller can actually assign.
+  // We offer anyone who can act on an occurrence (guard, supervisor, control
+  // room, manager, admin) within the same site/org.
+  let assignees: { id: string; name: string; role: string }[] = [];
+  if (can(caps, 'occurrences.assign')) {
+    // The generated AppRoleEnum lags behind the live `app_role` enum, so we
+    // route through `any` for this query only.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    let q = sb
+      .from('profiles')
+      .select('id, full_name, email, role')
+      .eq('is_active', true)
+      .in('role', ['guard', 'supervisor', 'control_room', 'manager', 'admin']);
+    if (profile.role !== 'admin' && profile.site_id) q = q.eq('site_id', profile.site_id);
+    q = q.order('full_name', { ascending: true, nullsFirst: false });
+    const { data } = await q;
+    assignees = ((data ?? []) as Array<{ id: string; full_name: string | null; email: string | null; role: string }>)
+      .map((r) => ({
+        id: r.id,
+        name: r.full_name ?? r.email ?? 'Unknown',
+        role: r.role,
+      }));
+  }
+
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Log New Incident" description="Record an occurrence in the security book." />
-      <LogIncidentForm profile={profile} sites={(sites ?? []) as Site[]} reporters={reporters} />
+      <LogIncidentForm
+        profile={profile}
+        sites={(sites ?? []) as Site[]}
+        reporters={reporters}
+        assignees={assignees}
+        canAssign={can(caps, 'occurrences.assign')}
+        canLogManagementReport={can(caps, 'occurrences.log_management_report')}
+      />
     </div>
   );
 }

@@ -15,15 +15,21 @@
   --muted: 215 20% 45%;
   --border: 214 32% 91%;
   --brand: 245 75% 66%;
+  color-scheme: light;
 }
 
-.dark {
+/* html.dark (not just .dark) so we outrank the inline critical-CSS :root
+   block injected from app/layout.tsx — both have specificity 0,1,0 and
+   source-order would otherwise let the inline :root win. color-scheme also
+   themes native form controls and scrollbars. */
+html.dark {
   --background: 222 47% 9%;
   --surface: 222 40% 13%;
   --foreground: 210 40% 96%;
   --muted: 215 20% 65%;
   --border: 217 30% 22%;
   --brand: 245 75% 70%;
+  color-scheme: dark;
 }
 
 * {

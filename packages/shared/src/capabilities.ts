@@ -19,6 +19,7 @@ export const CAPABILITY_KEYS = [
   'occurrences.bulk_actions',
   'occurrences.comment',
   'occurrences.export_csv',
+  'occurrences.log_management_report',
   // Reports
   'reports.view',
   'reports.create',

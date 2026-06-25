@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -9,18 +9,30 @@ import { Button } from '@/components/ui/button';
 import { Input, Textarea, Select, Label } from '@/components/ui/input';
 import { OcrDropzone } from './ocr-dropzone';
 import {
-  SEVERITIES, SEVERITY_LABELS, SLA_CONFIG,
+  SEVERITIES, SEVERITY_LABELS, SLA_CONFIG, ROLE_LABELS,
   mergeIncidentCategories, mergeIncidentSubcategories, mergeIncidentTypes,
-  type Profile, type Site, type SeverityLevel,
+  type Profile, type Site, type SeverityLevel, type AppRole,
   type OrgIncidentType, type OrgIncidentCategory, type OrgIncidentSubcategory,
 } from '@digilog/shared';
 
+// Special-case subcategory + type used by the "Log management reports"
+// capability. Picking the subcategory locks the type to MGMT_REPORT_TYPE so
+// reviewers know it's a management report at a glance.
+const MGMT_REPORT_SUBCATEGORY = 'Management Reports';
+const MGMT_REPORT_TYPE = 'Reports';
+
+interface Assignee { id: string; name: string; role: string }
+
 export function LogIncidentForm({
-  profile, sites, reporters,
+  profile, sites, reporters, assignees = [],
+  canAssign = false, canLogManagementReport = false,
 }: {
   profile: Profile;
   sites: Site[];
   reporters: { id: string; name: string }[];
+  assignees?: Assignee[];
+  canAssign?: boolean;
+  canLogManagementReport?: boolean;
 }) {
   const router = useRouter();
   const [category, setCategory] = useState('');
@@ -31,6 +43,7 @@ export function LogIncidentForm({
   const [incidentAt, setIncidentAt] = useState(() => new Date().toISOString().slice(0, 16));
   const [siteId, setSiteId] = useState(profile.site_id ?? '');
   const [reportedBy, setReportedBy] = useState(profile.full_name ?? profile.email ?? '');
+  const [assignedTo, setAssignedTo] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -51,10 +64,27 @@ export function LogIncidentForm({
       .then(({ data }: { data: OrgIncidentSubcategory[] | null }) => setOrgSubcategories(data ?? []));
   }, []);
 
-  // Cascaded option lists — built-in + active org-custom at every level.
   const categoryOptions = mergeIncidentCategories(orgCategories);
-  const subcategoryOptions = mergeIncidentSubcategories(category, orgSubcategories);
-  const typeOptions = mergeIncidentTypes(category, subcategory, orgTypes);
+
+  // Subcategory list — built-in + org custom + (optionally) "Management
+  // Reports" injected for users with the dedicated capability. The shortcut
+  // is offered under EVERY category so the user can pair it with whatever
+  // category fits their report.
+  const subcategoryOptions = useMemo(() => {
+    const base = mergeIncidentSubcategories(category, orgSubcategories);
+    if (!canLogManagementReport || !category) return base;
+    if (base.some((s) => s.toLowerCase() === MGMT_REPORT_SUBCATEGORY.toLowerCase())) return base;
+    return [...base, MGMT_REPORT_SUBCATEGORY];
+  }, [category, orgSubcategories, canLogManagementReport]);
+
+  // Type list — built-in + org custom. When the user picked the management-
+  // report shortcut, lock the list to just "Reports" so the field is unambiguous.
+  const typeOptions = useMemo(() => {
+    if (subcategory === MGMT_REPORT_SUBCATEGORY) return [MGMT_REPORT_TYPE];
+    return mergeIncidentTypes(category, subcategory, orgTypes);
+  }, [category, subcategory, orgTypes]);
+
+  const isMgmtReport = subcategory === MGMT_REPORT_SUBCATEGORY;
 
   // Reset downstream selections whenever an upstream choice changes so we
   // never submit a stale (category, subcategory, type) combination.
@@ -65,7 +95,8 @@ export function LogIncidentForm({
   }
   function onSubcategoryChange(s: string) {
     setSubcategory(s);
-    setType('');
+    // Auto-select the only valid type for the management-report shortcut.
+    setType(s === MGMT_REPORT_SUBCATEGORY ? MGMT_REPORT_TYPE : '');
   }
 
   async function submit(e: React.FormEvent) {
@@ -79,8 +110,9 @@ export function LogIncidentForm({
 
     const supabase = createClient();
     const siteName = sites.find((s) => s.id === siteId)?.name ?? null;
+    const assignee = assignees.find((a) => a.id === assignedTo) ?? null;
 
-    const { data, error: insErr } = await supabase.from('occurrences').insert({
+    const insertPayload: Record<string, unknown> = {
       occurrence_type: type,
       category,
       subcategory,
@@ -92,12 +124,23 @@ export function LogIncidentForm({
       logged_by: profile.id,
       logged_by_name: reportedBy || profile.full_name || profile.email,
       status: 'open',
-    }).select('ob_number').single();
+    };
+    if (assignee) {
+      insertPayload.assigned_to = assignee.id;
+      insertPayload.assigned_to_name = assignee.name;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error: insErr } = await (supabase as any)
+      .from('occurrences')
+      .insert(insertPayload)
+      .select('ob_number')
+      .single();
 
     setSaving(false);
     if (insErr) { setError(insErr.message); return; }
     setOk(`Occurrence ${data?.ob_number} logged successfully.`);
-    setCategory(''); setSubcategory(''); setType(''); setDescription('');
+    setCategory(''); setSubcategory(''); setType(''); setDescription(''); setAssignedTo('');
     router.refresh();
   }
 
@@ -128,11 +171,11 @@ export function LogIncidentForm({
               </Select>
             </div>
             <div>
-              <Label>Specific Type *</Label>
+              <Label>Specific Type *{isMgmtReport && ' (locked)'}</Label>
               <Select
                 value={type}
                 onChange={(e) => setType(e.target.value)}
-                disabled={!subcategory}
+                disabled={!subcategory || isMgmtReport}
                 required
               >
                 <option value="">{subcategory ? 'Select…' : 'Pick a sub-category first'}</option>
@@ -167,15 +210,34 @@ export function LogIncidentForm({
             </div>
           </div>
 
-          <div>
-            <Label>Reported By</Label>
-            {reporters.length > 0 ? (
-              <Select value={reportedBy} onChange={(e) => setReportedBy(e.target.value)}>
-                <option value={profile.full_name ?? profile.email ?? ''}>{profile.full_name ?? profile.email} (me)</option>
-                {reporters.map((r) => <option key={r.id} value={r.name}>{r.name}</option>)}
-              </Select>
-            ) : (
-              <Input value={reportedBy} onChange={(e) => setReportedBy(e.target.value)} />
+          <div className={canAssign ? 'grid gap-4 sm:grid-cols-2' : ''}>
+            <div>
+              <Label>Reported By</Label>
+              {reporters.length > 0 ? (
+                <Select value={reportedBy} onChange={(e) => setReportedBy(e.target.value)}>
+                  <option value={profile.full_name ?? profile.email ?? ''}>{profile.full_name ?? profile.email} (me)</option>
+                  {reporters.map((r) => <option key={r.id} value={r.name}>{r.name}</option>)}
+                </Select>
+              ) : (
+                <Input value={reportedBy} onChange={(e) => setReportedBy(e.target.value)} />
+              )}
+            </div>
+
+            {canAssign && (
+              <div>
+                <Label>Assign To</Label>
+                <Select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
+                  <option value="">— Unassigned —</option>
+                  {assignees.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} · {ROLE_LABELS[a.role as AppRole] ?? a.role}
+                    </option>
+                  ))}
+                </Select>
+                {assignees.length === 0 && (
+                  <p className="mt-1 text-xs text-[hsl(var(--muted))]">No assignable users in scope.</p>
+                )}
+              </div>
             )}
           </div>
 
