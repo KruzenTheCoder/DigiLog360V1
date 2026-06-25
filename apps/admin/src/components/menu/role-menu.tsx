@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin } from 'lucide-react';
+import { Info, MapPin } from 'lucide-react';
 import { MenuGrid } from './menu-grid';
 import { ROLE_COLORS, ROLE_LABELS, type AppRole } from '@digilog/shared';
 import type { NavSection } from '@/components/layout/nav-config';
@@ -89,7 +89,40 @@ export function RoleMenu({
         ))}
       </div>
 
-      <MenuGrid sections={current.sections} />
+      {current.sections.length > 0 ? (
+        <MenuGrid sections={current.sections} />
+      ) : (
+        <EmptyRoleState
+          role={current.role}
+          otherRoles={roleMenus.filter((m) => m.role !== current.role).map((m) => m.role)}
+        />
+      )}
     </>
+  );
+}
+
+/**
+ * Shown when every nav item for this role has been deduped into a
+ * higher-ranked role's tab (e.g. a Control Room + Manager user clicks the
+ * Control Room pill — all the shared items live under Manager). The pill
+ * is intentionally kept clickable so the user knows the role is active.
+ */
+function EmptyRoleState({ role, otherRoles }: { role: AppRole; otherRoles: AppRole[] }) {
+  const otherNames = otherRoles.map((r) => ROLE_LABELS[r]).join(' / ');
+  return (
+    <div className="rounded-2xl border bg-[hsl(var(--surface))] p-10 text-center shadow-sm">
+      <div
+        className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full"
+        style={{ background: `${ROLE_COLORS[role]}22`, color: ROLE_COLORS[role] }}
+      >
+        <Info className="h-6 w-6" />
+      </div>
+      <h3 className="text-base font-semibold">{ROLE_LABELS[role]} role active</h3>
+      <p className="mx-auto mt-2 max-w-md text-sm text-[hsl(var(--muted))]">
+        Every action available to your {ROLE_LABELS[role]} role is already on display under your{' '}
+        <strong>{otherNames || 'other'}</strong> tab — we don&apos;t duplicate the same shortcut twice.
+        Switch back above to use them.
+      </p>
+    </div>
   );
 }

@@ -51,7 +51,7 @@ export default async function NewOccurrencePage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <>
       <PageHeader title="Log New Incident" description="Record an occurrence in the security book." />
       <LogIncidentForm
         profile={profile}
@@ -61,6 +61,6 @@ export default async function NewOccurrencePage() {
         canAssign={can(caps, 'occurrences.assign')}
         canLogManagementReport={can(caps, 'occurrences.log_management_report')}
       />
-    </div>
+    </>
   );
 }

@@ -34,6 +34,10 @@ export default async function MenuPage() {
 
   // For each role, only show items NOT already shown by a higher-ranked role
   // in this same user's set. Identity = href (every nav item has a unique URL).
+  // We always KEEP the role's tab even when every item was absorbed by a
+  // higher role — the pill stays clickable; the body shows an empty-state
+  // message pointing at the higher tab. (The user explicitly wants both tabs
+  // visible for dual roles; only the functions are deduped.)
   const seenHrefs = new Set<string>();
   const roleMenus: RoleMenuData[] = [];
   for (const role of rankedRoles) {
@@ -47,19 +51,10 @@ export default async function MenuPage() {
         }),
       }))
       .filter((s) => s.items.length > 0);
-    if (sections.length > 0) {
-      roleMenus.push({
-        role,
-        title: ROLE_MENU_TITLE[role] ?? 'Menu',
-        sections,
-      });
-    }
-  }
-  if (roleMenus.length === 0) {
     roleMenus.push({
-      role: rankedRoles[0],
-      title: ROLE_MENU_TITLE[rankedRoles[0]] ?? 'Menu',
-      sections: visibleSections(roleList, caps),
+      role,
+      title: ROLE_MENU_TITLE[role] ?? 'Menu',
+      sections,
     });
   }
 
