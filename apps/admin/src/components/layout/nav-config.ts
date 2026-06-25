@@ -30,7 +30,7 @@ export const NAV: NavSection[] = [
     title: 'Occurrences',
     items: [
       { label: 'All Occurrences', href: '/occurrences/all', icon: 'ClipboardList', capability: 'occurrences.view_all' },
-      { label: 'Log Incident', href: '/occurrences/new', icon: 'PlusCircle', capability: 'occurrences.log' },
+      { label: 'Log New Occurrence', href: '/occurrences/new', icon: 'PlusCircle', capability: 'occurrences.log' },
       { label: 'Reports', href: '/reports', icon: 'FileText', roles: REVIEWERS, capability: 'reports.view' },
       { label: 'History', href: '/occurrences/history', icon: 'Archive', capability: 'occurrences.view_all' },
       { label: 'Assigned to Me', href: '/my-queue', icon: 'Inbox', roles: REVIEWERS, capability: 'occurrences.view_assigned' },
@@ -66,7 +66,9 @@ export const NAV: NavSection[] = [
       { label: 'Organisation', href: '/settings/organization', icon: 'Settings', roles: ORG_ADMINS, capability: 'org.edit_branding' },
       { label: 'SLA Matrix', href: '/settings/sla', icon: 'Gauge', roles: ORG_ADMINS, capability: 'org.edit_sla' },
       { label: 'Occurrence Types', href: '/settings/types', icon: 'Tags', roles: ORG_ADMINS, capability: 'org.edit_types' },
-      { label: 'My Access', href: '/my-access', icon: 'KeySquare' },
+      // 'My Access' — hidden per request until the capability matrix is finalised.
+      // Route still works if hit directly; just not surfaced in nav/menu.
+      // { label: 'My Access', href: '/my-access', icon: 'KeySquare' },
       { label: 'My Preferences', href: '/settings/notifications', icon: 'BellRing', capability: 'preferences.manage' },
       { label: 'Security (2FA)', href: '/settings/security', icon: 'ShieldCheck', capability: 'security.manage_2fa' },
       { label: 'Webhooks', href: '/settings/webhooks', icon: 'Webhook', roles: ORG_ADMINS, capability: 'webhooks.manage' },

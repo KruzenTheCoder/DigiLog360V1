@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Search, Download } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
@@ -11,10 +12,12 @@ import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
 import { formatDateTime } from '@/lib/utils';
 import { toCsv, downloadCsv } from '@/lib/csv';
 import {
-  OCCURRENCE_STATUSES, SEVERITIES, STATUS_LABELS, SEVERITY_LABELS, type Occurrence,
+  OCCURRENCE_STATUSES, SEVERITIES, STATUS_LABELS, SEVERITY_LABELS, SEVERITY_COLORS,
+  type Occurrence,
 } from '@digilog/shared';
 
 export function OccurrencesTable({ rows }: { rows: Occurrence[] }) {
+  const router = useRouter();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [severity, setSeverity] = useState('');
@@ -89,21 +92,42 @@ export function OccurrencesTable({ rows }: { rows: Occurrence[] }) {
           </TR>
         </THead>
         <TBody>
-          {filtered.map((r) => (
-            <TR key={r.id}>
-              <TD>
-                <Link href={`/occurrences/${r.id}`} className="font-medium text-brand hover:underline">
-                  {r.ob_number}
-                </Link>
-              </TD>
-              <TD>{r.occurrence_type}</TD>
-              <TD><SeverityBadge severity={r.severity} /></TD>
-              <TD><StatusBadge status={r.status} /></TD>
-              <TD>{r.site_name ?? '—'}</TD>
-              <TD>{r.logged_by_name ?? '—'}</TD>
-              <TD className="whitespace-nowrap text-xs text-[hsl(var(--muted))]">{formatDateTime(r.incident_at)}</TD>
-            </TR>
-          ))}
+          {filtered.map((r) => {
+            const sevColor = SEVERITY_COLORS[r.severity];
+            return (
+              <TR
+                key={r.id}
+                onClick={() => router.push(`/occurrences/${r.id}`)}
+                className="cursor-pointer"
+                // Severity-tinted left rail + faint row tint. Reads at a glance,
+                // doesn't fight the rest of the page. Hover layer in the base TR
+                // class still applies on top.
+                style={{
+                  borderLeft: `4px solid ${sevColor}`,
+                  background: `linear-gradient(90deg, ${sevColor}10 0%, transparent 35%)`,
+                }}
+              >
+                <TD>
+                  {/* Keep the explicit OB link too so right-click → open-in-new-tab
+                      keeps working. Stop propagation so we don't double-fire the
+                      row click navigation. */}
+                  <Link
+                    href={`/occurrences/${r.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="font-medium text-brand hover:underline"
+                  >
+                    {r.ob_number}
+                  </Link>
+                </TD>
+                <TD>{r.occurrence_type}</TD>
+                <TD><SeverityBadge severity={r.severity} /></TD>
+                <TD><StatusBadge status={r.status} /></TD>
+                <TD>{r.site_name ?? '—'}</TD>
+                <TD>{r.logged_by_name ?? '—'}</TD>
+                <TD className="whitespace-nowrap text-xs text-[hsl(var(--muted))]">{formatDateTime(r.incident_at)}</TD>
+              </TR>
+            );
+          })}
           {filtered.length === 0 && (
             <TR><TD colSpan={7} className="py-8 text-center text-[hsl(var(--muted))]">No matching occurrences.</TD></TR>
           )}

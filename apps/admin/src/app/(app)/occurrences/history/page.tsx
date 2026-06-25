@@ -1,12 +1,10 @@
 import Link from 'next/link';
-import { ArrowLeft, Radio } from 'lucide-react';
+import { ArrowLeft, Radio, Footprints } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { HistoryOccurrences, type HistoryRow } from '@/components/occurrences/history-occurrences';
-import { formatDateTime } from '@/lib/utils';
+import { CompletedPatrols } from '@/components/occurrences/completed-patrols';
 import type { PatrolDetailed } from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
@@ -36,6 +34,12 @@ export default async function HistoryPage() {
           <p className="mt-1 text-sm text-[hsl(var(--muted))]">Resolved occurrences and completed patrols.</p>
         </div>
         <div className="flex gap-2">
+          {/* Jump anchor — instantly scrolls to the Completed Patrols section
+              further down the page so users don't have to scroll past every
+              closed occurrence first. */}
+          <a href="#completed-patrols">
+            <Button variant="secondary"><Footprints className="h-4 w-4" /> Jump to Patrols ({pat.length})</Button>
+          </a>
           <Link href="/occurrences">
             <Button variant="secondary"><Radio className="h-4 w-4" /> View Live Occurrences</Button>
           </Link>
@@ -47,27 +51,9 @@ export default async function HistoryPage() {
 
       <HistoryOccurrences rows={occ} />
 
-      <Card className="mt-5">
-        <CardHeader><CardTitle>Completed Patrols ({pat.length})</CardTitle></CardHeader>
-        <CardContent>
-          <Table>
-            <THead><TR><TH>Guard</TH><TH>Route</TH><TH>Site</TH><TH>Checkpoints</TH><TH>Duration</TH><TH>Ended</TH></TR></THead>
-            <TBody>
-              {pat.map((p) => (
-                <TR key={p.id}>
-                  <TD className="font-medium">{p.guard_name}</TD>
-                  <TD>{p.route_name ?? '—'}</TD>
-                  <TD>{p.site_name ?? '—'}</TD>
-                  <TD>{p.scan_count}{p.checkpoints_total ? ` / ${p.checkpoints_total}` : ''}</TD>
-                  <TD>{p.duration_minutes != null ? `${p.duration_minutes} min` : '—'}</TD>
-                  <TD className="whitespace-nowrap text-xs text-[hsl(var(--muted))]">{formatDateTime(p.ended_at)}</TD>
-                </TR>
-              ))}
-              {pat.length === 0 && <TR><TD colSpan={6} className="py-6 text-center text-[hsl(var(--muted))]">No completed patrols.</TD></TR>}
-            </TBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <div className="mt-5">
+        <CompletedPatrols patrols={pat} />
+      </div>
     </>
   );
 }

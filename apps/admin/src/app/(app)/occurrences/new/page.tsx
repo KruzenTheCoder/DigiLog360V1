@@ -28,7 +28,7 @@ export default async function NewOccurrencePage() {
   // Assignable users — only fetched when the caller can actually assign.
   // We offer anyone who can act on an occurrence (guard, supervisor, control
   // room, manager, admin) within the same site/org.
-  let assignees: { id: string; name: string; role: string }[] = [];
+  let assignees: { id: string; name: string; role: string; jobTitle: string | null }[] = [];
   if (can(caps, 'occurrences.assign')) {
     // The generated AppRoleEnum lags behind the live `app_role` enum, so we
     // route through `any` for this query only.
@@ -36,23 +36,24 @@ export default async function NewOccurrencePage() {
     const sb = supabase as any;
     let q = sb
       .from('profiles')
-      .select('id, full_name, email, role')
+      .select('id, full_name, email, role, job_title')
       .eq('is_active', true)
       .in('role', ['guard', 'supervisor', 'control_room', 'manager', 'admin']);
     if (profile.role !== 'admin' && profile.site_id) q = q.eq('site_id', profile.site_id);
     q = q.order('full_name', { ascending: true, nullsFirst: false });
     const { data } = await q;
-    assignees = ((data ?? []) as Array<{ id: string; full_name: string | null; email: string | null; role: string }>)
+    assignees = ((data ?? []) as Array<{ id: string; full_name: string | null; email: string | null; role: string; job_title: string | null }>)
       .map((r) => ({
         id: r.id,
         name: r.full_name ?? r.email ?? 'Unknown',
         role: r.role,
+        jobTitle: r.job_title ?? null,
       }));
   }
 
   return (
     <>
-      <PageHeader title="Log New Incident" description="Record an occurrence in the security book." />
+      <PageHeader title="Log New Occurrence" description="Record an occurrence in the security book." />
       <LogIncidentForm
         profile={profile}
         sites={(sites ?? []) as Site[]}

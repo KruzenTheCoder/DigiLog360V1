@@ -19,7 +19,8 @@ function Icon({ name, className }: { name: string; className?: string }) {
 }
 
 export function AppShell({
-  profile, siteName, children, capabilities = [], showNetstreamLogo = true,
+  profile, siteName, children, capabilities = [],
+  showNetstreamLogo = true, netstreamLogoUrl = null,
 }: {
   profile: Profile;
   siteName: string | null;
@@ -28,6 +29,8 @@ export function AppShell({
   capabilities?: string[];
   /** Per-org toggle from organizations.show_netstream_logo. */
   showNetstreamLogo?: boolean;
+  /** Optional uploaded override (from organizations.netstream_logo_url). */
+  netstreamLogoUrl?: string | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -174,7 +177,16 @@ export function AppShell({
               via the super_user toggle at /super/branding. */}
           {showNetstreamLogo && (
             <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 md:block">
-              <NetstreamLogo height={40} />
+              {netstreamLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={netstreamLogoUrl}
+                  alt="Netstream"
+                  className="h-10 w-auto object-contain"
+                />
+              ) : (
+                <NetstreamLogo height={40} />
+              )}
             </div>
           )}
 

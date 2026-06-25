@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     profile.site_id
       ? supabase.from('sites').select('name').eq('id', profile.site_id).single()
       : Promise.resolve({ data: null }),
-    sb.from('organizations').select('show_netstream_logo').eq('id', profile.org_id).maybeSingle(),
+    sb.from('organizations').select('show_netstream_logo, netstream_logo_url').eq('id', profile.org_id).maybeSingle(),
   ]);
 
   return (
@@ -25,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       siteName={profile.role === 'admin' ? null : (siteRow.data?.name ?? null)}
       capabilities={Array.from(capsSet)}
       showNetstreamLogo={orgRow.data?.show_netstream_logo !== false}
+      netstreamLogoUrl={orgRow.data?.netstream_logo_url ?? null}
     >
       {children}
     </AppShell>

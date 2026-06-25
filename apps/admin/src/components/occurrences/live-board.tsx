@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   AlertTriangle, RefreshCw, FileText, Bell, ScrollText, PencilLine, RotateCcw,
 } from 'lucide-react';
@@ -10,7 +11,10 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
 import { UpdateOccurrenceDialog } from './update-dialog';
-import { SEVERITIES, SEVERITY_LABELS, type LiveOccurrence, type Profile } from '@digilog/shared';
+import {
+  SEVERITIES, SEVERITY_LABELS, SEVERITY_COLORS,
+  type LiveOccurrence, type Profile,
+} from '@digilog/shared';
 
 // The live view selects o.*, so these timing columns are present even if the
 // generated Row type lags behind. Extend locally and cast on read.
@@ -27,6 +31,7 @@ const SELECT =
 type SlaFilter = 'all' | 'breached' | 'due' | 'on_track';
 
 export function LiveBoard({ initial, profile }: { initial: LiveOccurrence[]; profile: Profile }) {
+  const router = useRouter();
   const [items, setItems] = useState<LiveRow[]>(initial as LiveRow[]);
   const [target, setTarget] = useState<LiveOccurrence | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -166,19 +171,29 @@ export function LiveBoard({ initial, profile }: { initial: LiveOccurrence[]; pro
             <tbody className="divide-y divide-[hsl(var(--border))]">
               {filtered.map((o) => {
                 const updateTarget = updateDueAt(o);
+                const sevColor = SEVERITY_COLORS[o.severity];
+                // Base row tint = SLA state (breached/due > severity), with a
+                // severity-coloured left rail in all cases. Click anywhere on
+                // the row to open the detail page; inline action buttons stop
+                // propagation so they still work.
+                const slaBgClass = o.is_sla_breached
+                  ? 'bg-red-50/60 dark:bg-red-950/30'
+                  : o.is_sla_update_due
+                    ? 'bg-amber-50/50 dark:bg-amber-950/25'
+                    : '';
                 return (
                   <tr
                     key={o.id}
-                    className={
-                      o.is_sla_breached
-                        ? 'bg-red-50/50 dark:bg-red-950/20'
-                        : o.is_sla_update_due
-                          ? 'bg-amber-50/40 dark:bg-amber-950/20'
-                          : 'hover:bg-[hsl(var(--surface-alt))]'
-                    }
+                    onClick={() => router.push(`/occurrences/${o.id}`)}
+                    className={`cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${slaBgClass}`}
+                    style={{ borderLeft: `4px solid ${sevColor}` }}
                   >
                     <td className="whitespace-nowrap px-4 py-3">
-                      <Link href={`/occurrences/${o.id}`} className="font-semibold text-brand hover:underline">
+                      <Link
+                        href={`/occurrences/${o.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-semibold text-brand hover:underline"
+                      >
                         {o.ob_number}
                       </Link>
                     </td>
@@ -205,7 +220,9 @@ export function LiveBoard({ initial, profile }: { initial: LiveOccurrence[]; pro
                       {fmtDate(o.incident_at)}<br />{fmtTime(o.incident_at)}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1.5">
+                      {/* Wrapper stops row-click navigation when the user
+                          taps one of the inline action buttons. */}
+                      <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                         <Button size="sm" onClick={() => setTarget(o)}>
                           <PencilLine className="h-3.5 w-3.5" /> Update
                         </Button>

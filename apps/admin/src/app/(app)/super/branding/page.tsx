@@ -15,7 +15,7 @@ export default async function BrandingPage() {
   const sb: any = supabase;
   const { data: orgs } = await sb
     .from('organizations')
-    .select('id, name, slug, show_netstream_logo, is_active')
+    .select('id, name, slug, show_netstream_logo, netstream_logo_url, is_active')
     .order('name', { ascending: true });
 
   return (
@@ -34,5 +34,6 @@ interface Org {
   name: string;
   slug: string;
   show_netstream_logo: boolean;
+  netstream_logo_url: string | null;
   is_active: boolean;
 }

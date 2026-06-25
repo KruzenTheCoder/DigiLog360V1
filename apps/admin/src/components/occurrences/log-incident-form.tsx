@@ -25,7 +25,9 @@ import {
 const MGMT_REPORT_SUBCATEGORY = 'Management Reports';
 const MGMT_REPORT_TYPE = 'Reports';
 
-interface Assignee { id: string; name: string; role: string }
+interface Assignee { id: string; name: string; role: string; jobTitle?: string | null }
+
+const EMERGENCY_OPTIONS = ['Police', 'Fire', 'Medical', 'Private Security', 'Other'] as const;
 
 export function LogIncidentForm({
   profile, sites, reporters, assignees = [],
@@ -44,16 +46,37 @@ export function LogIncidentForm({
   const [type, setType] = useState('');
   const [severity, setSeverity] = useState<SeverityLevel>('medium');
   const [description, setDescription] = useState('');
-  const [incidentAt, setIncidentAt] = useState(() => new Date().toISOString().slice(0, 16));
+  // Live "now" — ticks every second. Used both as the visible running clock
+  // (so users see the system recording the time as it happens) and as the
+  // value stamped onto the record at submit. Admins can manually back-date
+  // an incident via the override field; everyone else is locked to "now".
+  const [now, setNow] = useState(() => new Date());
+  const [override, setOverride] = useState<string>('');
+  const canBackdate = profile.role === 'admin' || profile.role === 'super_user';
   const [siteId, setSiteId] = useState(profile.site_id ?? '');
   const [reportedBy, setReportedBy] = useState(profile.full_name ?? profile.email ?? '');
   const [assignedTo, setAssignedTo] = useState<string>('');
+  // Operational details — all optional, mirroring legacy occurrence fields
+  // so reviewers can answer "was it active?", "what CCTV exists?", "who was
+  // dispatched?" without opening a separate report.
+  const [statusIndicator, setStatusIndicator] = useState<'' | 'active' | 'inactive'>('');
+  const [cctvAvailable, setCctvAvailable] = useState<boolean | null>(null);
+  const [cctvTimes, setCctvTimes] = useState('');
+  const [emergencyServices, setEmergencyServices] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [orgTypes, setOrgTypes] = useState<OrgIncidentType[]>([]);
   const [orgCategories, setOrgCategories] = useState<OrgIncidentCategory[]>([]);
   const [orgSubcategories, setOrgSubcategories] = useState<OrgIncidentSubcategory[]>([]);
+
+  // Tick the running clock every second so the displayed "incident time" is
+  // always the real now-time. Stops re-rendering the whole tree by isolating
+  // the dependency to a single setNow call.
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   // Load the org's custom taxonomy (categories + sub-categories + types).
   useEffect(() => {
@@ -90,8 +113,14 @@ export function LogIncidentForm({
   function reset() {
     setCategory(''); setSubcategory(''); setType(''); setDescription('');
     setSeverity('medium'); setAssignedTo('');
-    setIncidentAt(new Date().toISOString().slice(0, 16));
+    setOverride('');
+    setStatusIndicator(''); setCctvAvailable(null); setCctvTimes('');
+    setEmergencyServices([]);
     setOk(null); setError(null);
+  }
+
+  function toggleEmergency(s: string) {
+    setEmergencyServices((cur) => cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]);
   }
 
   async function submit(e: React.FormEvent) {
@@ -100,8 +129,15 @@ export function LogIncidentForm({
     if (!category) { setError('Pick a category.'); return; }
     if (!subcategory) { setError('Pick a sub-category.'); return; }
     if (!type) { setError('Pick the specific type.'); return; }
-    if (!description || !incidentAt) { setError('Fill in all required fields.'); return; }
+    if (!description) { setError('Fill in all required fields.'); return; }
     setSaving(true);
+
+    // Stamp the incident time at the exact moment Submit fires (or use the
+    // admin's back-dated override). This is the spec from the user — the
+    // running clock locks in only when the user commits.
+    const incidentAt = (canBackdate && override)
+      ? new Date(override).toISOString()
+      : new Date().toISOString();
 
     const supabase = createClient();
     const siteName = sites.find((s) => s.id === siteId)?.name ?? null;
@@ -113,7 +149,7 @@ export function LogIncidentForm({
       subcategory,
       severity,
       description: description.trim(),
-      incident_at: new Date(incidentAt).toISOString(),
+      incident_at: incidentAt,
       site_id: siteId || null,
       site_name: siteName,
       logged_by: profile.id,
@@ -124,6 +160,11 @@ export function LogIncidentForm({
       insertPayload.assigned_to = assignee.id;
       insertPayload.assigned_to_name = assignee.name;
     }
+    // Operational details — only attach the ones the user actually answered.
+    if (statusIndicator) insertPayload.status_indicator = statusIndicator;
+    if (cctvAvailable !== null) insertPayload.cctv_available = cctvAvailable;
+    if (cctvTimes.trim()) insertPayload.cctv_times = cctvTimes.trim();
+    if (emergencyServices.length) insertPayload.emergency_services = emergencyServices;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error: insErr } = await (supabase as any)
@@ -143,6 +184,9 @@ export function LogIncidentForm({
   const selectedSite = sites.find((s) => s.id === siteId) ?? null;
   const selectedAssignee = assignees.find((a) => a.id === assignedTo) ?? null;
   const charCount = description.length;
+  // Progress is informational only — the submit button is no longer gated on
+  // it. The "needs 10 chars" rule was overly strict for quick management-
+  // report logs where the title + classification carry most of the meaning.
   const progressPct = (() => {
     let done = 0;
     const total = 5;
@@ -150,7 +194,7 @@ export function LogIncidentForm({
     if (subcategory) done++;
     if (type) done++;
     if (siteId) done++;
-    if (description.trim().length >= 10) done++;
+    if (description.trim().length > 0) done++;
     return Math.round((done / total) * 100);
   })();
 
@@ -226,7 +270,29 @@ export function LogIncidentForm({
             </div>
             <div>
               <Label>Incident Date &amp; Time *</Label>
-              <Input type="datetime-local" value={incidentAt} onChange={(e) => setIncidentAt(e.target.value)} required />
+              {/* Read-only running clock for non-admins. Admins get the
+                  back-date override below. */}
+              <div className="flex h-10 items-center gap-2 rounded-lg border bg-slate-50 px-3 font-mono text-sm dark:bg-slate-900">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                </span>
+                {now.toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' })}
+              </div>
+              <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">
+                Recorded the moment you click <strong>Log Occurrence</strong>.
+              </p>
+              {canBackdate && (
+                <div className="mt-2">
+                  <Label className="text-xs">Admin: back-date (optional)</Label>
+                  <Input
+                    type="datetime-local"
+                    value={override}
+                    onChange={(e) => setOverride(e.target.value)}
+                    max={new Date().toISOString().slice(0, 16)}
+                  />
+                </div>
+              )}
             </div>
             <div className="sm:col-span-2">
               <Label>Reported By</Label>
@@ -256,7 +322,7 @@ export function LogIncidentForm({
             />
             <div className="mt-1 flex items-center justify-between text-[11px] text-[hsl(var(--muted))]">
               <span>{charCount} characters</span>
-              <span>{charCount < 10 ? 'A bit more detail helps reviewers.' : '✓ Looks good'}</span>
+              <span>{charCount === 0 ? 'Required.' : 'OCR a written note above or type directly — both work.'}</span>
             </div>
             <div className="mt-4">
               <OcrDropzone onText={(text) => setDescription((d) => d ? `${d}\n\n${text}` : text)} />
@@ -264,7 +330,91 @@ export function LogIncidentForm({
           </div>
         </GradientSection>
 
-        {/* 4. Assignment — only renders when the caller has the capability */}
+        {/* 4. Operational details — CCTV, status, emergency services. All
+            optional. Mirrors the legacy occurrence fields so reviewers have
+            the operational picture without opening a separate report. */}
+        <GradientSection
+          title="Operational details (optional)"
+          icon="Radio"
+          tone="amber"
+          subtitle="CCTV, on-scene status, emergency services dispatched"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label>Site status at the time</Label>
+              <Select value={statusIndicator} onChange={(e) => setStatusIndicator(e.target.value as '' | 'active' | 'inactive')}>
+                <option value="">— Not recorded —</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </Select>
+            </div>
+            <div>
+              <Label>CCTV available?</Label>
+              <div className="mt-1 grid grid-cols-3 gap-2">
+                {[
+                  { val: null, label: '—' },
+                  { val: true, label: 'Yes' },
+                  { val: false, label: 'No' },
+                ].map((opt) => {
+                  const on = cctvAvailable === opt.val;
+                  return (
+                    <button
+                      key={String(opt.val)}
+                      type="button"
+                      onClick={() => setCctvAvailable(opt.val)}
+                      className={`rounded-lg border-2 px-3 py-2 text-sm font-semibold transition ${
+                        on
+                          ? 'border-amber-500 bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
+                          : 'border-[hsl(var(--border))] text-[hsl(var(--muted))] hover:border-amber-200'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {cctvAvailable && (
+            <div className="mt-4">
+              <Label>CCTV time window</Label>
+              <Input
+                value={cctvTimes}
+                onChange={(e) => setCctvTimes(e.target.value)}
+                placeholder="e.g. 14:32 – 14:58, camera 03 (gate)"
+              />
+            </div>
+          )}
+
+          <div className="mt-4">
+            <Label>Emergency services on scene</Label>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {EMERGENCY_OPTIONS.map((s) => {
+                const on = emergencyServices.includes(s);
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => toggleEmergency(s)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                      on
+                        ? 'border-red-500 bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-200'
+                        : 'border-[hsl(var(--border))] text-[hsl(var(--muted))] hover:border-red-300'
+                    }`}
+                  >
+                    {on ? '✓ ' : ''}{s}
+                  </button>
+                );
+              })}
+            </div>
+            {emergencyServices.length === 0 && (
+              <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">Tap any that attended. Leave blank if none.</p>
+            )}
+          </div>
+        </GradientSection>
+
+        {/* 5. Assignment — only renders when the caller has the capability */}
         {canAssign && (
           <GradientSection title="Assignment (optional)" icon="UserPlus" tone="green"
             subtitle="Hand this incident to a specific person on duty">
@@ -274,7 +424,9 @@ export function LogIncidentForm({
                 <option value="">— Leave unassigned —</option>
                 {assignees.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} · {ROLE_LABELS[a.role as AppRole] ?? a.role}
+                    {/* Job title sits between name and role so the line reads
+                        "Name · Job title · Role" — matches Udeen's spec. */}
+                    {a.name}{a.jobTitle ? ` · ${a.jobTitle}` : ''} · {ROLE_LABELS[a.role as AppRole] ?? a.role}
                   </option>
                 ))}
               </Select>
@@ -379,9 +531,12 @@ export function LogIncidentForm({
                   : <em className="text-[hsl(var(--muted))]">Select a site</em>
               } />
               <SummaryRow label="Incident time" value={
-                incidentAt
-                  ? new Date(incidentAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-                  : '—'
+                <span className="font-mono">
+                  {(canBackdate && override
+                    ? new Date(override)
+                    : now
+                  ).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                </span>
               } />
               <SummaryRow label="Reported by" value={reportedBy || '—'} />
               {canAssign && (
@@ -433,7 +588,7 @@ export function LogIncidentForm({
               <Button type="button" variant="secondary" onClick={reset} disabled={saving}>
                 <RotateCcw className="h-4 w-4" /> Reset
               </Button>
-              <Button type="submit" disabled={saving || progressPct < 100}>
+              <Button type="submit" disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 Log Occurrence
               </Button>

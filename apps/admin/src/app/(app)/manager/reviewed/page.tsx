@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge, SeverityBadge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { ReviewedFilterBar } from '@/components/manager/reviewed-filter-bar';
 import { formatDateTime } from '@/lib/utils';
 import {
   MANAGER_DECISION_LABELS, MANAGER_DECISION_COLORS,
@@ -15,6 +16,10 @@ import {
 } from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
+
+interface PageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
 
 type AckWithBulk = ManagerAcknowledgement & {
   bulk_id: string | null;
@@ -41,19 +46,51 @@ type RowEntry =
       items: AckWithBulk[];
     };
 
-export default async function ReviewedLogsPage() {
+export default async function ReviewedLogsPage({ searchParams }: PageProps) {
   const profile = await requireProfile();
   if (!isManager(profile)) redirect('/dashboard');
 
+  const params = await searchParams;
+  const scopeRaw = typeof params.scope === 'string' ? params.scope : 'mine';
+  const scope: 'mine' | 'by' | 'all' = (['mine','by','all'] as const).includes(scopeRaw as 'mine'|'by'|'all')
+    ? (scopeRaw as 'mine' | 'by' | 'all')
+    : 'mine';
+  const reviewerFilter = typeof params.reviewer === 'string' ? params.reviewer : null;
+
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (supabase as any)
+  let q = (supabase as any)
     .from('manager_acknowledgements')
     .select('*')
     .order('reviewed_at', { ascending: false })
     .limit(500);
 
+  if (scope === 'mine') {
+    q = q.eq('reviewed_by', profile.id);
+  } else if (scope === 'by' && reviewerFilter) {
+    q = q.eq('reviewed_by', reviewerFilter);
+  }
+  // scope === 'all' (or 'by' with no reviewer chosen) → no extra filter.
+
+  const { data } = await q;
   const acks = (data ?? []) as unknown as AckWithBulk[];
+
+  // Build the reviewer dropdown options from the org's manager-ish users so
+  // the "By Person" tab can show real names, not just whoever has acked.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: reviewersRaw } = await (supabase as any)
+    .from('profiles')
+    .select('id, full_name, email, role, roles')
+    .eq('org_id', profile.org_id)
+    .order('full_name', { ascending: true, nullsFirst: false });
+  const reviewers = ((reviewersRaw ?? []) as Array<{
+    id: string; full_name: string | null; email: string | null; role: string; roles: string[] | null;
+  }>)
+    .filter((p) => {
+      const all = (p.roles && p.roles.length > 0) ? p.roles : [p.role];
+      return all.some((r) => ['admin','manager','control_room','super_user'].includes(r));
+    })
+    .map((p) => ({ id: p.id, name: p.full_name ?? p.email ?? 'Unknown' }));
 
   // Fetch the occurrence detail for every ack in one round-trip so the
   // bulk-row summary can show severity mix + sites + types without N+1.
@@ -125,6 +162,13 @@ export default async function ReviewedLogsPage() {
       <PageHeader
         title="Reviewed Logs"
         description="Every incident you and your team have signed off. Bulk acknowledgements appear as one entry."
+      />
+
+      <ReviewedFilterBar
+        scope={scope}
+        reviewerId={reviewerFilter}
+        reviewers={reviewers}
+        currentUserName={profile.full_name ?? profile.email ?? 'You'}
       />
 
       <Card>

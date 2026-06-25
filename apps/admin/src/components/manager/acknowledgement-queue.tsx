@@ -16,7 +16,7 @@ import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
 import { SignaturePad } from '@/components/ui/signature-pad';
 import {
   MANAGER_DECISIONS, MANAGER_DECISION_LABELS, MANAGER_DECISION_COLORS,
-  SEVERITIES, SEVERITY_LABELS,
+  SEVERITIES, SEVERITY_LABELS, SEVERITY_COLORS,
   type Occurrence, type ManagerDecision, type SeverityLevel,
 } from '@digilog/shared';
 import { formatDateTime } from '@/lib/utils';
@@ -272,10 +272,26 @@ function GridCard({
   onToggleSelect: () => void;
   onReview: () => void;
 }) {
+  const sevColor = SEVERITY_COLORS[o.severity];
   return (
-    <Card className={`p-4 ${selected ? 'border-brand ring-1 ring-brand/40' : ''}`}>
+    <Card
+      // Clicking anywhere on the card body acts as Review — same as the
+      // legacy app. Inline action zones (checkbox, OB link, action button)
+      // stop propagation so they keep their own click behaviour.
+      onClick={onReview}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onReview(); }}
+      className={`cursor-pointer p-4 transition-shadow hover:shadow-md ${selected ? 'border-brand ring-1 ring-brand/40' : ''}`}
+      // Severity left rail + soft tonal background — replaces the stark
+      // pure-white card and gives the row a glanceable severity colour.
+      style={{
+        borderLeft: `4px solid ${sevColor}`,
+        background: `linear-gradient(135deg, ${sevColor}0a 0%, transparent 50%)`,
+      }}
+    >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-2" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
             checked={selected}
@@ -299,7 +315,7 @@ function GridCard({
       </p>
       <p className="mt-0.5 text-[11px] text-[hsl(var(--muted))]">{formatDateTime(o.incident_at)}</p>
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
         <Button size="sm" className="flex-1" onClick={onReview}>Review</Button>
       </div>
     </Card>
@@ -331,21 +347,32 @@ function ListRows({
       <ul className="divide-y divide-[hsl(var(--border))]">
         {items.map((o) => {
           const isSel = selected.has(o.id);
+          const sevColor = SEVERITY_COLORS[o.severity];
           return (
             <li
               key={o.id}
-              className={`grid grid-cols-1 gap-2 px-4 py-3 transition-colors md:grid-cols-[36px_110px_minmax(0,1fr)_120px_140px_140px_120px] md:items-center md:gap-3 ${
+              onClick={() => onReview(o)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onReview(o); }}
+              className={`grid cursor-pointer grid-cols-1 gap-2 px-4 py-3 transition-colors md:grid-cols-[36px_110px_minmax(0,1fr)_120px_140px_140px_120px] md:items-center md:gap-3 ${
                 isSel ? 'bg-brand/5' : 'hover:bg-[hsl(var(--surface-alt))]'
               }`}
+              style={{ borderLeft: `4px solid ${sevColor}` }}
             >
               <input
                 type="checkbox"
                 checked={isSel}
+                onClick={(e) => e.stopPropagation()}
                 onChange={() => onToggleSelect(o.id)}
                 aria-label={`Select ${o.ob_number}`}
                 className="h-4 w-4 self-start md:self-center"
               />
-              <Link href={`/occurrences/${o.id}`} className="font-semibold hover:text-brand">
+              <Link
+                href={`/occurrences/${o.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="font-semibold hover:text-brand"
+              >
                 {o.ob_number}
               </Link>
               <div className="min-w-0">
@@ -365,7 +392,7 @@ function ListRows({
               <span className="hidden text-xs text-[hsl(var(--muted))] md:inline">
                 {formatDateTime(o.incident_at)}
               </span>
-              <div className="flex justify-end">
+              <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
                 <Button size="sm" onClick={() => onReview(o)}>Review</Button>
               </div>
             </li>

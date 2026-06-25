@@ -236,6 +236,9 @@ function UserDialog({
     : [initialRole];
   const [email, setEmail] = useState(user?.email ?? '');
   const [fullName, setFullName] = useState(user?.full_name ?? '');
+  const [jobTitle, setJobTitle] = useState(
+    (user as unknown as { job_title?: string | null })?.job_title ?? '',
+  );
   const [password, setPassword] = useState('');
   const [roles, setRoles] = useState<AppRole[]>(initialRoles);
   // Primary role is always roles[0]; we surface it for the PIN-trigger logic.
@@ -376,7 +379,18 @@ function UserDialog({
         ...(pin ? { pin } : {}),
       };
 
-    const { error: fnErr } = await supabase.functions.invoke(fn, { body });
+    const { error: fnErr, data: fnData } = await supabase.functions.invoke(fn, { body });
+    // job_title isn't part of the existing admin-* edge functions, so we
+    // patch it directly on the profile after the function succeeds. RLS lets
+    // users with users.edit / admin / super_user perform this update.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const created = (fnData as any)?.user?.id ?? (fnData as any)?.id ?? user?.id;
+      if (!fnErr && created) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).from('profiles').update({ job_title: jobTitle.trim() || null }).eq('id', created);
+      }
+    } catch { /* non-fatal — job title can be edited again later */ }
     setBusy(false);
     if (fnErr) {
       // supabase-js wraps non-2xx responses with a generic message ("Failed
@@ -420,6 +434,17 @@ function UserDialog({
           <div>
             <Label>Full Name</Label>
             <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <Label>Job Title</Label>
+            <Input
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+              placeholder="e.g. Site Manager, Control Room Operator"
+            />
+            <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">
+              Shown next to the name in assignment dropdowns and audit rows.
+            </p>
           </div>
         </div>
 

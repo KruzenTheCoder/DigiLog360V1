@@ -19,7 +19,7 @@ const DESCRIPTIONS: Record<string, string> = {
   // '/menu' deliberately omitted — it's the landing hub, not a destination.
   '/notifications': 'Alerts and messages addressed to you.',
   '/occurrences/all': 'Browse every occurrence on record.',
-  '/occurrences/new': 'Manually log an incident.',
+  '/occurrences/new': 'Log a new occurrence.',
   '/reports': 'Search, view and export occurrence reports.',
   '/occurrences/history': 'View and filter past occurrences.',
   '/my-queue': 'Occurrences assigned to you.',
