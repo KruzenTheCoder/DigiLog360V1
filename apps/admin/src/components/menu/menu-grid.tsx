@@ -32,6 +32,7 @@ const DESCRIPTIONS: Record<string, string> = {
   '/guards-map': 'Track guard positions on a live map.',
   '/manager/acknowledgements': 'Review occurrences, acknowledge and sign off.',
   '/manager/reviewed': 'View the logs of occurrences you have reviewed.',
+  '/manager/staff-reports': 'Hero KPIs, severity, SLA & per-role rankings.',
   '/users': 'Add, edit and deactivate users.',
   '/sites': 'Manage sites and locations.',
   '/settings/organization': 'Branding and organisation details.',

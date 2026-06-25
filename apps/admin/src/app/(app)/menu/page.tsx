@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireProfile, loadMyCapabilities } from '@/lib/auth';
 import { visibleSections } from '@/components/layout/nav-config';
 import { RoleMenu, type RoleMenuData } from '@/components/menu/role-menu';
-import { profileRoles, type AppRole } from '@digilog/shared';
+import { profileRoles, roleRank, type AppRole } from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,20 +26,39 @@ export default async function MenuPage() {
 
   // One menu per role the user holds, so multi-role users (e.g. Control Room +
   // Manager) get a pill switcher. The role filter differentiates the tabs;
-  // common items appear under each. Fall back to the combined view if a single
-  // role resolves to nothing.
+  // shared items only appear under the highest-ranked role — see dedupe below.
   const roleList: AppRole[] = profileRoles(profile).length > 0 ? profileRoles(profile) : [profile.role];
-  const roleMenus: RoleMenuData[] = roleList
-    .map((role) => ({
-      role,
-      title: ROLE_MENU_TITLE[role] ?? 'Menu',
-      sections: visibleSections([role], caps),
-    }))
-    .filter((m) => m.sections.length > 0);
+
+  // Sort roles by rank, highest first, so we walk top-down when deduping.
+  const rankedRoles = [...roleList].sort((a, b) => roleRank(b) - roleRank(a));
+
+  // For each role, only show items NOT already shown by a higher-ranked role
+  // in this same user's set. Identity = href (every nav item has a unique URL).
+  const seenHrefs = new Set<string>();
+  const roleMenus: RoleMenuData[] = [];
+  for (const role of rankedRoles) {
+    const sections = visibleSections([role], caps)
+      .map((s) => ({
+        ...s,
+        items: s.items.filter((i) => {
+          if (seenHrefs.has(i.href)) return false;
+          seenHrefs.add(i.href);
+          return true;
+        }),
+      }))
+      .filter((s) => s.items.length > 0);
+    if (sections.length > 0) {
+      roleMenus.push({
+        role,
+        title: ROLE_MENU_TITLE[role] ?? 'Menu',
+        sections,
+      });
+    }
+  }
   if (roleMenus.length === 0) {
     roleMenus.push({
-      role: roleList[0],
-      title: ROLE_MENU_TITLE[roleList[0]] ?? 'Menu',
+      role: rankedRoles[0],
+      title: ROLE_MENU_TITLE[rankedRoles[0]] ?? 'Menu',
       sections: visibleSections(roleList, caps),
     });
   }

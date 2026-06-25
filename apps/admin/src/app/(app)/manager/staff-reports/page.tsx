@@ -2,13 +2,49 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, isManager } from '@/lib/auth';
 import { PageHeader } from '@/components/page-header';
+import { GradientSection } from '@/components/ui/gradient-section';
+import { HeroKpi } from '@/components/dashboard/hero-kpi';
+import { SeverityCards } from '@/components/dashboard/severity-cards';
+import {
+  CategoryDonut, MonthlyTrendChart, PALETTE,
+} from '@/components/dashboard/dashboard-charts';
+import { SlaComplianceReport } from '@/components/dashboard/sla-compliance';
+import { RolePerformanceTable, type RolePerfRow } from '@/components/manager/role-performance';
 import { StaffReports } from '@/components/manager/staff-reports';
-import { APP_ROLES, type AppRole } from '@digilog/shared';
+import {
+  APP_ROLES, SEVERITIES, SEVERITY_LABELS, isSlaBreached, isSlaUpdateDue,
+  type AppRole, type SeverityLevel,
+} from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+interface DashboardOcc {
+  id: number;
+  // Stored DB enums — typed as plain string here so we can cast freely from
+  // the generated-types-aware fetch without dragging the union all over.
+  status: string;
+  severity: SeverityLevel;
+  occurrence_type: string;
+  site_id: string | null;
+  site_name: string | null;
+  incident_at: string;
+  closed_at: string | null;
+  sla_due_at: string | null;
+  last_sla_update_at: string | null;
+  sla_hours: number | null;
+  logged_by: string | null;
+  assigned_to: string | null;
+  [key: string]: unknown;
+}
+
+interface AckLiteRow extends AckLite {
+  [key: string]: unknown;
 }
 
 interface ProfileLite {
@@ -20,6 +56,14 @@ interface ProfileLite {
   site_id: string | null;
 }
 
+interface AckLite {
+  reviewed_by: string | null;
+  reviewed_at: string;
+  occurrence_id: number;
+}
+
+// We need an index signature on the row type passed to the StaffReports
+// per-user table so its CSV exporter is happy.
 interface UserStats {
   user_id: string;
   full_name: string | null;
@@ -38,8 +82,6 @@ interface UserStats {
   acknowledgements: number;
   tasks_open: number;
   tasks_done: number;
-  // Mirror the component-side index signature so the StaffReports prop
-  // accepts these rows.
   [key: string]: unknown;
 }
 
@@ -53,81 +95,275 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
 
   const supabase = await createClient();
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const now = new Date();
 
-  // ---------- Roster (filtered by role if asked) ----------
+  // ----------------------------- core data -----------------------------------
+
+  // Generated types lag behind a few recently-added columns (assigned_to,
+  // etc.) — route through `any` so the page-level types stay clean.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q = (supabase as any).from('profiles').select('id, full_name, email, role, roles, site_id');
-  if (roleFilter !== 'all') {
-    // Match either primary role OR roles[] contains it
-    q = q.or(`role.eq.${roleFilter},roles.cs.{${roleFilter}}`);
-  }
-  q = q.order('full_name', { ascending: true, nullsFirst: false });
-  const { data: profiles } = await q;
-  const roster: ProfileLite[] = (profiles ?? []) as ProfileLite[];
-  const userIds = roster.map((p) => p.id);
-
-  // ---------- Sites lookup ----------
-  const { data: sites } = await supabase.from('sites').select('id, name');
-  const siteName = new Map<string, string>((sites ?? []).map((s) => [s.id, s.name]));
-
-  // ---------- Per-user roll-up via small parallel queries ----------
-  // For each metric, we run one query and aggregate client-side. Postgres
-  // group-by would be cleaner but we'd need an RPC; this stays portable.
+  const sb: any = supabase;
   const [
-    occRes,
-    patrolRes,
-    scanRes,
-    shiftRes,
-    ackRes,
-    tasksRes,
+    { data: occRaw },
+    { data: profilesRaw },
+    { data: sites },
+    { data: acksRaw },
+    { data: patrolsRaw },
+    { data: scansRaw },
+    { data: shiftsRaw },
+    { data: tasksRaw },
   ] = await Promise.all([
-    supabase.from('occurrences').select('id, logged_by, status, created_at')
-      .gte('created_at', since).in('logged_by', userIds.length ? userIds : ['00000000-0000-0000-0000-000000000000']),
-    supabase.from('patrols').select('id, guard_id, duration_minutes, started_at')
-      .gte('started_at', since).in('guard_id', userIds.length ? userIds : ['00000000-0000-0000-0000-000000000000']),
-    supabase.from('checkpoint_scans').select('id, guard_id, scanned_at')
-      .gte('scanned_at', since).in('guard_id', userIds.length ? userIds : ['00000000-0000-0000-0000-000000000000']),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('shifts').select('id, user_id, duration_minutes, started_at')
-      .gte('started_at', since).in('user_id', userIds.length ? userIds : ['00000000-0000-0000-0000-000000000000']),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('manager_acknowledgements').select('id, reviewed_by, reviewed_at')
-      .gte('reviewed_at', since).in('reviewed_by', userIds.length ? userIds : ['00000000-0000-0000-0000-000000000000']),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('tasks').select('id, assigned_to, status, created_at')
-      .gte('created_at', since).in('assigned_to', userIds.length ? userIds : ['00000000-0000-0000-0000-000000000000']),
+    sb
+      .from('occurrences')
+      .select('id, status, severity, occurrence_type, site_id, site_name, incident_at, closed_at, sla_due_at, last_sla_update_at, sla_hours, logged_by, assigned_to')
+      .gte('incident_at', since)
+      .order('incident_at', { ascending: false }),
+    sb.from('profiles').select('id, full_name, email, role, roles, site_id'),
+    sb.from('sites').select('id, name'),
+    sb.from('manager_acknowledgements').select('reviewed_by, reviewed_at, occurrence_id').gte('reviewed_at', since),
+    sb.from('patrols').select('id, guard_id, duration_minutes, started_at').gte('started_at', since),
+    sb.from('checkpoint_scans').select('id, guard_id, scanned_at').gte('scanned_at', since),
+    sb.from('shifts').select('id, user_id, duration_minutes, started_at').gte('started_at', since),
+    sb.from('tasks').select('id, assigned_to, status, created_at').gte('created_at', since),
   ]);
 
-  function tally<T extends Record<string, unknown>>(
-    rows: T[] | null | undefined,
-    key: keyof T,
-  ): Map<string, T[]> {
+  const occ = (occRaw ?? []) as unknown as DashboardOcc[];
+  const roster = (profilesRaw ?? []) as unknown as ProfileLite[];
+  const siteName = new Map<string, string>(((sites ?? []) as Array<{ id: string; name: string }>).map((s) => [s.id, s.name]));
+  const acks = (acksRaw ?? []) as unknown as AckLiteRow[];
+
+  // ----------------------------- alerts strip --------------------------------
+
+  const openCount = occ.filter((o) => o.status === 'open').length;
+  // isSlaBreached / isSlaUpdateDue expect the strict OccurrenceStatus enum
+  // type from shared; runtime values are equivalent so cast through unknown.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const breached = occ.filter((o) => isSlaBreached(o as any, now)).length;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateDue = occ.filter((o) => isSlaUpdateDue(o as any, now) && !isSlaBreached(o as any, now)).length;
+
+  // ----------------------------- hero KPIs -----------------------------------
+
+  const total30 = occ.length;
+  const resolved = occ.filter((o) => o.status === 'resolved' || o.status === 'closed').length;
+  const closedWithTime = occ.filter((o) => o.closed_at);
+  const avgResHrs = closedWithTime.length
+    ? Math.round(
+        (closedWithTime.reduce((s, o) =>
+          s + (new Date(o.closed_at as string).getTime() - new Date(o.incident_at).getTime()), 0)
+          / closedWithTime.length) / 36e5,
+      )
+    : 0;
+
+  // Highest-risk category — the type with the most incidents
+  const typeMap = new Map<string, number>();
+  occ.forEach((o) => typeMap.set(o.occurrence_type, (typeMap.get(o.occurrence_type) ?? 0) + 1));
+  const typeBreakdown = [...typeMap.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+  const highestRisk = typeBreakdown[0] ?? { name: '—', count: 0 };
+
+  // ----------------------------- severity ------------------------------------
+
+  const severityCounts = SEVERITIES.reduce((acc, key) => {
+    acc[key] = occ.filter((o) => o.severity === key).length;
+    return acc;
+  }, {} as Record<SeverityLevel, number>);
+
+  // ----------------------------- top sites -----------------------------------
+
+  const siteMap = new Map<string, number>();
+  occ.forEach((o) => {
+    const s = o.site_name ?? 'Unassigned';
+    siteMap.set(s, (siteMap.get(s) ?? 0) + 1);
+  });
+  const topSites = [...siteMap.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // ----------------------------- monthly trend (6 months) --------------------
+
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const { data: trendRaw } = await supabase
+    .from('occurrences')
+    .select('id, incident_at, status, sla_due_at')
+    .gte('incident_at', sixMonthsAgo.toISOString());
+  const monthly = (() => {
+    const map = new Map<string, { count: number; breached: number }>();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      map.set(`${d.getFullYear()}-${d.getMonth()}`, { count: 0, breached: 0 });
+    }
+    (trendRaw ?? []).forEach((o) => {
+      const d = new Date(o.incident_at as string);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      const slot = map.get(key);
+      if (slot) {
+        slot.count++;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (isSlaBreached(o as any, now)) slot.breached++;
+      }
+    });
+    return [...map.entries()].map(([k, v]) => {
+      const m = Number(k.split('-')[1]);
+      return { month: MONTHS[m], count: v.count, breached: v.breached };
+    });
+  })();
+
+  // ----------------------------- SLA breach analysis -------------------------
+
+  const slaEnd = (o: DashboardOcc) =>
+    (o.status === 'resolved' || o.status === 'closed') && o.closed_at
+      ? new Date(o.closed_at).getTime()
+      : now.getTime();
+  const breachedEver = (o: DashboardOcc) =>
+    !!o.sla_due_at && slaEnd(o) > new Date(o.sla_due_at).getTime();
+  const slaScoped = occ.filter((o) => o.sla_due_at);
+  const slaTotal = slaScoped.length;
+  const slaBreaches = slaScoped.filter(breachedEver);
+  const slaWithin = slaTotal - slaBreaches.length;
+  const complianceRate = slaTotal ? Math.round((slaWithin / slaTotal) * 100) : 100;
+  const avgOverageHrs = slaBreaches.length
+    ? Math.round(
+        (slaBreaches.reduce((s, o) => s + (slaEnd(o) - new Date(o.sla_due_at as string).getTime()), 0)
+          / slaBreaches.length) / 36e5 * 10,
+      ) / 10
+    : 0;
+  const slaBySeverity = SEVERITIES.map((sev) => {
+    const rows = slaScoped.filter((o) => o.severity === sev);
+    const br = rows.filter(breachedEver).length;
+    return {
+      key: sev, label: SEVERITY_LABELS[sev],
+      total: rows.length, breached: br,
+      compliance: rows.length ? Math.round(((rows.length - br) / rows.length) * 100) : 100,
+    };
+  }).filter((s) => s.total > 0);
+  const slaSiteMap = new Map<string, { total: number; breached: number }>();
+  slaScoped.forEach((o) => {
+    const s = o.site_name ?? 'Unassigned';
+    const cur = slaSiteMap.get(s) ?? { total: 0, breached: 0 };
+    cur.total++; if (breachedEver(o)) cur.breached++;
+    slaSiteMap.set(s, cur);
+  });
+  const slaBySite = [...slaSiteMap.entries()]
+    .map(([name, v]) => ({
+      name, total: v.total, breached: v.breached,
+      compliance: v.total ? Math.round(((v.total - v.breached) / v.total) * 100) : 100,
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
+
+  // ----------------------------- per-role rankings ---------------------------
+
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+  const startOfWeek = new Date(); startOfWeek.setDate(startOfWeek.getDate() - 7);
+
+  const occByLogger = new Map<string, DashboardOcc[]>();
+  occ.forEach((o) => {
+    if (!o.logged_by) return;
+    const list = occByLogger.get(o.logged_by) ?? [];
+    list.push(o);
+    occByLogger.set(o.logged_by, list);
+  });
+
+  const occByAssignee = new Map<string, DashboardOcc[]>();
+  occ.forEach((o) => {
+    if (!o.assigned_to) return;
+    const list = occByAssignee.get(o.assigned_to) ?? [];
+    list.push(o);
+    occByAssignee.set(o.assigned_to, list);
+  });
+
+  function buildLoggerRow(p: ProfileLite): RolePerfRow {
+    const list = occByLogger.get(p.id) ?? [];
+    const breachedCount = list.filter(breachedEver).length;
+    return {
+      user_id: p.id,
+      full_name: p.full_name,
+      email: p.email,
+      site_name: p.site_id ? siteName.get(p.site_id) ?? null : null,
+      total: list.length,
+      today: list.filter((o) => new Date(o.incident_at) >= startOfToday).length,
+      week: list.filter((o) => new Date(o.incident_at) >= startOfWeek).length,
+      sla_breach_pct: list.length ? Math.round((breachedCount / list.length) * 100) : 0,
+    };
+  }
+
+  const guards = roster.filter((p) => p.role === 'guard' || (p.roles ?? []).includes('guard'));
+  const guardRows = guards
+    .map(buildLoggerRow)
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  const controlRoom = roster.filter((p) => p.role === 'control_room' || (p.roles ?? []).includes('control_room'));
+  const controlRoomRows = controlRoom
+    .map(buildLoggerRow)
+    .sort((a, b) => b.total - a.total);
+
+  // Manager rows — different metrics: acknowledgements + assigned/closed
+  const acksByMgr = new Map<string, number>();
+  acks.forEach((a) => {
+    if (!a.reviewed_by) return;
+    acksByMgr.set(a.reviewed_by, (acksByMgr.get(a.reviewed_by) ?? 0) + 1);
+  });
+  const managers = roster.filter((p) => p.role === 'manager' || (p.roles ?? []).includes('manager'));
+  const managerRows: RolePerfRow[] = managers
+    .map((p) => {
+      const assigned = occByAssignee.get(p.id) ?? [];
+      const closed = assigned.filter((o) => o.status === 'resolved' || o.status === 'closed');
+      const breachedCount = assigned.filter(breachedEver).length;
+      return {
+        user_id: p.id,
+        full_name: p.full_name,
+        email: p.email,
+        site_name: p.site_id ? siteName.get(p.site_id) ?? null : null,
+        total: assigned.length,
+        today: 0,
+        week: 0,
+        sla_breach_pct: assigned.length ? Math.round((breachedCount / assigned.length) * 100) : 0,
+        assigned: assigned.length,
+        closed: closed.length,
+        response_rate: assigned.length ? Math.round((closed.length / assigned.length) * 100) : 0,
+        acks: acksByMgr.get(p.id) ?? 0,
+      };
+    })
+    .sort((a, b) => (b.acks ?? 0) - (a.acks ?? 0) || (b.assigned ?? 0) - (a.assigned ?? 0));
+
+  // ----------------------------- per-user stats (existing table) -------------
+
+  let userIds = roster.map((p) => p.id);
+  let rosterFiltered = roster;
+  if (roleFilter !== 'all') {
+    rosterFiltered = roster.filter((p) => p.role === roleFilter || (p.roles ?? []).includes(roleFilter));
+    userIds = rosterFiltered.map((p) => p.id);
+  }
+  const inSet = new Set(userIds);
+  function tally<T extends { [k: string]: unknown }>(rows: T[] | null | undefined, key: keyof T) {
     const m = new Map<string, T[]>();
     for (const r of rows ?? []) {
       const k = String(r[key] ?? '');
+      if (!inSet.has(k)) continue;
       if (!m.has(k)) m.set(k, []);
       m.get(k)!.push(r);
     }
     return m;
   }
+  const byOcc = tally(occ, 'logged_by');
+  const byPatrol = tally(patrolsRaw ?? [], 'guard_id');
+  const byScan = tally(scansRaw ?? [], 'guard_id');
+  const byShift = tally(shiftsRaw ?? [], 'user_id');
+  const byAck = tally(acks, 'reviewed_by');
+  const byTask = tally(tasksRaw ?? [], 'assigned_to');
 
-  const byOcc = tally(occRes.data ?? [], 'logged_by');
-  const byPatrol = tally(patrolRes.data ?? [], 'guard_id');
-  const byScan = tally(scanRes.data ?? [], 'guard_id');
-  const byShift = tally(shiftRes.data ?? [], 'user_id');
-  const byAck = tally(ackRes.data ?? [], 'reviewed_by');
-  const byTask = tally(tasksRes.data ?? [], 'assigned_to');
-
-  const stats: UserStats[] = roster.map((p) => {
-    const occ = (byOcc.get(p.id) ?? []) as Array<{ status: string }>;
-    const patrols = (byPatrol.get(p.id) ?? []) as Array<{ duration_minutes: number | null }>;
-    const scans = byScan.get(p.id) ?? [];
-    const shifts = (byShift.get(p.id) ?? []) as Array<{ duration_minutes: number | null }>;
-    const acks = byAck.get(p.id) ?? [];
-    const tasks = (byTask.get(p.id) ?? []) as Array<{ status: string }>;
-
-    const occClosed = occ.filter((o) => o.status === 'resolved' || o.status === 'closed').length;
-
+  const userStats: UserStats[] = rosterFiltered.map((p) => {
+    const occList = (byOcc.get(p.id) ?? []) as Array<{ status: string }>;
+    const patList = (byPatrol.get(p.id) ?? []) as Array<{ duration_minutes: number | null }>;
+    const scanList = byScan.get(p.id) ?? [];
+    const shiftList = (byShift.get(p.id) ?? []) as Array<{ duration_minutes: number | null }>;
+    const ackList = byAck.get(p.id) ?? [];
+    const taskList = (byTask.get(p.id) ?? []) as Array<{ status: string }>;
+    const occClosed = occList.filter((o) => o.status === 'resolved' || o.status === 'closed').length;
     return {
       user_id: p.id,
       full_name: p.full_name,
@@ -135,32 +371,216 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
       role: p.role,
       roles: Array.isArray(p.roles) && p.roles.length > 0 ? p.roles : [p.role],
       site_name: p.site_id ? siteName.get(p.site_id) ?? null : null,
-      occurrences: occ.length,
-      occurrences_open: occ.length - occClosed,
+      occurrences: occList.length,
+      occurrences_open: occList.length - occClosed,
       occurrences_closed: occClosed,
-      patrols: patrols.length,
-      patrol_minutes: patrols.reduce((s, p) => s + (p.duration_minutes ?? 0), 0),
-      scans: scans.length,
-      shifts: shifts.length,
-      shift_minutes: shifts.reduce((s, sh) => s + (sh.duration_minutes ?? 0), 0),
-      acknowledgements: acks.length,
-      tasks_open: tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled').length,
-      tasks_done: tasks.filter((t) => t.status === 'done').length,
+      patrols: patList.length,
+      patrol_minutes: patList.reduce((s, x) => s + (x.duration_minutes ?? 0), 0),
+      scans: scanList.length,
+      shifts: shiftList.length,
+      shift_minutes: shiftList.reduce((s, x) => s + (x.duration_minutes ?? 0), 0),
+      acknowledgements: ackList.length,
+      tasks_open: taskList.filter((t) => t.status !== 'done' && t.status !== 'cancelled').length,
+      tasks_done: taskList.filter((t) => t.status === 'done').length,
     };
   });
 
+  // -------------------------------- render -----------------------------------
   return (
     <>
       <PageHeader
-        title="Staff Reports"
-        description={`Per-user activity in the last ${days} days, filterable by role.`}
+        title="Manager Performance Dashboard"
+        description={`Real-time analytics & key performance indicators — last ${days} days.`}
       />
-      <StaffReports
-        rows={stats}
-        roleFilter={roleFilter}
-        days={days}
-        roles={APP_ROLES}
-      />
+
+      {/* Alerts banner */}
+      {(breached > 0 || updateDue > 0 || openCount > 50) && (
+        <div className="mb-5 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 text-sm shadow-sm dark:border-amber-900 dark:from-amber-950/40 dark:to-yellow-950/40">
+          <p className="mb-1 font-semibold text-amber-800 dark:text-amber-300">
+            <span aria-hidden>⚠ </span>Active System Alerts
+          </p>
+          <ul className="space-y-0.5 text-amber-700 dark:text-amber-200">
+            {openCount > 50 && <li>Too many open incidents ({openCount}) requiring attention.</li>}
+            {breached > 0 && <li>{breached} incident(s) have breached their SLA.</li>}
+            {updateDue > 0 && <li>{updateDue} incident(s) require SLA updates.</li>}
+          </ul>
+        </div>
+      )}
+
+      {/* Hero KPIs */}
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <HeroKpi
+          tone="red"
+          icon="TriangleAlert"
+          label="Total Incidents"
+          sublabel={`Last ${days} days`}
+          value={total30}
+          footer={<span>{resolved} resolved · {openCount} open</span>}
+        />
+        <HeroKpi
+          tone="blue"
+          icon="ShieldAlert"
+          label="Highest Risk"
+          sublabel="Category"
+          value={highestRisk.name}
+          footer={`${highestRisk.count} incidents logged`}
+        />
+        <HeroKpi
+          tone={avgResHrs <= 4 ? 'green' : 'red'}
+          icon="Clock"
+          label="Avg Resolution"
+          sublabel="Time to close"
+          value={`${avgResHrs} Hrs`}
+          footer={avgResHrs <= 4 ? '✓ Within 4h target' : '⚠ Over 4h target'}
+        />
+      </div>
+
+      {/* Period switcher */}
+      <div className="mb-5 flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-[hsl(var(--muted))]">Period:</span>
+        {[7, 30, 60, 90, 180, 365].map((d) => (
+          <a
+            key={d}
+            href={`?days=${d}${roleFilter !== 'all' ? `&role=${roleFilter}` : ''}`}
+            className={`rounded-full px-3 py-1 ${days === d ? 'bg-brand text-white' : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700'}`}
+          >
+            {d === 7 ? '7d' : d === 365 ? '1y' : `${d}d`}
+          </a>
+        ))}
+      </div>
+
+      {/* Category breakdown + high-frequency incidents */}
+      <div className="mb-5 grid gap-4 lg:grid-cols-2">
+        <GradientSection title="Incident Breakdown by Category" icon="PieChart" tone="brand">
+          <CategoryDonut data={typeBreakdown.slice(0, 7)} />
+        </GradientSection>
+        <GradientSection title="High-Frequency Incidents" icon="Flame" tone="red">
+          <div className="space-y-3.5">
+            {typeBreakdown.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
+            {typeBreakdown.slice(0, 7).map((t, i) => {
+              const pct = total30 ? Math.round((t.count / total30) * 100) : 0;
+              const color = PALETTE[i % PALETTE.length];
+              return (
+                <div key={t.name} className="flex items-center gap-3">
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm"
+                    style={{ background: color }}
+                  >
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                      <span className="truncate font-medium">{t.name}</span>
+                      <span className="shrink-0 text-xs text-[hsl(var(--muted))]">
+                        <span className="font-semibold text-[hsl(var(--foreground))]">{t.count}</span> · {pct}%
+                      </span>
+                    </div>
+                    <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${Math.max(pct, 2)}%`, background: `linear-gradient(90deg, ${color}bb, ${color})` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </GradientSection>
+      </div>
+
+      {/* Volume by site + monthly trend */}
+      <div className="mb-5 grid gap-4 lg:grid-cols-2">
+        <GradientSection title="Occurrence Volume by Site" icon="MapPin" tone="sky">
+          <div className="space-y-3">
+            {topSites.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
+            {topSites.slice(0, 8).map((s) => {
+              const pct = total30 ? Math.round((s.count / total30) * 100) : 0;
+              return (
+                <div key={s.name}>
+                  <div className="mb-1 flex justify-between text-sm">
+                    <span className="font-medium">{s.name}</span>
+                    <span className="text-[hsl(var(--muted))]">{s.count} ({pct}%)</span>
+                  </div>
+                  <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div className="h-full rounded-full bg-brand-gradient" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </GradientSection>
+        <GradientSection title="Monthly Incident Trend" icon="TrendingUp" tone="violet">
+          <div className="h-72">
+            <MonthlyTrendChart data={monthly} />
+          </div>
+        </GradientSection>
+      </div>
+
+      {/* Guard performance */}
+      <div className="mb-5">
+        <GradientSection title="Guard Performance Ranking" subtitle="Top loggers by activity in the selected period" icon="ShieldCheck" tone="green">
+          <RolePerformanceTable rows={guardRows.slice(0, 10)} variant="guard" />
+        </GradientSection>
+      </div>
+
+      {/* Severity */}
+      <div className="mb-5">
+        <GradientSection title="Severity Distribution" icon="Layers" tone="amber">
+          <SeverityCards counts={severityCounts} />
+        </GradientSection>
+      </div>
+
+      {/* Advanced reports banner */}
+      <div className="mb-5 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-4 py-3 text-sm shadow-sm dark:border-violet-900 dark:from-violet-950/40 dark:to-fuchsia-950/40">
+        <p className="font-semibold text-violet-800 dark:text-violet-200">
+          <span aria-hidden>📊 </span>Advanced Performance Reports
+        </p>
+        <p className="text-violet-700 dark:text-violet-300">
+          Exclusive access to Control Room &amp; Manager performance rankings and detailed SLA Breach Analysis.
+        </p>
+      </div>
+
+      {/* Control Room */}
+      <div className="mb-5">
+        <GradientSection title="Control Room Performance Ranking" icon="Radio" tone="sky">
+          <RolePerformanceTable rows={controlRoomRows.slice(0, 10)} variant="control_room" />
+        </GradientSection>
+      </div>
+
+      {/* Manager */}
+      <div className="mb-5">
+        <GradientSection title="Manager Performance Ranking" icon="Crown" tone="violet">
+          <RolePerformanceTable rows={managerRows.slice(0, 10)} variant="manager" />
+        </GradientSection>
+      </div>
+
+      {/* SLA Compliance */}
+      <div className="mb-5">
+        <GradientSection title="SLA Breach Analysis & Compliance Tracking" icon="Gauge" tone="red">
+          <SlaComplianceReport
+            complianceRate={complianceRate}
+            within={slaWithin}
+            breached={slaBreaches.length}
+            total={slaTotal}
+            avgOverageHrs={avgOverageHrs}
+            bySeverity={slaBySeverity}
+            bySite={slaBySite}
+          />
+        </GradientSection>
+      </div>
+
+      {/* Detailed per-user table (existing) */}
+      <div className="mb-5">
+        <GradientSection title="Per-User Activity (filterable)" subtitle="Drill into individual contributions" icon="Users" tone="slate">
+          <StaffReports
+            rows={userStats}
+            roleFilter={roleFilter}
+            days={days}
+            roles={APP_ROLES}
+          />
+        </GradientSection>
+      </div>
     </>
   );
 }
