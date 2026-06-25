@@ -1,6 +1,3 @@
-'use client';
-
-import { useState } from 'react';
 import { Info, MapPin } from 'lucide-react';
 import { MenuGrid } from './menu-grid';
 import { ROLE_COLORS, ROLE_LABELS, type AppRole } from '@digilog/shared';
@@ -14,10 +11,16 @@ export interface RoleMenuData {
 interface Kpi { label: string; value: number; accent: string }
 
 /**
- * The landing hub. When the user holds more than one role (e.g. Control Room +
- * Manager) it shows a pill switcher and swaps the banner title + action cards
- * for the selected role — mirroring the legacy role tabs, on the new theme.
- * A single-role user simply sees their one menu with no switcher.
+ * The landing hub.
+ *
+ * Single-role users see one menu under a brand banner.
+ *
+ * Multi-role users (e.g. Control Room + Manager) see one stacked section per
+ * role — no pill switcher, no hidden tabs — with each role getting its own
+ * coloured header bar. Items are deduped upstream in /menu/page.tsx so the
+ * lower-ranked role only shows its UNIQUE actions; that gives a natural
+ * "low-level on top, high-level below" split (e.g. Control Room shows the
+ * operational floor; Manager shows the high-level review/admin surfaces).
  */
 export function RoleMenu({
   roleMenus, kpis, siteName,
@@ -26,46 +29,23 @@ export function RoleMenu({
   kpis: Kpi[];
   siteName: string | null;
 }) {
-  const [active, setActive] = useState<AppRole>(roleMenus[0]?.role);
-  const current = roleMenus.find((m) => m.role === active) ?? roleMenus[0];
   const multi = roleMenus.length > 1;
+  const primary = roleMenus[0];
 
   return (
     <>
-      {multi && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {roleMenus.map((m) => {
-            const on = m.role === active;
-            const color = ROLE_COLORS[m.role];
-            return (
-              <button
-                key={m.role}
-                type="button"
-                onClick={() => setActive(m.role)}
-                className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition"
-                style={
-                  on
-                    ? { background: color, borderColor: color, color: '#fff' }
-                    : { borderColor: `${color}55`, color }
-                }
-              >
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ background: on ? '#fff' : color }}
-                />
-                {ROLE_LABELS[m.role]}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Banner */}
+      {/* Banner — single title for multi-role users, role-specific otherwise */}
       <div className="mb-6 overflow-hidden rounded-2xl bg-brand-gradient p-6 text-white shadow-lg">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{current.title}</h1>
-            <p className="mt-1 text-sm text-white/85">Select a dashboard or action to proceed.</p>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {multi ? 'My Console' : primary.title}
+            </h1>
+            <p className="mt-1 text-sm text-white/85">
+              {multi
+                ? `Your ${roleMenus.map((m) => ROLE_LABELS[m.role]).join(' + ')} actions, grouped by role.`
+                : 'Select a dashboard or action to proceed.'}
+            </p>
           </div>
           {siteName && (
             <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium backdrop-blur-sm">
@@ -89,39 +69,81 @@ export function RoleMenu({
         ))}
       </div>
 
-      {current.sections.length > 0 ? (
-        <MenuGrid sections={current.sections} />
+      {/* Single-role: just the cards. Multi-role: one stacked section per role. */}
+      {!multi ? (
+        primary.sections.length > 0
+          ? <MenuGrid sections={primary.sections} />
+          : <EmptyRoleState role={primary.role} otherRoles={[]} />
       ) : (
-        <EmptyRoleState
-          role={current.role}
-          otherRoles={roleMenus.filter((m) => m.role !== current.role).map((m) => m.role)}
-        />
+        <div className="space-y-7">
+          {roleMenus.map((m) => (
+            <RoleSection
+              key={m.role}
+              data={m}
+              otherRoles={roleMenus.filter((x) => x.role !== m.role).map((x) => x.role)}
+            />
+          ))}
+        </div>
       )}
     </>
   );
 }
 
 /**
- * Shown when every nav item for this role has been deduped into a
- * higher-ranked role's tab (e.g. a Control Room + Manager user clicks the
- * Control Room pill — all the shared items live under Manager). The pill
- * is intentionally kept clickable so the user knows the role is active.
+ * One role's slice of the page — a coloured header bar (role colour) followed
+ * by that role's action cards.
  */
-function EmptyRoleState({ role, otherRoles }: { role: AppRole; otherRoles: AppRole[] }) {
+function RoleSection({ data, otherRoles }: { data: RoleMenuData; otherRoles: AppRole[] }) {
+  const color = ROLE_COLORS[data.role];
+  return (
+    <section className="overflow-hidden rounded-2xl border bg-[hsl(var(--surface))] shadow-sm ring-1" style={{ boxShadow: `0 1px 2px ${color}22` }}>
+      <header
+        className="flex items-center justify-between gap-3 px-5 py-3 text-white"
+        style={{ background: `linear-gradient(90deg, ${color}, ${color}dd)` }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-white/90" />
+          <h2 className="text-sm font-bold tracking-wide">{ROLE_LABELS[data.role]}</h2>
+          <span className="hidden text-[11px] text-white/85 sm:inline">· {data.title}</span>
+        </div>
+        <span className="text-[11px] font-medium text-white/85">
+          {countItems(data.sections)} action{countItems(data.sections) === 1 ? '' : 's'}
+        </span>
+      </header>
+      <div className="p-5">
+        {data.sections.length > 0 ? (
+          <MenuGrid sections={data.sections} />
+        ) : (
+          <EmptyRoleState role={data.role} otherRoles={otherRoles} inline />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function countItems(sections: NavSection[]) {
+  return sections.reduce((n, s) => n + s.items.length, 0);
+}
+
+/**
+ * Empty-state panel. `inline` shrinks the padding for use inside a role
+ * section (vs. as the only thing on the page).
+ */
+function EmptyRoleState({
+  role, otherRoles, inline = false,
+}: { role: AppRole; otherRoles: AppRole[]; inline?: boolean }) {
   const otherNames = otherRoles.map((r) => ROLE_LABELS[r]).join(' / ');
   return (
-    <div className="rounded-2xl border bg-[hsl(var(--surface))] p-10 text-center shadow-sm">
+    <div className={`rounded-xl border border-dashed bg-[hsl(var(--surface))] text-center ${inline ? 'px-4 py-6' : 'p-10 shadow-sm'}`}>
       <div
-        className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full"
+        className={`mx-auto ${inline ? 'mb-2 h-9 w-9' : 'mb-4 h-12 w-12'} flex items-center justify-center rounded-full`}
         style={{ background: `${ROLE_COLORS[role]}22`, color: ROLE_COLORS[role] }}
       >
-        <Info className="h-6 w-6" />
+        <Info className={inline ? 'h-4 w-4' : 'h-6 w-6'} />
       </div>
-      <h3 className="text-base font-semibold">{ROLE_LABELS[role]} role active</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm text-[hsl(var(--muted))]">
-        Every action available to your {ROLE_LABELS[role]} role is already on display under your{' '}
-        <strong>{otherNames || 'other'}</strong> tab — we don&apos;t duplicate the same shortcut twice.
-        Switch back above to use them.
+      <p className="text-sm text-[hsl(var(--muted))]">
+        Nothing unique to your <strong>{ROLE_LABELS[role]}</strong> role —
+        {otherNames ? <> all actions show above under <strong>{otherNames}</strong>.</> : ' nothing assigned yet.'}
       </p>
     </div>
   );
