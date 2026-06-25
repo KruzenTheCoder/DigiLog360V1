@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { cn, initials } from '@/lib/utils';
 import { visibleSections } from './nav-config';
 import { Logo } from '@/components/brand/logo';
+import { NetstreamLogo } from '@/components/brand/netstream-logo';
 import { BRAND, ROLE_LABELS, type Profile } from '@digilog/shared';
 
 function Icon({ name, className }: { name: string; className?: string }) {
@@ -151,7 +152,7 @@ export function AppShell({
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-[hsl(var(--surface))]/80 px-4 backdrop-blur lg:px-6">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-[hsl(var(--surface))]/80 px-4 backdrop-blur lg:px-6 relative">
           {hideSidebar ? (
             <Link href="/menu" className="flex items-center" aria-label={`${BRAND.name} home`}>
               <Logo className="text-xl" />
@@ -161,6 +162,16 @@ export function AppShell({
               <Icons.Menu className="h-6 w-6" />
             </button>
           )}
+
+          {/* Netstream logo — true-centered in the header bar. `absolute`
+              avoids competing with the surrounding flex items for spacing,
+              and `pointer-events-none` lets clicks fall through to whatever
+              sits under the centre (typically dead space). Hidden on small
+              screens where the bar is already tight. */}
+          <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 md:block">
+            <NetstreamLogo height={40} />
+          </div>
+
 
           {/* History navigation — Back / Forward / Home. Mirrors the browser
               chrome inside the app so users don't have to reach for the
