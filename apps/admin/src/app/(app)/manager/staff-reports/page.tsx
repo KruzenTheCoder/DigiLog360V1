@@ -495,15 +495,12 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
                           <span className="font-semibold text-[hsl(var(--foreground))]">{t.count}</span> · {pct}%
                         </span>
                       </div>
-                      <div
-                        className="h-3.5 overflow-hidden rounded-full"
-                        style={{ background: `${color}1f`, boxShadow: `inset 0 0 0 1px ${color}33` }}
-                      >
+                      <div className="h-4 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                         <div
-                          className="flex h-full items-center justify-end rounded-full pr-2 text-[10px] font-bold text-white transition-all"
+                          className="flex h-full items-center justify-end rounded-full pr-2 text-[10px] font-bold text-white"
                           style={{
                             width: `${barWidth}%`,
-                            background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+                            backgroundColor: color,
                           }}
                         >
                           {barWidth >= 22 ? `${pct}%` : ''}
