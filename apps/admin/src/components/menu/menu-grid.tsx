@@ -77,6 +77,7 @@ export function MenuGrid({ sections }: { sections: NavSection[] }) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={item.href.startsWith('/tasks') ? false : undefined}
                   className="group relative flex items-start gap-3 overflow-hidden rounded-xl border bg-[hsl(var(--surface))] p-4 pl-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
                   <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: color }} />

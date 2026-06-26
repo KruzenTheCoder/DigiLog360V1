@@ -136,7 +136,7 @@ export function TasksBoard({
               return (
                 <TR key={t.id}>
                   <TD>
-                    <Link href={`/tasks/${t.id}`} className="font-medium text-brand hover:underline">
+                    <Link href={`/tasks/${t.id}`} prefetch={false} className="font-medium text-brand hover:underline">
                       {t.title}
                     </Link>
                     {t.description && <p className="line-clamp-1 text-xs text-[hsl(var(--muted))]">{t.description}</p>}

@@ -490,11 +490,22 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
                         <span className="font-semibold text-[hsl(var(--foreground))]">{t.count}</span> · {pct}%
                       </span>
                     </div>
-                    <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className="h-3 overflow-hidden rounded-full"
+                      style={{ background: `${color}22`, boxShadow: `inset 0 0 0 1px ${color}33` }}
+                    >
                       <div
-                        className="h-full rounded-full transition-all"
-                        style={{ width: `${Math.max(pct, 2)}%`, background: `linear-gradient(90deg, ${color}bb, ${color})` }}
-                      />
+                        className="flex h-full items-center justify-end rounded-full pr-2 text-[10px] font-semibold text-white transition-all"
+                        style={{
+                          width: `${Math.max(pct, 6)}%`,
+                          background: `linear-gradient(90deg, ${color}cc, ${color})`,
+                        }}
+                      >
+                        {pct >= 18 ? `${pct}%` : ''}
+                      </div>
+                    </div>
+                    <div className="mt-1 text-right text-[10px] font-medium text-[hsl(var(--muted))]">
+                      {pct}% of total incidents
                     </div>
                   </div>
                 </div>
