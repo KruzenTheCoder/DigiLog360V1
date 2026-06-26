@@ -61,6 +61,9 @@ export const CAPABILITY_KEYS = [
   'notifications.view_own',
   'preferences.manage',
   'security.manage_2fa',
+  // Mobile UI preferences
+  'mobile.kpi_visible',
+  'mobile.occurrence_history_visible',
   // Super user
   'super.orgs_manage',
   'super.users_cross_org',

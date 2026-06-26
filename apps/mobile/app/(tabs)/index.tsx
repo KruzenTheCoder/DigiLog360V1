@@ -39,6 +39,11 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [siteName, setSiteName] = useState<string | null>(null);
+  
+  // UI toggle states
+  const [activeModule, setActiveModule] = useState<'patrol' | 'shift'>('patrol');
+  const [showKpi, setShowKpi] = useState(true);
+  const [showHistory, setShowHistory] = useState(true);
 
   const isSupervisor = !!profile && hasAnyRole(profile, ['supervisor']);
 
@@ -126,6 +131,10 @@ export default function Home() {
   const canKeys = can('keys.manage');
   const canShift = can('shifts.clock');
   const canTeam = can('team.view');
+  
+  // UI visibility based on permissions
+  const canViewKpi = can('mobile.kpi_visible');
+  const canViewHistory = can('mobile.occurrence_history_visible');
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
@@ -152,32 +161,124 @@ export default function Home() {
           </View>
         </View>
 
-        {/* ----- shift card ----- */}
-        <TouchableOpacity onPress={() => router.push('/shift')} activeOpacity={0.85}>
-          <View style={[styles.shiftCard, stats.onShift && styles.shiftCardOn]}>
-            <View style={[styles.shiftDot, { backgroundColor: stats.onShift ? theme.success : theme.textFaint }]} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.shiftStatus}>
-                {stats.onShift ? 'On shift' : 'Off shift'}
-              </Text>
-              <Text style={styles.shiftHint}>
-                {stats.onShift ? 'Tap to view or clock out' : 'Tap to clock in'}
-              </Text>
+        {/* ----- Module Toggle: Patrol / Shift ----- */}
+        {(canPatrol || canShift) && (
+          <View style={styles.moduleToggleContainer}>
+            <View style={styles.moduleToggle}>
+              {canPatrol && (
+                <Press
+                  onPress={() => setActiveModule('patrol')}
+                  style={[styles.moduleToggleBtn, activeModule === 'patrol' && styles.moduleToggleBtnActive]}
+                  hapticStyle="light"
+                >
+                  <Ionicons name="walk" size={16} color={activeModule === 'patrol' ? '#fff' : theme.text} />
+                  <Text style={[styles.moduleToggleText, activeModule === 'patrol' && styles.moduleToggleTextActive]}>
+                    Patrol
+                  </Text>
+                </Press>
+              )}
+              {canShift && (
+                <Press
+                  onPress={() => setActiveModule('shift')}
+                  style={[styles.moduleToggleBtn, activeModule === 'shift' && styles.moduleToggleBtnActive]}
+                  hapticStyle="light"
+                >
+                  <Ionicons name="time" size={16} color={activeModule === 'shift' ? '#fff' : theme.text} />
+                  <Text style={[styles.moduleToggleText, activeModule === 'shift' && styles.moduleToggleTextActive]}>
+                    Shift
+                  </Text>
+                </Press>
+              )}
             </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
           </View>
-        </TouchableOpacity>
+        )}
 
-        {/* ----- KPI strip ----- */}
-        <View style={styles.kpiRow}>
-          <Stat label="My open"      value={stats.open}    icon="alert-circle-outline" tint={theme.warning} loading={loading} />
-          <Stat label="Today"        value={stats.today}   icon="time-outline"        tint={theme.brand}   loading={loading} />
-          {isSupervisor ? (
-            <Stat label="Breached"   value={stats.siteBreached} icon="flame-outline" tint={theme.danger}  loading={loading} />
-          ) : (
-            <Stat label="Visitors"   value={stats.onSiteVisitors} icon="people-outline" tint={theme.info}  loading={loading} />
-          )}
-        </View>
+        {/* ----- Patrol Module Card ----- */}
+        {activeModule === 'patrol' && canPatrol && (
+          <TouchableOpacity 
+            onPress={() => router.push('/(tabs)/patrol')} 
+            activeOpacity={0.85}
+          >
+            <View style={[styles.moduleCard, stats.activePatrol && styles.moduleCardActive]}>
+              <View style={[styles.moduleIcon, { backgroundColor: stats.activePatrol ? theme.success : theme.brand }]}>
+                <Ionicons name="walk" size={24} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.moduleTitle}>
+                  {stats.activePatrol ? 'Patrol Active' : 'Start Patrol'}
+                </Text>
+                <Text style={styles.moduleHint}>
+                  {stats.activePatrol 
+                    ? 'Tap to scan checkpoints or end patrol' 
+                    : 'Tap to begin a new patrol'}
+                </Text>
+              </View>
+              <Ionicons 
+                name="chevron-forward" 
+                size={20} 
+                color={stats.activePatrol ? theme.success : theme.textMuted} 
+              />
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* ----- Shift Module Card ----- */}
+        {activeModule === 'shift' && canShift && (
+          <TouchableOpacity 
+            onPress={() => router.push('/shift')} 
+            activeOpacity={0.85}
+          >
+            <View style={[styles.moduleCard, stats.onShift && styles.moduleCardActive]}>
+              <View style={[styles.moduleIcon, { backgroundColor: stats.onShift ? theme.success : theme.brand }]}>
+                <Ionicons name="time" size={24} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.moduleTitle}>
+                  {stats.onShift ? 'On Shift' : 'Off Shift'}
+                </Text>
+                <Text style={styles.moduleHint}>
+                  {stats.onShift 
+                    ? 'Tap to view shift details or clock out' 
+                    : 'Tap to clock in and start your shift'}
+                </Text>
+              </View>
+              <Ionicons 
+                name="chevron-forward" 
+                size={20} 
+                color={stats.onShift ? theme.success : theme.textMuted} 
+              />
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* ----- KPI strip (toggleable via permission) ----- */}
+        {canViewKpi && showKpi && (
+          <View style={styles.kpiSection}>
+            <View style={styles.kpiToggleHeader}>
+              <Text style={styles.kpiTitle}>Key Metrics</Text>
+              <Press onPress={() => setShowKpi(false)} hapticStyle="light">
+                <Ionicons name="eye-off-outline" size={18} color={theme.textMuted} />
+              </Press>
+            </View>
+            <View style={styles.kpiRow}>
+              <Stat label="My open"      value={stats.open}    icon="alert-circle-outline" tint={theme.warning} loading={loading} />
+              <Stat label="Today"        value={stats.today}   icon="time-outline"        tint={theme.brand}   loading={loading} />
+              {isSupervisor ? (
+                <Stat label="Breached"   value={stats.siteBreached} icon="flame-outline" tint={theme.danger}  loading={loading} />
+              ) : (
+                <Stat label="Visitors"   value={stats.onSiteVisitors} icon="people-outline" tint={theme.info}  loading={loading} />
+              )}
+            </View>
+          </View>
+        )}
+        
+        {/* Show KPI toggle button when hidden */}
+        {canViewKpi && !showKpi && (
+          <Press onPress={() => setShowKpi(true)} hapticStyle="light" style={styles.showKpiBtn}>
+            <Ionicons name="eye-outline" size={16} color={theme.brand} />
+            <Text style={styles.showKpiText}>Show Key Metrics</Text>
+          </Press>
+        )}
 
         {/* ----- handover prompt ----- */}
         {stats.openHandovers > 0 && (
@@ -192,9 +293,9 @@ export default function Home() {
           </TouchableOpacity>
         )}
 
-        {/* ----- patrol callout ----- */}
-        {stats.activePatrol && (
-          <TouchableOpacity onPress={() => router.push('/(tabs)/patrol')}>
+        {/* ----- patrol callout (legacy - now in module toggle) ----- */}
+        {stats.activePatrol && activeModule !== 'patrol' && (
+          <TouchableOpacity onPress={() => { setActiveModule('patrol'); router.push('/(tabs)/patrol'); }}>
             <Card style={[styles.callout, { borderColor: theme.success }]}>
               <Ionicons name="walk" size={22} color={theme.success} />
               <View style={{ flex: 1 }}>
@@ -211,7 +312,7 @@ export default function Home() {
           {canLog && (
             <IconTile icon="document-text" label="Log occurrence" onPress={() => router.push('/(tabs)/new')} />
           )}
-          {canPatrol && (
+          {canPatrol && activeModule !== 'patrol' && (
             <IconTile icon="walk" label="Patrol" onPress={() => router.push('/(tabs)/patrol')}
               tint={stats.activePatrol ? theme.success : theme.brand}
               badge={stats.activePatrol ? '●' : undefined} />
@@ -226,7 +327,7 @@ export default function Home() {
           {canKeys && (
             <IconTile icon="key" label="Keys" onPress={() => router.push('/gate/keys')} tint={theme.brand} />
           )}
-          {canShift && (
+          {canShift && activeModule !== 'shift' && (
             <IconTile icon="time" label="My shift" onPress={() => router.push('/shift')}
               tint={stats.onShift ? theme.success : theme.brand} />
           )}
@@ -244,38 +345,55 @@ export default function Home() {
           </>
         )}
 
-        {/* ----- My recent — placeholder, real loader stays in /logs tab ----- */}
-        <SectionTitle right={
-          <Press onPress={() => router.push('/(tabs)/logs?filter=all')} hapticStyle="light" hitSlop={8}>
-            <Text style={styles.sectionLink}>All →</Text>
+        {/* ----- My recent / History container (toggleable) ----- */}
+        {canViewHistory && showHistory && (
+          <>
+            <SectionTitle right={
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Press onPress={() => setShowHistory(false)} hapticStyle="light">
+                  <Ionicons name="eye-off-outline" size={18} color={theme.textMuted} />
+                </Press>
+                <Press onPress={() => router.push('/(tabs)/logs?filter=all')} hapticStyle="light" hitSlop={8}>
+                  <Text style={styles.sectionLink}>All →</Text>
+                </Press>
+              </View>
+            }>My logs · today</SectionTitle>
+            <Press
+              onPress={() => router.push('/(tabs)/logs?filter=today')}
+              hapticStyle="light"
+              style={{ marginBottom: spacing.md }}
+            >
+            <Card style={{ paddingVertical: 0, paddingHorizontal: 0 }}>
+              {loading ? (
+                <>
+                  <SkeletonRow />
+                  <SkeletonRow />
+                </>
+              ) : stats.today === 0 ? (
+                <EmptyState
+                  icon="clipboard-outline"
+                  title="No incidents logged yet"
+                  hint="Use the Log tab below to record your first one."
+                />
+              ) : (
+                <View style={styles.todayRow}>
+                  <Text style={styles.todayCount}>{stats.today}</Text>
+                  <Text style={[type.muted, { flex: 1 }]}>incident{stats.today === 1 ? '' : 's'} logged today</Text>
+                  <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
+                </View>
+              )}
+            </Card>
+            </Press>
+          </>
+        )}
+        
+        {/* Show History toggle button when hidden */}
+        {canViewHistory && !showHistory && (
+          <Press onPress={() => setShowHistory(true)} hapticStyle="light" style={styles.showKpiBtn}>
+            <Ionicons name="list-outline" size={16} color={theme.brand} />
+            <Text style={styles.showKpiText}>Show My Logs</Text>
           </Press>
-        }>My logs · today</SectionTitle>
-        <Press
-          onPress={() => router.push('/(tabs)/logs?filter=today')}
-          hapticStyle="light"
-          style={{ marginBottom: spacing.md }}
-        >
-        <Card style={{ paddingVertical: 0, paddingHorizontal: 0 }}>
-          {loading ? (
-            <>
-              <SkeletonRow />
-              <SkeletonRow />
-            </>
-          ) : stats.today === 0 ? (
-            <EmptyState
-              icon="clipboard-outline"
-              title="No incidents logged yet"
-              hint="Use the Log tab below to record your first one."
-            />
-          ) : (
-            <View style={styles.todayRow}>
-              <Text style={styles.todayCount}>{stats.today}</Text>
-              <Text style={[type.muted, { flex: 1 }]}>incident{stats.today === 1 ? '' : 's'} logged today</Text>
-              <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
-            </View>
-          )}
-        </Card>
-        </Press>
+        )}
       </ScrollView>
     </View>
   );
@@ -315,6 +433,107 @@ const styles = StyleSheet.create({
   },
   iconBtnBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 
+  // Module Toggle (Patrol/Shift)
+  moduleToggleContainer: {
+    marginBottom: spacing.md,
+  },
+  moduleToggle: {
+    flexDirection: 'row',
+    backgroundColor: theme.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 4,
+    gap: 4,
+  },
+  moduleToggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+  },
+  moduleToggleBtnActive: {
+    backgroundColor: theme.brand,
+  },
+  moduleToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.text,
+  },
+  moduleToggleTextActive: {
+    color: '#fff',
+  },
+
+  // Module Cards
+  moduleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: theme.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: theme.border,
+    marginBottom: spacing.md,
+  },
+  moduleCardActive: {
+    borderColor: theme.success,
+    backgroundColor: theme.successTint,
+  },
+  moduleIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moduleTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.text,
+  },
+  moduleHint: {
+    fontSize: 13,
+    color: theme.textMuted,
+    marginTop: 2,
+  },
+
+  // KPI Section
+  kpiSection: {
+    marginBottom: spacing.md,
+  },
+  kpiToggleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  kpiTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.text,
+  },
+  kpiRow: { 
+    flexDirection: 'row', 
+    gap: spacing.sm,
+  },
+  showKpiBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  showKpiText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.brand,
+  },
+
+  // Legacy shift card (fallback when not using module toggle)
   shiftCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: theme.surface, borderRadius: radius.lg,
@@ -326,8 +545,6 @@ const styles = StyleSheet.create({
   shiftDot: { width: 10, height: 10, borderRadius: 5 },
   shiftStatus: { ...type.h3 },
   shiftHint: { ...type.muted, marginTop: 2 },
-
-  kpiRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
 
   callout: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
