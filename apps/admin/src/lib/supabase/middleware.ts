@@ -72,25 +72,27 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Use getSession() — cookie-only, no network call. The middleware is just
-  // gating ("is there a session"); the actual identity verification still
-  // happens in server components via getUser() inside requireProfile.
-  // This avoids two big classes of flakiness:
-  //   1. Edge-runtime network calls to the Supabase auth server timing out
-  //      and tagging every request as "no user" → bounce to /login.
-  //   2. Calling getUser() during the cookie-write race after sign-in.
-  // Worst case: a forged/expired cookie passes the gate, then the server
-  // component rejects via getUser() and the user lands on /login?error=...
-  let user: { id: string; email?: string | null } | null = null;
+  // getUser() does TWO things we need:
+  //   1. Validates the JWT signature with the auth server.
+  //   2. Auto-refreshes the access token if it's about to expire, writing
+  //      the refreshed tokens back to the cookie store via setAll.
+  //
+  // We previously switched to getSession() to skip the network round-trip,
+  // but that meant expired access tokens kept flowing through — middleware
+  // saw "session exists", let the request through, and then PostgREST
+  // rejected the JWT (RLS sees auth.uid() = null and returns 0 rows).
+  // Symptom: empty task lists, missing data, "logged in but app blank".
+  //
+  // Wrapped in try/catch so a transient auth-server hiccup is non-fatal:
+  // treat any failure as "no user" and bounce to /login.
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] = null;
   let userError: unknown = null;
   try {
-    const result = await supabase.auth.getSession();
-    user = result.data.session?.user
-      ? { id: result.data.session.user.id, email: result.data.session.user.email }
-      : null;
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
     userError = result.error;
   } catch (err) {
-    console.error('[middleware] auth.getSession failed:', err);
+    console.error('[middleware] auth.getUser failed:', err);
     userError = err;
   }
 
