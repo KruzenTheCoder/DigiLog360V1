@@ -29,8 +29,12 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {}
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => (
-    <button ref={ref} className={cn(buttonVariants({ variant, size }), className)} {...props} />
+  // Default to type="button" — without this, any <Button> placed inside a
+  // <form> implicitly becomes a submit button (HTML default) and triggers
+  // a form submission on click, which is almost never what we want. Callers
+  // that DO want a submit button still pass `type="submit"` explicitly.
+  ({ className, variant, size, type = 'button', ...props }, ref) => (
+    <button ref={ref} type={type} className={cn(buttonVariants({ variant, size }), className)} {...props} />
   ),
 );
 Button.displayName = 'Button';
