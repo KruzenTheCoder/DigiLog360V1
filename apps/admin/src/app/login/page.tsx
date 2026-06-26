@@ -39,13 +39,14 @@ function LoginForm() {
   // doesn't wait on a cold route compile + initial server render.
   useEffect(() => { router.prefetch(next); }, [router, next]);
 
-  // If the layout bounced the user here with an error, their auth cookie is
-  // probably still valid but the profile gate failed. Sign out client-side
-  // so the next attempt starts from a clean slate (otherwise the cookie
-  // would survive a manual /menu visit and the user would loop again).
+  // If the layout bounced the user here with a profile-gate error, the
+  // session cookie is still valid but the profile is unusable. Sign out
+  // once on mount so the next sign-in starts from a clean slate. We ONLY
+  // sign out on real error params (no_profile / deactivated / no_web_access /
+  // session_expired) — not on `?redirect=` or `?next=` which are benign.
   useEffect(() => {
     const errParam = params.get('error');
-    if (!errParam) return;
+    if (!errParam || !(errParam in ERROR_MESSAGES)) return;
     const supabase = createClient();
     supabase.auth.signOut().catch(() => { /* non-fatal */ });
   }, [params]);
@@ -66,11 +67,13 @@ function LoginForm() {
       return;
     }
 
-    // Hard navigation — guarantees the freshly-set auth cookies are visible
-    // to the middleware on the next request. router.replace + router.refresh
-    // race the cookie write against the navigation and can produce a
-    // transient redirect loop on the first attempt.
-    window.location.replace(next);
+    // Client-side navigation. router.refresh re-runs the server components
+    // with the freshly-attached cookies in the SAME context, avoiding the
+    // browser-cookie / middleware race that bites a full `window.location`
+    // navigation. The middleware change (don't bounce `/login → /menu` when
+    // ?error= / ?redirect= is present) keeps the no-loop guarantee.
+    router.replace(next);
+    router.refresh();
   }
 
   return (
