@@ -103,8 +103,8 @@ export function OccurrencesTable({ rows }: { rows: Occurrence[] }) {
                 // doesn't fight the rest of the page. Hover layer in the base TR
                 // class still applies on top.
                 style={{
-                  borderLeft: `4px solid ${sevColor}`,
-                  background: `linear-gradient(90deg, ${sevColor}10 0%, transparent 35%)`,
+                  borderLeft: `5px solid ${sevColor}`,
+                  background: `linear-gradient(90deg, ${sevColor}33 0%, ${sevColor}11 40%, transparent 70%)`,
                 }}
               >
                 <TD>

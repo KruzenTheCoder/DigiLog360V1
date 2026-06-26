@@ -186,7 +186,14 @@ export function LiveBoard({ initial, profile }: { initial: LiveOccurrence[]; pro
                     key={o.id}
                     onClick={() => router.push(`/occurrences/${o.id}`)}
                     className={`cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${slaBgClass}`}
-                    style={{ borderLeft: `4px solid ${sevColor}` }}
+                    style={{
+                      borderLeft: `5px solid ${sevColor}`,
+                      // Darker tonal wash so the row colour reads at a glance
+                      // even on white backgrounds (per user request).
+                      background: slaBgClass
+                        ? undefined
+                        : `linear-gradient(90deg, ${sevColor}2a 0%, ${sevColor}10 40%, transparent 75%)`,
+                    }}
                   >
                     <td className="whitespace-nowrap px-4 py-3">
                       <Link
