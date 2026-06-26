@@ -69,11 +69,16 @@ const nextConfig = {
     serverMinification: true,
     // Hoist/dedupe React work in server components for faster SSR.
     optimizeServerReact: true,
-    // Enable optimistic client cache — Link prefetches stay warm longer so
-    // back/forward + revisits render instantly from the client cache.
+    // Client Router Cache lifetimes. This is the single biggest app-wide
+    // "instant" lever: a visited/prefetched route stays in the browser's
+    // router cache for this long, so navigating BACK to any page (or to a
+    // prefetched one) renders instantly with ZERO server round-trip — which
+    // matters a lot for SA users hitting a US backend. Mutations call
+    // router.refresh() to bust the cache, and realtime pages self-update, so
+    // 2 minutes of revisit-freshness is a safe trade for the speed.
     staleTimes: {
-      dynamic: 30,
-      static: 180,
+      dynamic: 120,
+      static: 300,
     },
   },
 
