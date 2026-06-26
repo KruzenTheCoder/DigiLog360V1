@@ -3,7 +3,7 @@ import { requireProfile } from '@/lib/auth';
 import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { GradientSection } from '@/components/ui/gradient-section';
-import { MonthlyTrendChart, CategoryDonut, PALETTE } from '@/components/dashboard/dashboard-charts';
+import { MonthlyTrendChart, CategoryDonut } from '@/components/dashboard/dashboard-charts';
 import { HeroKpi } from '@/components/dashboard/hero-kpi';
 import { SeverityCards } from '@/components/dashboard/severity-cards';
 import { SlaComplianceReport } from '@/components/dashboard/sla-compliance';
@@ -22,6 +22,12 @@ type DashboardOcc = Pick<
 >;
 
 export const dynamic = 'force-dynamic';
+
+// Local palette — the imported PALETTE comes from a `'use client'` module, so
+// reading its values in THIS server component yields undefined (it becomes a
+// client reference across the RSC boundary). Defining it here keeps the bar
+// colours resolvable server-side. Mirrors the chart palette.
+const BAR_PALETTE = ['#667eea', '#764ba2', '#0ea5e9', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -331,7 +337,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
               return typeBreakdown.map((t, i) => {
                 const pct = total30 ? Math.round((t.count / total30) * 100) : 0;
                 const barWidth = Math.max(Math.round((t.count / maxCount) * 100), 8);
-                const color = PALETTE[i % PALETTE.length];
+                const color = BAR_PALETTE[i % BAR_PALETTE.length];
                 return (
                   <div key={t.name} className="flex items-center gap-3">
                     {/* Rank badge */}

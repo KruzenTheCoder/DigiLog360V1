@@ -6,7 +6,7 @@ import { GradientSection } from '@/components/ui/gradient-section';
 import { HeroKpi } from '@/components/dashboard/hero-kpi';
 import { SeverityCards } from '@/components/dashboard/severity-cards';
 import {
-  CategoryDonut, MonthlyTrendChart, PALETTE,
+  CategoryDonut, MonthlyTrendChart,
 } from '@/components/dashboard/dashboard-charts';
 import { SlaComplianceReport } from '@/components/dashboard/sla-compliance';
 import { RolePerformanceTable, type RolePerfRow } from '@/components/manager/role-performance';
@@ -17,6 +17,11 @@ import {
 } from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
+
+// Local palette — `PALETTE` from the charts module is a `'use client'` export,
+// so its values aren't readable in this server component (becomes a client
+// reference). Define it here so the bar colours resolve server-side.
+const BAR_PALETTE = ['#667eea', '#764ba2', '#0ea5e9', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -479,7 +484,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
               return top.map((t, i) => {
                 const pct = total30 ? Math.round((t.count / total30) * 100) : 0;
                 const barWidth = Math.max(Math.round((t.count / maxCount) * 100), 8);
-                const color = PALETTE[i % PALETTE.length];
+                const color = BAR_PALETTE[i % BAR_PALETTE.length];
                 return (
                   <div key={t.name} className="flex items-center gap-3">
                     <span
