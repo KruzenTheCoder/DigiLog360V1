@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { getActivePatrol, startPatrol, endPatrol, scannedCheckpointIds } from '@/lib/patrol';
 import { startLocationReporting, stopLocationReporting } from '@/lib/location-reporter';
-import { Button, Card, H1, Muted, Badge } from '@/components/ui';
+import { Button, Card, Muted, Badge } from '@/components/ui';
 import { theme, spacing, radius } from '@/lib/theme';
 import type { Patrol, PatrolRoute, Checkpoint } from '@digilog/shared';
 
@@ -88,12 +88,55 @@ export default function PatrolScreen() {
     <ScrollView style={{ flex: 1, backgroundColor: theme.bg }}
       contentContainerStyle={{ padding: spacing.lg, paddingTop: spacing.xl * 2 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.brand} />}>
-      <H1>Patrol</H1>
-      <View style={{ height: spacing.lg }} />
+      
+      {/* ----- On Duty / Off Duty Toggle ----- */}
+      <View style={styles.dutyToggleContainer}>
+        <View style={styles.dutyToggle}>
+          {/* Off Duty Button */}
+          <TouchableOpacity 
+            onPress={patrol ? onEnd : undefined}
+            style={[
+              styles.dutyButton,
+              !patrol && styles.dutyButtonActiveOff
+            ]}
+            activeOpacity={0.8}
+          >
+            <View style={[
+              styles.indicatorDot,
+              !patrol ? { backgroundColor: theme.danger } : { backgroundColor: theme.textMuted }
+            ]} />
+            <Text style={[
+              styles.dutyButtonText,
+              !patrol && styles.dutyButtonTextActive
+            ]}>Off Duty</Text>
+          </TouchableOpacity>
 
-      {!patrol ? (
+          {/* On Duty Button */}
+          <TouchableOpacity 
+            onPress={!patrol ? onStart : undefined}
+            style={[
+              styles.dutyButton,
+              patrol && styles.dutyButtonActiveOn
+            ]}
+            activeOpacity={0.8}
+          >
+            <View style={[
+              styles.indicatorDot,
+              patrol ? { backgroundColor: theme.success } : { backgroundColor: theme.textMuted }
+            ]} />
+            <Text style={[
+              styles.dutyButtonText,
+              patrol && styles.dutyButtonTextActive
+            ]}>On Duty</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Route Selection - Only show when Off Duty */}
+      {!patrol && (
         <>
-          <Muted>Select a route (optional) and start your patrol.</Muted>
+          <View style={{ height: spacing.md }} />
+          <Muted>Select a route (optional) before starting patrol.</Muted>
           <View style={{ height: spacing.md }} />
           <TouchableOpacity onPress={() => setRouteId(null)}>
             <Card style={[styles.routeCard, !routeId && styles.routeActive]}>
@@ -110,12 +153,13 @@ export default function PatrolScreen() {
               </Card>
             </TouchableOpacity>
           ))}
-          <View style={{ height: spacing.md }} />
-          <Button title="Start Patrol" onPress={onStart} loading={busy}
-            icon={<Ionicons name="play" size={18} color="#fff" />} />
         </>
-      ) : (
+      )}
+
+      {/* Active Patrol Info - Only show when On Duty */}
+      {patrol && (
         <>
+          <View style={{ height: spacing.md }} />
           <Card style={{ borderColor: theme.brand }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={styles.activeTitle}>Patrol active</Text>
@@ -153,18 +197,62 @@ export default function PatrolScreen() {
               })}
             </>
           )}
-
-          <View style={{ height: spacing.lg }} />
-          <Button title="End Patrol" variant="danger" onPress={onEnd} loading={busy}
-            icon={<Ionicons name="stop" size={18} color="#fff" />} />
         </>
       )}
+
       <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  // Duty Toggle Styles
+  dutyToggleContainer: {
+    marginBottom: spacing.md,
+  },
+  dutyToggle: {
+    flexDirection: 'row',
+    backgroundColor: theme.surface,
+    borderRadius: radius.xl,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  dutyButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: radius.lg,
+    backgroundColor: 'transparent',
+  },
+  dutyButtonActiveOff: {
+    backgroundColor: theme.danger + '20',
+    borderWidth: 1,
+    borderColor: theme.danger,
+  },
+  dutyButtonActiveOn: {
+    backgroundColor: theme.success + '20',
+    borderWidth: 1,
+    borderColor: theme.success,
+  },
+  indicatorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  dutyButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.textMuted,
+  },
+  dutyButtonTextActive: {
+    color: theme.text,
+  },
+
+  // Original styles
   routeCard: { borderColor: theme.border },
   routeActive: { borderColor: theme.brand, backgroundColor: theme.brand + '14' },
   routeName: { color: theme.text, fontWeight: '700', fontSize: 15 },

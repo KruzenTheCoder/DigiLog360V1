@@ -12,6 +12,7 @@ import {
   Animated,
   ActivityIndicator,
   Easing,
+  Image,
   ImageBackground,
   StyleSheet,
   Text,
@@ -20,6 +21,8 @@ import {
 import { theme, spacing } from '@/lib/theme';
 import { Logo } from '@/components/logo';
 import { BRAND } from '@digilog/shared';
+
+const markIcon = require('../../assets/branding/digilog-logo.png');
 
 const bg = require('../../assets/splash-bg.png');
 
@@ -58,7 +61,15 @@ export function BrandSplash({ status }: { status?: string }) {
         <Animated.View
           style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], alignItems: 'center' }}
         >
-          <Logo width={264} onDark />
+          {/* App Icon above logo */}
+          <View style={styles.iconContainer}>
+            <Image source={markIcon} style={styles.appIcon} resizeMode="contain" />
+          </View>
+          
+          <View style={styles.logoSpacing}>
+            <Logo width={240} onDark />
+          </View>
+          
           <Text style={[styles.tagline, styles.taglineSpacing]} allowFontScaling={false}>
             {BRAND.tagline}
           </Text>
@@ -83,6 +94,22 @@ export function BrandSplash({ status }: { status?: string }) {
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: theme.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  appIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  logoSpacing: { marginTop: spacing.md },
   taglineSpacing: { marginTop: spacing.md },
   tagline: {
     color: theme.textMuted,
