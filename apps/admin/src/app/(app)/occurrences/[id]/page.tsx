@@ -10,7 +10,7 @@ import { AssignmentCard } from '@/components/occurrences/assignment-card';
 import { CommentsThread } from '@/components/occurrences/comments-thread';
 import { formatDateTime } from '@/lib/utils';
 import {
-  STATUS_COLORS, STATUS_LABELS,
+  STATUS_LABELS, SEVERITY_COLORS, SEVERITY_LABELS,
   type Occurrence, type OccurrenceUpdate, type OccurrenceReport, type OccurrenceImage,
   type OccurrenceComment, type AppRole,
 } from '@digilog/shared';
@@ -56,13 +56,12 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
   const comments = (commentsRes?.data ?? []) as OccurrenceComment[];
   const assignables = (assignablesRes.data ?? []) as { id: string; full_name: string | null; email: string | null; role: AppRole }[];
 
-  // The whole detail view is themed to the occurrence's current status colour:
-  // a top accent strip + status-tinted card header, so an open vs. closed vs.
-  // resolved occurrence reads at a glance.
-  const statusColor = STATUS_COLORS[o.status];
-  // A reusable status-strip + tinted header for the primary cards.
-  const accentStripStyle = { background: `linear-gradient(90deg, ${statusColor}, ${statusColor}88)` };
-  const tintedHeaderStyle = { background: `${statusColor}14`, borderBottom: `1px solid ${statusColor}33` };
+  // The whole detail view is themed to the occurrence's SEVERITY colour
+  // (critical = red, high = orange, medium = amber, low = blue): a top accent
+  // "lip" + tinted card header, so the severity reads at a glance.
+  const sevColor = SEVERITY_COLORS[o.severity];
+  const accentStripStyle = { background: `linear-gradient(90deg, ${sevColor}, ${sevColor}88)` };
+  const tintedHeaderStyle = { background: `${sevColor}14`, borderBottom: `1px solid ${sevColor}33` };
 
   return (
     <>
@@ -72,17 +71,19 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
         action={<OccurrenceActions occurrence={o} profile={profile} hasReport={!!rep} />}
       />
 
-      {/* Status banner strip — the whole page picks up the status colour. */}
+      {/* Severity banner strip — the whole page picks up the severity colour. */}
       <div
-        className="mb-5 flex items-center gap-3 rounded-xl px-4 py-3 text-sm"
-        style={{ background: `${statusColor}12`, border: `1px solid ${statusColor}40` }}
+        className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-4 py-3 text-sm"
+        style={{ background: `${sevColor}12`, border: `1px solid ${sevColor}40` }}
       >
-        <span className="inline-block h-3 w-3 rounded-full" style={{ background: statusColor }} />
-        <span className="font-semibold" style={{ color: statusColor }}>{STATUS_LABELS[o.status]}</span>
+        <span className="inline-block h-3 w-3 rounded-full" style={{ background: sevColor }} />
+        <span className="font-semibold" style={{ color: sevColor }}>{SEVERITY_LABELS[o.severity]}</span>
+        <span className="text-[hsl(var(--muted))]">·</span>
+        <span className="font-medium text-[hsl(var(--foreground))]">{STATUS_LABELS[o.status]}</span>
         <span className="text-[hsl(var(--muted))]">
           {o.status === 'resolved' || o.status === 'closed'
-            ? `Closed ${formatDateTime(o.closed_at)}`
-            : `SLA due ${formatDateTime(o.sla_due_at)}`}
+            ? `· Closed ${formatDateTime(o.closed_at)}`
+            : `· SLA due ${formatDateTime(o.sla_due_at)}`}
         </span>
       </div>
 
