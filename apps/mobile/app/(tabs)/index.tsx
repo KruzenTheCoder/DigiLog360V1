@@ -6,17 +6,20 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, RefreshControl,
+  View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Defs, LinearGradient as SvgGradient, Stop, Rect } from 'react-native-svg';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { Card } from '@/components/ui';
+import { Card, Button, Muted, Badge } from '@/components/ui';
 import { SectionTitle, SkeletonRow, Press, Stat } from '@/components/primitives';
 import { theme, spacing, radius, type } from '@/lib/theme';
 import { hasAnyRole, profileRoles, ROLE_LABELS } from '@digilog/shared';
+import { getActivePatrol, startPatrol, endPatrol, scannedCheckpointIds } from '@/lib/patrol';
+import { startLocationReporting, stopLocationReporting } from '@/lib/location-reporter';
+import type { Patrol, PatrolRoute, Checkpoint } from '@digilog/shared';
 
 interface Stats {
   open: number;
@@ -43,6 +46,14 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [siteName, setSiteName] = useState<string | null>(null);
+  
+  // Patrol/On Duty state
+  const [patrol, setPatrol] = useState<Patrol | null>(null);
+  const [routes, setRoutes] = useState<PatrolRoute[]>([]);
+  const [routeId, setRouteId] = useState<string | null>(null);
+  const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
+  const [scanned, setScanned] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
 
   const isSupervisor = !!profile && hasAnyRole(profile, ['supervisor']);
 
@@ -233,6 +244,51 @@ export default function Home() {
           </View>
         </View>
 
+        {/* ----- On Duty / Off Duty Toggle ----- */}
+        {can('patrols.run') && (
+          <View style={styles.dutyToggleContainer}>
+            <View style={styles.dutyToggle}>
+              {/* Off Duty Button */}
+              <TouchableOpacity 
+                onPress={stats.activePatrol ? () => router.push('/(tabs)/patrol') : undefined}
+                style={[
+                  styles.dutyButton,
+                  !stats.activePatrol && styles.dutyButtonActiveOff
+                ]}
+                activeOpacity={0.8}
+              >
+                <View style={[
+                  styles.indicatorDot,
+                  !stats.activePatrol ? { backgroundColor: theme.danger } : { backgroundColor: theme.textMuted }
+                ]} />
+                <Text style={[
+                  styles.dutyButtonText,
+                  !stats.activePatrol && styles.dutyButtonTextActive
+                ]}>Off Duty</Text>
+              </TouchableOpacity>
+
+              {/* On Duty Button */}
+              <TouchableOpacity 
+                onPress={!stats.activePatrol ? () => router.push('/(tabs)/patrol') : undefined}
+                style={[
+                  styles.dutyButton,
+                  stats.activePatrol && styles.dutyButtonActiveOn
+                ]}
+                activeOpacity={0.8}
+              >
+                <View style={[
+                  styles.indicatorDot,
+                  stats.activePatrol ? { backgroundColor: theme.success } : { backgroundColor: theme.textMuted }
+                ]} />
+                <Text style={[
+                  styles.dutyButtonText,
+                  stats.activePatrol && styles.dutyButtonTextActive
+                ]}>On Duty</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* ----- KPI strip (container toggle) ----- */}
         {showKpi && (
           <View style={styles.kpiRow}>
@@ -395,4 +451,50 @@ const styles = StyleSheet.create({
     borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center',
   },
   portalBadgeText: { fontSize: 11, fontWeight: '800' },
+
+  // On Duty / Off Duty Toggle Styles
+  dutyToggleContainer: {
+    marginBottom: spacing.md,
+  },
+  dutyToggle: {
+    flexDirection: 'row',
+    backgroundColor: theme.surface,
+    borderRadius: radius.xl,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  dutyButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: radius.lg,
+    backgroundColor: 'transparent',
+  },
+  dutyButtonActiveOff: {
+    backgroundColor: theme.danger + '20',
+    borderWidth: 1,
+    borderColor: theme.danger,
+  },
+  dutyButtonActiveOn: {
+    backgroundColor: theme.success + '20',
+    borderWidth: 1,
+    borderColor: theme.success,
+  },
+  indicatorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  dutyButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.textMuted,
+  },
+  dutyButtonTextActive: {
+    color: theme.text,
+  },
 });
