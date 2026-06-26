@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { MonthlyTrendChart, CategoryDonut, PALETTE } from '@/components/dashboard/dashboard-charts';
 import { HeroKpi } from '@/components/dashboard/hero-kpi';
 import { SeverityCards } from '@/components/dashboard/severity-cards';
@@ -11,6 +12,8 @@ import {
   OCCURRENCE_STATUSES, STATUS_LABELS, STATUS_COLORS,
 } from '@digilog/shared';
 import type { Occurrence } from '@digilog/shared';
+import Link from 'next/link';
+import { FileText } from 'lucide-react';
 
 // Minimal projection — exactly the columns the dashboard aggregates over.
 // Keeps payloads small on big orgs (thousands of occurrences in 6 months).
@@ -197,7 +200,16 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
       <PageHeader
         title="Performance Dashboard"
         description={`Real-time analytics & key performance indicators — last 30 days${activeSite ? ` · ${activeSite.name}` : profile.role === 'admin' ? ' · all sites' : ''}`}
-      />
+      >
+        {profile.capabilities?.includes('audit.user_view') && (
+          <Link href="/settings/audit">
+            <Button variant="outline" size="sm">
+              <FileText className="h-4 w-4 mr-2" />
+              Audit Log
+            </Button>
+          </Link>
+        )}
+      </PageHeader>
 
       {(allSites ?? []).length > 1 && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
