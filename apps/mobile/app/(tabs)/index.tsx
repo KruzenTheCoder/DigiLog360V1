@@ -144,20 +144,24 @@ export default function Home() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.brand} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* ----- header ----- */}
-        <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.greeting}>Hi, {firstName}</Text>
-            <View style={styles.rolesRow}>
-              {myRoles.map((r, idx) => (
-                <Badge key={r} label={ROLE_LABELS[r]} color={idx === 0 ? theme.brand : theme.brandPurple} />
-              ))}
-              {siteName && <Text style={styles.site}>· {siteName}</Text>}
+        {/* ----- header with purple gradient ----- */}
+        <View style={styles.headerGradient}>
+          <View style={styles.headerContent}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.greetingLight}>Hi, {firstName}</Text>
+              <View style={styles.rolesRow}>
+                {myRoles.map((r, idx) => (
+                  <View key={r} style={[styles.roleBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                    <Text style={styles.roleBadgeText}>{ROLE_LABELS[r]}</Text>
+                  </View>
+                ))}
+                {siteName && <Text style={styles.siteLight}>· {siteName}</Text>}
+              </View>
             </View>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 4 }}>
-            <IconBtn icon="notifications-outline" badge={stats.unread} onPress={() => router.push('/inbox')} />
-            <IconBtn icon="settings-outline" onPress={() => router.push('/settings')} />
+            <View style={{ flexDirection: 'row', gap: 4 }}>
+              <IconBtnLight icon="notifications-outline" badge={stats.unread} onPress={() => router.push('/inbox')} />
+              <IconBtnLight icon="settings-outline" onPress={() => router.push('/settings')} />
+            </View>
           </View>
         </View>
 
@@ -415,7 +419,60 @@ function IconBtn({ icon, badge, onPress }: {
   );
 }
 
+// Light variant for gradient header
+function IconBtnLight({ icon, badge, onPress }: {
+  icon: keyof typeof Ionicons.glyphMap; badge?: number; onPress: () => void;
+}) {
+  return (
+    <Press onPress={onPress} style={styles.iconBtn} hapticStyle="light" hitSlop={6}>
+      <Ionicons name={icon} size={22} color="rgba(255,255,255,0.9)" />
+      {badge && badge > 0 ? (
+        <View style={[styles.iconBtnBadge, { backgroundColor: '#fbbf24' }]}>
+          <Text style={[styles.iconBtnBadgeText, { color: '#1f2937' }]}>{badge > 99 ? '99+' : String(badge)}</Text>
+        </View>
+      ) : null}
+    </Press>
+  );
+}
+
 const styles = StyleSheet.create({
+  // Purple Gradient Header
+  headerGradient: {
+    marginHorizontal: -spacing.lg,
+    marginTop: -spacing.xl * 2,
+    paddingTop: spacing.xl * 2.5,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    backgroundColor: theme.brandPurple,
+    backgroundImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  greetingLight: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#fff',
+    lineHeight: 36,
+  },
+  siteLight: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
+  },
+  roleBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  roleBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // Legacy styles (fallback)
   header: {
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
     marginBottom: spacing.lg,
@@ -423,6 +480,14 @@ const styles = StyleSheet.create({
   greeting: { ...type.display, lineHeight: 36 },
   rolesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4, alignItems: 'center' },
   site: { color: theme.textMuted, fontSize: 13 },
+
+  // Light icon button for gradient header
+  iconBtnLight: {
+    padding: 8,
+    position: 'relative',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: radius.md,
+  },
 
   iconBtn: { padding: 8, position: 'relative' },
   iconBtnBadge: {
