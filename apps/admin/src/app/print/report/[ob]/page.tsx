@@ -110,14 +110,22 @@ export default async function PrintReportPage({ params }: { params: Promise<{ ob
         <>
           <h2 style={{ background: '#f1f5f9', padding: 8, fontSize: 15 }}>Detailed Report</h2>
           <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse', marginBottom: 12 }}><tbody>
+            <Row label="Occurrence Type" value={rep.occurrence_type} />
+            <Row label="All Areas Secure" value={rep.all_areas_secure === null ? '—' : rep.all_areas_secure ? 'Yes' : 'No'} />
+            <Row label="Severity Level" value={rep.severity ? SEVERITY_LABELS[rep.severity] : '—'} />
+            <Row label="Incident Date & Time" value={formatDateTime(rep.incident_at)} />
+            <Row label="Location / Site" value={rep.location} />
+            <Row label="Reported By" value={rep.reported_by} />
             <Row label="Personnel Involved" value={rep.personnel} />
             <Row label="Responding Officer" value={rep.responding_officer} />
-            <Row label="Emergency Services" value={rep.emergency_services} />
-            <Row label="External Case #" value={rep.external_case} />
-            <Row label="CCTV Available" value={rep.cctv} />
-            <Row label="CCTV Times" value={rep.cctv_times} />
+            <Row label="Emergency Service Type" value={rep.emergency_services} />
+            <Row label="External Case" value={rep.external_case} />
+            <Row label="CCTV Status" value={rep.cctv} />
             <Row label="Property Damage" value={rep.property_damage} />
+            <Row label="Report Status" value={STATUS_LABELS[rep.status]} />
           </tbody></table>
+          <p style={{ fontWeight: 600, fontSize: 13, padding: '4px 8px' }}>Incident Description:</p>
+          <p style={{ fontSize: 13, lineHeight: 1.6, padding: '0 8px 12px' }}>{rep.description}</p>
           {rep.immediate_actions && <><p style={{ fontWeight: 600, fontSize: 13, padding: '4px 8px' }}>Immediate Actions:</p><p style={{ fontSize: 13, lineHeight: 1.6, padding: '0 8px 12px' }}>{rep.immediate_actions}</p></>}
           {rep.next_steps && <><p style={{ fontWeight: 600, fontSize: 13, padding: '4px 8px' }}>Next Steps:</p><p style={{ fontSize: 13, lineHeight: 1.6, padding: '0 8px 12px' }}>{rep.next_steps}</p></>}
         </>

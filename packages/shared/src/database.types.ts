@@ -91,7 +91,7 @@ export interface Database {
         Row: {
           id: number; occurrence_id: number; ob_number: string | null; severity: SeverityEnum | null;
           occurrence_type: string | null; incident_at: string | null; location: string | null;
-          reported_by: string | null; description: string; personnel: string | null;
+          reported_by: string | null; all_areas_secure: boolean | null; description: string; personnel: string | null;
           responding_officer: string | null; emergency_services: string | null; external_case: string | null;
           cctv: string | null; cctv_times: string | null; property_damage: string | null;
           immediate_actions: string | null; next_steps: string | null; created_by: string | null;
@@ -101,7 +101,7 @@ export interface Database {
         Insert: {
           id?: never; occurrence_id: number; ob_number?: string | null; severity?: SeverityEnum | null;
           occurrence_type?: string | null; incident_at?: string | null; location?: string | null;
-          reported_by?: string | null; description: string; personnel?: string | null;
+          reported_by?: string | null; all_areas_secure?: boolean | null; description: string; personnel?: string | null;
           responding_officer?: string | null; emergency_services?: string | null; external_case?: string | null;
           cctv?: string | null; cctv_times?: string | null; property_damage?: string | null;
           immediate_actions?: string | null; next_steps?: string | null; created_by?: string | null;

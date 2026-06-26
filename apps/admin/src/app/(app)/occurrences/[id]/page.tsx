@@ -120,14 +120,24 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
               <CardHeader style={tintedHeaderStyle}><CardTitle>Occurrence Report</CardTitle></CardHeader>
               <CardContent className="pt-5">
                 <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  <Field label="Occurrence Type" value={rep.occurrence_type} />
+                  <Field label="All Areas Secure" value={rep.all_areas_secure === null ? '—' : rep.all_areas_secure ? 'Yes' : 'No'} />
+                  <Field label="Severity Level" value={rep.severity ? SEVERITY_LABELS[rep.severity] : '—'} />
+                  <Field label="Incident Date & Time" value={formatDateTime(rep.incident_at)} />
+                  <Field label="Location / Site" value={rep.location} />
+                  <Field label="Reported By" value={rep.reported_by} />
                   <Field label="Personnel" value={rep.personnel} />
                   <Field label="Responding Officer" value={rep.responding_officer} />
-                  <Field label="Emergency Services" value={rep.emergency_services} />
-                  <Field label="External Case #" value={rep.external_case} />
-                  <Field label="CCTV" value={rep.cctv} />
-                  <Field label="CCTV Times" value={rep.cctv_times} />
+                  <Field label="Emergency Service Type" value={rep.emergency_services} />
+                  <Field label="External Case" value={rep.external_case} />
+                  <Field label="CCTV Status" value={rep.cctv} />
                   <Field label="Property Damage" value={rep.property_damage} />
+                  <Field label="Report Status" value={STATUS_LABELS[rep.status]} />
                 </dl>
+                <div className="mt-4">
+                  <dt className="text-xs uppercase tracking-wide text-[hsl(var(--muted))]">Incident Description</dt>
+                  <dd className="mt-1 whitespace-pre-wrap text-sm">{rep.description}</dd>
+                </div>
                 {rep.immediate_actions && <div className="mt-3"><dt className="text-xs uppercase tracking-wide text-[hsl(var(--muted))]">Immediate Actions</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{rep.immediate_actions}</dd></div>}
                 {rep.next_steps && <div className="mt-3"><dt className="text-xs uppercase tracking-wide text-[hsl(var(--muted))]">Next Steps</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{rep.next_steps}</dd></div>}
               </CardContent>
