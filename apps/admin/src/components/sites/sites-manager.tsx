@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Plus, Pencil, Search } from 'lucide-react';
+import { Loader2, Plus, Pencil, Search, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,9 +12,10 @@ import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import type { Site } from '@digilog/shared';
 
-export function SitesManager({ sites }: { sites: Site[] }) {
+export function SitesManager({ sites, isSuperUser = false }: { sites: Site[]; isSuperUser?: boolean }) {
   const router = useRouter();
   const [edit, setEdit] = useState<Site | null>(null);
+  const [deleteSite, setDeleteSite] = useState<Site | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [q, setQ] = useState('');
   const [active, setActive] = useState<'all' | 'active' | 'inactive'>('all');
@@ -31,6 +32,18 @@ export function SitesManager({ sites }: { sites: Site[] }) {
       return true;
     });
   }, [sites, q, active]);
+
+  async function handleDelete() {
+    if (!deleteSite) return;
+    const supabase = createClient();
+    const { error } = await supabase.from('sites').delete().eq('id', deleteSite.id);
+    if (error) {
+      alert('Failed to delete site: ' + error.message);
+    } else {
+      setDeleteSite(null);
+      router.refresh();
+    }
+  }
 
   return (
     <>
@@ -73,7 +86,16 @@ export function SitesManager({ sites }: { sites: Site[] }) {
                 <TD>{s.code ?? '—'}</TD>
                 <TD>{s.address ?? '—'}</TD>
                 <TD>{s.is_active ? <Badge color="#16a34a">Active</Badge> : <Badge color="#64748b">Inactive</Badge>}</TD>
-                <TD className="text-right"><Button variant="ghost" size="icon" onClick={() => setEdit(s)}><Pencil className="h-4 w-4" /></Button></TD>
+                <TD className="text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => setEdit(s)}><Pencil className="h-4 w-4" /></Button>
+                    {isSuperUser && (
+                      <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700" onClick={() => setDeleteSite(s)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </TD>
               </TR>
             ))}
           </TBody>
@@ -82,6 +104,19 @@ export function SitesManager({ sites }: { sites: Site[] }) {
 
       <SiteDialog key={addOpen ? 'site-open' : 'site'} open={addOpen} onClose={() => setAddOpen(false)} onDone={() => router.refresh()} />
       <SiteDialog key={edit?.id ?? 'site-edit'} open={!!edit} onClose={() => setEdit(null)} site={edit} onDone={() => router.refresh()} />
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteSite} onClose={() => setDeleteSite(null)} title="Delete Site">
+        <div className="space-y-4">
+          <p className="text-sm text-[hsl(var(--muted))]">
+            Are you sure you want to delete <strong>{deleteSite?.name}</strong>? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setDeleteSite(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+          </div>
+        </div>
+      </Dialog>
     </>
   );
 }
