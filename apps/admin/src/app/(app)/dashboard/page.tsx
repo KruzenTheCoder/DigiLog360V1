@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
 import { PageHeader } from '@/components/page-header';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
+import { GradientSection } from '@/components/ui/gradient-section';
 import { MonthlyTrendChart, CategoryDonut, PALETTE } from '@/components/dashboard/dashboard-charts';
 import { HeroKpi } from '@/components/dashboard/hero-kpi';
 import { SeverityCards } from '@/components/dashboard/severity-cards';
@@ -195,9 +196,21 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   return (
     <>
       <PageHeader
-        title="Performance Dashboard"
+        title="Control Room Performance Dashboard"
         description={`Real-time analytics & key performance indicators — last 30 days${activeSite ? ` · ${activeSite.name}` : profile.role === 'admin' ? ' · all sites' : ''}`}
       />
+
+      {(breached > 0 || updateDue > 0) && (
+        <div className="mb-5 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 text-sm shadow-sm dark:border-amber-900 dark:from-amber-950/40 dark:to-yellow-950/40">
+          <p className="mb-1 font-semibold text-amber-800 dark:text-amber-300">
+            Active System Alerts
+          </p>
+          <ul className="space-y-0.5 text-amber-700 dark:text-amber-200">
+            {breached > 0 && <li>{breached} occurrence(s) have breached their SLA.</li>}
+            {updateDue > 0 && <li>{updateDue} occurrence(s) require SLA updates.</li>}
+          </ul>
+        </div>
+      )}
 
       {(allSites ?? []).length > 1 && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
@@ -217,21 +230,6 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
               {s.name}
             </a>
           ))}
-        </div>
-      )}
-
-      {(breached > 0 || updateDue > 3) && (
-        <div className="mb-5 flex flex-wrap gap-3">
-          {breached > 0 && (
-            <div className="flex-1 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
-              <strong>{breached}</strong> occurrence(s) have breached their SLA.
-            </div>
-          )}
-          {updateDue > 3 && (
-            <div className="flex-1 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-              <strong>{updateDue}</strong> occurrence(s) require an SLA update.
-            </div>
-          )}
         </div>
       )}
 
@@ -289,9 +287,8 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
 
       {/* Status pipeline */}
       {statusCounts.length > 0 && (
-        <Card className="mt-5">
-          <CardHeader><CardTitle>Status Pipeline</CardTitle></CardHeader>
-          <CardContent>
+        <div className="mt-5">
+          <GradientSection title="Status Pipeline" icon="GitBranchPlus" tone="brand">
             <div className="flex h-3.5 w-full overflow-hidden rounded-full">
               {statusCounts.map((s) => (
                 <div
@@ -314,16 +311,17 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
+          </GradientSection>
+        </div>
       )}
 
       {/* Category breakdown + high-frequency incidents */}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <CategoryDonut data={typeBreakdown} />
-        <Card className="h-full">
-          <CardHeader><CardTitle>High-Frequency Incidents</CardTitle></CardHeader>
-          <CardContent className="space-y-3.5">
+        <GradientSection title="Incident Breakdown by Category" icon="PieChart" tone="brand">
+          <CategoryDonut data={typeBreakdown} />
+        </GradientSection>
+        <GradientSection title="High-Frequency Incidents" icon="Flame" tone="red">
+          <div className="space-y-3.5">
             {typeBreakdown.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
             {typeBreakdown.map((t, i) => {
               const pct = total30 ? Math.round((t.count / total30) * 100) : 0;
@@ -365,15 +363,14 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
                 </div>
               );
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </GradientSection>
       </div>
 
       {/* Volume by site + monthly trend */}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <Card className="h-full">
-          <CardHeader><CardTitle>Occurrence Volume by Site</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
+        <GradientSection title="Occurrence Volume by Site" icon="MapPin" tone="sky">
+          <div className="space-y-3">
             {topSites.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
             {topSites.map((s) => {
               const pct = total30 ? Math.round((s.count / total30) * 100) : 0;
@@ -389,30 +386,33 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
                 </div>
               );
             })}
-          </CardContent>
-        </Card>
-        <MonthlyTrendChart data={monthly} />
+          </div>
+        </GradientSection>
+        <GradientSection title="Monthly Incident Trend" icon="TrendingUp" tone="violet">
+          <MonthlyTrendChart data={monthly} />
+        </GradientSection>
       </div>
 
       {/* Severity distribution */}
       <div className="mt-5">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
-          Severity Distribution
-        </h2>
-        <SeverityCards counts={severityCounts} />
+        <GradientSection title="Severity Distribution" icon="Layers" tone="amber">
+          <SeverityCards counts={severityCounts} />
+        </GradientSection>
       </div>
 
       {/* SLA breach analysis & compliance tracking */}
       <div className="mt-5">
-        <SlaComplianceReport
-          complianceRate={complianceRate}
-          within={slaWithin}
-          breached={slaBreachCount}
-          total={slaTotal}
-          avgOverageHrs={avgOverageHrs}
-          bySeverity={slaBySeverity}
-          bySite={slaBySite}
-        />
+        <GradientSection title="SLA Breach Analysis & Compliance Tracking" icon="Gauge" tone="red">
+          <SlaComplianceReport
+            complianceRate={complianceRate}
+            within={slaWithin}
+            breached={slaBreachCount}
+            total={slaTotal}
+            avgOverageHrs={avgOverageHrs}
+            bySeverity={slaBySeverity}
+            bySite={slaBySite}
+          />
+        </GradientSection>
       </div>
     </>
   );

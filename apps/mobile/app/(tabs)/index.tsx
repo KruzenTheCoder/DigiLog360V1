@@ -13,14 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Defs, LinearGradient as SvgGradient, Stop, Rect } from 'react-native-svg';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { Card, Button, Muted, Badge } from '@/components/ui';
+import { Card } from '@/components/ui';
 import { SectionTitle, SkeletonRow, Press, Stat } from '@/components/primitives';
 import { theme, spacing, radius, type } from '@/lib/theme';
 import { hasAnyRole, profileRoles, ROLE_LABELS } from '@digilog/shared';
-import { getActivePatrol, startPatrol, endPatrol, scannedCheckpointIds } from '@/lib/patrol';
-import { startLocationReporting, stopLocationReporting } from '@/lib/location-reporter';
-import type { Patrol, PatrolRoute, Checkpoint } from '@digilog/shared';
-
 interface Stats {
   open: number;
   today: number;
@@ -46,16 +42,10 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [siteName, setSiteName] = useState<string | null>(null);
-  
-  // Patrol/On Duty state
-  const [patrol, setPatrol] = useState<Patrol | null>(null);
-  const [routes, setRoutes] = useState<PatrolRoute[]>([]);
-  const [routeId, setRouteId] = useState<string | null>(null);
-  const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
-  const [scanned, setScanned] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState(false);
+  const [dutyBusy, setDutyBusy] = useState(false);
 
   const isSupervisor = !!profile && hasAnyRole(profile, ['supervisor']);
+  const isGuardOnly = !!profile && hasAnyRole(profile, ['guard']) && !isSupervisor;
 
   useEffect(() => {
     if (!profile?.site_id) { setSiteName(null); return; }
@@ -131,6 +121,24 @@ export default function Home() {
 
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
+  async function clockInFromHome() {
+    if (!profile || dutyBusy) return;
+    setDutyBusy(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from('shifts').insert({
+      user_id: profile.id,
+      user_name: profile.full_name ?? profile.email ?? null,
+      site_id: profile.site_id,
+      site_name: siteName,
+    });
+    setDutyBusy(false);
+    if (error) {
+      Alert.alert('Could not start shift', error.message);
+      return;
+    }
+    await load();
+  }
+
   if (!profile) return <View style={{ flex: 1, backgroundColor: theme.bg }} />;
   const firstName = (profile.full_name ?? profile.email ?? 'Guard').split(/\s+/)[0];
   const myRoles = profileRoles(profile);
@@ -139,7 +147,21 @@ export default function Home() {
   // both granted. `funcCap = true` means "no extra functional gate".
   const showCard = (containerCap: string, funcCap: boolean) => can(containerCap) && funcCap;
 
-  const cards: PortalCardConfig[] = [
+  const guardCards: PortalCardConfig[] = [
+    showCard('mobile.home.new_occurrence', can('occurrences.log')) && {
+      id: 'new', icon: 'document-text', tint: theme.danger,
+      title: 'New Occurrence', subtitle: 'Report an incident or security event',
+      onPress: () => router.push('/(tabs)/new'),
+    },
+    showCard('mobile.home.shift', can('shifts.clock')) && {
+      id: 'shift', icon: 'time', tint: theme.success,
+      title: 'Shift Duty', subtitle: stats.onShift ? 'Tap to go on or off duty' : 'Go to the duty toggle',
+      badge: stats.onShift ? 'ON' : undefined, badgeTint: theme.success,
+      onPress: () => router.push('/shift'),
+    },
+  ].filter(Boolean) as PortalCardConfig[];
+
+  const supervisorCards: PortalCardConfig[] = [
     showCard('mobile.home.new_occurrence', can('occurrences.log')) && {
       id: 'new', icon: 'document-text', tint: theme.danger,
       title: 'New Occurrence', subtitle: 'Report an incident or security event',
@@ -199,7 +221,10 @@ export default function Home() {
     },
   ].filter(Boolean) as PortalCardConfig[];
 
+  const cards = isGuardOnly ? guardCards : supervisorCards;
+
   const showKpi = can('mobile.home.kpi') || can('mobile.kpi_visible');
+  const showGuardDutyGate = isGuardOnly && !loading && !stats.onShift;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
@@ -244,53 +269,41 @@ export default function Home() {
           </View>
         </View>
 
-        {/* ----- On Duty / Off Duty Toggle ----- */}
-        {can('patrols.run') && (
-          <View style={styles.dutyToggleContainer}>
-            <View style={styles.dutyToggle}>
-              {/* Off Duty Button */}
-              <TouchableOpacity 
-                onPress={stats.activePatrol ? () => router.push('/(tabs)/patrol') : undefined}
-                style={[
-                  styles.dutyButton,
-                  !stats.activePatrol && styles.dutyButtonActiveOff
-                ]}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.indicatorDot,
-                  !stats.activePatrol ? { backgroundColor: theme.danger } : { backgroundColor: theme.textMuted }
-                ]} />
-                <Text style={[
-                  styles.dutyButtonText,
-                  !stats.activePatrol && styles.dutyButtonTextActive
-                ]}>Off Duty</Text>
-              </TouchableOpacity>
+        {showGuardDutyGate ? (
+          <Card style={styles.dutyGateCard}>
+            <Text style={styles.dutyGateTitle}>Duty Status</Text>
+            <Text style={styles.dutyGateSubtitle}>
+              Toggle on when you are ready to start your shift and open the guard dashboard.
+            </Text>
+            <View style={styles.dutyToggleContainer}>
+              <View style={styles.dutyToggle}>
+                <TouchableOpacity
+                  style={[styles.dutyButton, styles.dutyButtonActiveOff]}
+                  activeOpacity={0.85}
+                >
+                  <View style={[styles.indicatorDot, { backgroundColor: theme.danger }]} />
+                  <Text style={[styles.dutyButtonText, styles.dutyButtonTextActive]}>Off Duty</Text>
+                </TouchableOpacity>
 
-              {/* On Duty Button */}
-              <TouchableOpacity 
-                onPress={!stats.activePatrol ? () => router.push('/(tabs)/patrol') : undefined}
-                style={[
-                  styles.dutyButton,
-                  stats.activePatrol && styles.dutyButtonActiveOn
-                ]}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.indicatorDot,
-                  stats.activePatrol ? { backgroundColor: theme.success } : { backgroundColor: theme.textMuted }
-                ]} />
-                <Text style={[
-                  styles.dutyButtonText,
-                  stats.activePatrol && styles.dutyButtonTextActive
-                ]}>On Duty</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={clockInFromHome}
+                  style={[styles.dutyButton, dutyBusy && styles.dutyButtonDisabled]}
+                  activeOpacity={0.85}
+                  disabled={dutyBusy}
+                >
+                  <View style={[styles.indicatorDot, { backgroundColor: theme.success }]} />
+                  <Text style={styles.dutyButtonText}>{dutyBusy ? 'Starting...' : 'On Duty'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        )}
+            <Text style={styles.dutyGateHint}>
+              After you go on duty, your dashboard will show only `New Occurrence` and `Shift Duty`.
+            </Text>
+          </Card>
+        ) : null}
 
         {/* ----- KPI strip (container toggle) ----- */}
-        {showKpi && (
+        {!isGuardOnly && showKpi && (
           <View style={styles.kpiRow}>
             <Stat label="My open" value={stats.open} icon="alert-circle-outline" tint={theme.warning} loading={loading} />
             <Stat label="Today" value={stats.today} icon="time-outline" tint={theme.brand} loading={loading} />
@@ -303,7 +316,7 @@ export default function Home() {
         )}
 
         {/* ----- Handover prompt ----- */}
-        {stats.openHandovers > 0 && (
+        {!isGuardOnly && stats.openHandovers > 0 && (
           <Press onPress={() => router.push('/handovers')} hapticStyle="light">
             <Card style={[styles.callout, { borderColor: theme.brand }]}>
               <Ionicons name="document-text" size={22} color={theme.brand} />
@@ -316,20 +329,24 @@ export default function Home() {
         )}
 
         {/* ----- Portal cards ----- */}
-        <SectionTitle>What would you like to do?</SectionTitle>
-        {loading && cards.length === 0 ? (
-          <><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
-        ) : (
-          cards.map((c) => <PortalCard key={c.id} {...c} />)
-        )}
+        {!showGuardDutyGate && (
+          <>
+            <SectionTitle>{isGuardOnly ? 'Guard Dashboard' : 'What would you like to do?'}</SectionTitle>
+            {loading && cards.length === 0 ? (
+              <><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
+            ) : (
+              cards.map((c) => <PortalCard key={c.id} {...c} />)
+            )}
 
-        {cards.length === 0 && !loading && (
-          <Card style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
-            <Ionicons name="lock-closed-outline" size={28} color={theme.textMuted} />
-            <Text style={[type.muted, { marginTop: 8, textAlign: 'center' }]}>
-              No actions enabled for your role yet.{'\n'}Ask an admin to enable your containers.
-            </Text>
-          </Card>
+            {cards.length === 0 && !loading && (
+              <Card style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
+                <Ionicons name="lock-closed-outline" size={28} color={theme.textMuted} />
+                <Text style={[type.muted, { marginTop: 8, textAlign: 'center' }]}>
+                  No actions enabled for your role yet.{'\n'}Ask an admin to enable your containers.
+                </Text>
+              </Card>
+            )}
+          </>
         )}
       </ScrollView>
     </View>
@@ -456,6 +473,27 @@ const styles = StyleSheet.create({
   dutyToggleContainer: {
     marginBottom: spacing.md,
   },
+  dutyGateCard: {
+    marginBottom: spacing.md,
+    borderColor: theme.border,
+  },
+  dutyGateTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: theme.text,
+    marginBottom: 6,
+  },
+  dutyGateSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: theme.textMuted,
+    marginBottom: spacing.md,
+  },
+  dutyGateHint: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: theme.textSecondary,
+  },
   dutyToggle: {
     flexDirection: 'row',
     backgroundColor: theme.surface,
@@ -483,6 +521,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.success + '20',
     borderWidth: 1,
     borderColor: theme.success,
+  },
+  dutyButtonDisabled: {
+    opacity: 0.6,
   },
   indicatorDot: {
     width: 10,

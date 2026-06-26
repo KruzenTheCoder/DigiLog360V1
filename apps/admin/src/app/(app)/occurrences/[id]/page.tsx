@@ -68,7 +68,7 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
       <PageHeader
         title={o.ob_number ?? `Occurrence ${o.id}`}
         description={o.occurrence_type}
-        action={<OccurrenceActions occurrence={o} profile={profile} hasReport={!!rep} />}
+        action={<OccurrenceActions occurrence={o} hasReport={!!rep} />}
       />
 
       {/* Severity banner strip — the whole page picks up the severity colour. */}

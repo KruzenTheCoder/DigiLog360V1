@@ -1,12 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RotateCcw } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
-import { SEVERITIES, SEVERITY_LABELS, type OccurrenceStatus, type SeverityLevel } from '@digilog/shared';
+import { SEVERITIES, SEVERITY_COLORS, SEVERITY_LABELS, type OccurrenceStatus, type SeverityLevel } from '@digilog/shared';
 
 export interface HistoryRow {
   id: number;
@@ -26,6 +27,7 @@ const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
 
 export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
+  const router = useRouter();
   const [date, setDate] = useState('');
   const [guard, setGuard] = useState('all');
   const [site, setSite] = useState('all');
@@ -101,10 +103,26 @@ export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-[hsl(var(--border))]">
-              {filtered.map((r) => (
-                <tr key={r.id} className="hover:bg-[hsl(var(--surface-alt))]">
+              {filtered.map((r) => {
+                const railColor = SEVERITY_COLORS[r.severity];
+                return (
+                <tr
+                  key={r.id}
+                  onClick={() => router.push(`/occurrences/${r.id}`)}
+                  className="cursor-pointer transition hover:brightness-[0.99]"
+                  style={{
+                    borderLeft: `5px solid ${railColor}`,
+                    background: `linear-gradient(90deg, ${railColor}2a 0%, ${railColor}11 40%, transparent 72%)`,
+                  }}
+                >
                   <td className="whitespace-nowrap px-4 py-3">
-                    <Link href={`/occurrences/${r.id}`} className="font-semibold text-brand hover:underline">{r.ob_number ?? '—'}</Link>
+                    <Link
+                      href={`/occurrences/${r.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="font-semibold text-brand hover:underline"
+                    >
+                      {r.ob_number ?? '—'}
+                    </Link>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-xs text-[hsl(var(--muted))]">{fmt(r.incident_at)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-xs text-[hsl(var(--muted))]">{fmt(r.closed_at)}</td>
@@ -119,7 +137,8 @@ export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
                     {r.description ?? '—'}
                   </td>
                 </tr>
-              ))}
+              );
+              })}
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-10 text-center text-[hsl(var(--muted))]">
