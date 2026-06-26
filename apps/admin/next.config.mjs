@@ -55,16 +55,22 @@ const nextConfig = {
   
   // ===== EXPERIMENTAL OPTIMIZATIONS =====
   experimental: {
-    // Tree-shake icon/utility libraries automatically
+    // Tree-shake icon/utility libraries automatically — barrel files in these
+    // packages otherwise pull the whole library into the bundle.
     optimizePackageImports: [
       'lucide-react',
       'date-fns',
       '@digilog/shared',
       'recharts',
+      '@supabase/supabase-js',
+      '@supabase/ssr',
     ],
     // Optimize memory usage
     serverMinification: true,
-    // Enable optimistic client cache
+    // Hoist/dedupe React work in server components for faster SSR.
+    optimizeServerReact: true,
+    // Enable optimistic client cache — Link prefetches stay warm longer so
+    // back/forward + revisits render instantly from the client cache.
     staleTimes: {
       dynamic: 30,
       static: 180,

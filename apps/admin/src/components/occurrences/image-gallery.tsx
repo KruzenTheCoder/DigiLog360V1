@@ -45,6 +45,7 @@ export function ImageGallery({ images }: { images: OccurrenceImage[] }) {
             {urls[img.id] ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={urls[img.id]} alt={img.caption ?? 'Evidence'}
+                loading="lazy" decoding="async"
                 className="h-full w-full object-cover transition group-hover:scale-105" />
             ) : (
               <div className="flex h-full items-center justify-center text-xs text-[hsl(var(--muted))]">Loading…</div>
