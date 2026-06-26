@@ -53,7 +53,7 @@
       "package": "com.netstream.digilog360",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0e1426"
+        "backgroundColor": "#0b1020"
       },
       "permissions": [
         "CAMERA",

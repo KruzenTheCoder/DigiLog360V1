@@ -61,9 +61,21 @@ export const CAPABILITY_KEYS = [
   'notifications.view_own',
   'preferences.manage',
   'security.manage_2fa',
-  // Mobile UI preferences
+  // Mobile UI preferences (legacy aliases — kept for older builds)
   'mobile.kpi_visible',
   'mobile.occurrence_history_visible',
+  // Mobile home containers — each gates a portal card on the guard home.
+  'mobile.home.new_occurrence',
+  'mobile.home.shift',
+  'mobile.home.patrol',
+  'mobile.home.scan',
+  'mobile.home.visitors',
+  'mobile.home.keys',
+  'mobile.home.tasks',
+  'mobile.home.history',
+  'mobile.home.kpi',
+  'mobile.home.supervisor_board',
+  'mobile.home.team',
   // Super user
   'super.orgs_manage',
   'super.users_cross_org',
