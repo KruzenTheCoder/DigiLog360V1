@@ -20,9 +20,19 @@ export function OccurrenceActions({
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Button onClick={() => setOpen(true)}><PencilLine className="h-4 w-4" /> Update</Button>
+      {/* These sit inside the coloured PageHeader, so the default brand-gradient
+          / white-secondary variants disappear into the background. Use solid
+          high-contrast styles instead: white primary + blue-gradient secondary. */}
+      <Button
+        onClick={() => setOpen(true)}
+        className="border-0 bg-white text-brand shadow-sm hover:bg-white/90"
+      >
+        <PencilLine className="h-4 w-4" /> Update
+      </Button>
       <Link href={hasReport ? `/reports?ob=${occurrence.ob_number}` : `/reports/new?occurrence=${occurrence.id}`}>
-        <Button variant="secondary"><FileText className="h-4 w-4" /> {hasReport ? 'View Report' : 'Create Report'}</Button>
+        <Button className="border-0 bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-sm hover:opacity-90">
+          <FileText className="h-4 w-4" /> {hasReport ? 'View Report' : 'Create Report'}
+        </Button>
       </Link>
       <UpdateOccurrenceDialog
         open={open} onClose={() => setOpen(false)}

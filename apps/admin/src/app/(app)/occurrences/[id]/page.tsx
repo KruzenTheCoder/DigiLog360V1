@@ -9,9 +9,10 @@ import { OccurrenceActions } from '@/components/occurrences/occurrence-actions';
 import { AssignmentCard } from '@/components/occurrences/assignment-card';
 import { CommentsThread } from '@/components/occurrences/comments-thread';
 import { formatDateTime } from '@/lib/utils';
-import type {
-  Occurrence, OccurrenceUpdate, OccurrenceReport, OccurrenceImage,
-  OccurrenceComment, AppRole,
+import {
+  STATUS_COLORS, STATUS_LABELS,
+  type Occurrence, type OccurrenceUpdate, type OccurrenceReport, type OccurrenceImage,
+  type OccurrenceComment, type AppRole,
 } from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
@@ -55,6 +56,14 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
   const comments = (commentsRes?.data ?? []) as OccurrenceComment[];
   const assignables = (assignablesRes.data ?? []) as { id: string; full_name: string | null; email: string | null; role: AppRole }[];
 
+  // The whole detail view is themed to the occurrence's current status colour:
+  // a top accent strip + status-tinted card header, so an open vs. closed vs.
+  // resolved occurrence reads at a glance.
+  const statusColor = STATUS_COLORS[o.status];
+  // A reusable status-strip + tinted header for the primary cards.
+  const accentStripStyle = { background: `linear-gradient(90deg, ${statusColor}, ${statusColor}88)` };
+  const tintedHeaderStyle = { background: `${statusColor}14`, borderBottom: `1px solid ${statusColor}33` };
+
   return (
     <>
       <PageHeader
@@ -63,16 +72,32 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
         action={<OccurrenceActions occurrence={o} profile={profile} hasReport={!!rep} />}
       />
 
+      {/* Status banner strip — the whole page picks up the status colour. */}
+      <div
+        className="mb-5 flex items-center gap-3 rounded-xl px-4 py-3 text-sm"
+        style={{ background: `${statusColor}12`, border: `1px solid ${statusColor}40` }}
+      >
+        <span className="inline-block h-3 w-3 rounded-full" style={{ background: statusColor }} />
+        <span className="font-semibold" style={{ color: statusColor }}>{STATUS_LABELS[o.status]}</span>
+        <span className="text-[hsl(var(--muted))]">
+          {o.status === 'resolved' || o.status === 'closed'
+            ? `Closed ${formatDateTime(o.closed_at)}`
+            : `SLA due ${formatDateTime(o.sla_due_at)}`}
+        </span>
+      </div>
+
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
-          <Card>
-            <CardHeader>
+          <Card className="overflow-hidden p-0">
+            {/* status accent strip */}
+            <div className="h-1.5 w-full" style={accentStripStyle} />
+            <CardHeader style={tintedHeaderStyle}>
               <div className="flex items-center justify-between">
                 <CardTitle>Details</CardTitle>
                 <div className="flex gap-1"><SeverityBadge severity={o.severity} /><StatusBadge status={o.status} /></div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-5">
               <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <Field label="Site" value={o.site_name} />
                 <Field label="Logged By" value={o.logged_by_name} />
@@ -89,9 +114,10 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
           </Card>
 
           {rep && (
-            <Card>
-              <CardHeader><CardTitle>Occurrence Report</CardTitle></CardHeader>
-              <CardContent>
+            <Card className="overflow-hidden p-0">
+              <div className="h-1.5 w-full" style={accentStripStyle} />
+              <CardHeader style={tintedHeaderStyle}><CardTitle>Occurrence Report</CardTitle></CardHeader>
+              <CardContent className="pt-5">
                 <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   <Field label="Personnel" value={rep.personnel} />
                   <Field label="Responding Officer" value={rep.responding_officer} />
@@ -107,9 +133,10 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
             </Card>
           )}
 
-          <Card>
-            <CardHeader><CardTitle>Photo Evidence</CardTitle></CardHeader>
-            <CardContent><ImageGallery images={imgs} /></CardContent>
+          <Card className="overflow-hidden p-0">
+            <div className="h-1.5 w-full" style={accentStripStyle} />
+            <CardHeader style={tintedHeaderStyle}><CardTitle>Photo Evidence</CardTitle></CardHeader>
+            <CardContent className="pt-5"><ImageGallery images={imgs} /></CardContent>
           </Card>
         </div>
 
@@ -123,9 +150,10 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
             assignables={assignables}
           />
 
-        <Card className="h-fit">
-          <CardHeader><CardTitle>Update Timeline</CardTitle></CardHeader>
-          <CardContent>
+        <Card className="h-fit overflow-hidden p-0">
+          <div className="h-1.5 w-full" style={accentStripStyle} />
+          <CardHeader style={tintedHeaderStyle}><CardTitle>Update Timeline</CardTitle></CardHeader>
+          <CardContent className="pt-5">
             {upd.length === 0 ? (
               <p className="text-sm text-[hsl(var(--muted))]">No updates recorded yet.</p>
             ) : (
