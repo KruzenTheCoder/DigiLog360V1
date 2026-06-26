@@ -56,7 +56,7 @@ export const NAV: NavSection[] = [
       { label: 'Acknowledgements', href: '/manager/acknowledgements', icon: 'CheckSquare', roles: ['manager', 'admin', 'super_user'], capability: 'manager.acknowledge' },
       { label: 'Reviewed Logs', href: '/manager/reviewed', icon: 'History', roles: ['manager', 'admin', 'super_user'], capability: 'manager.reviewed_logs' },
       { label: 'Performance Dashboard', href: '/manager/staff-reports', icon: 'BarChart3', roles: ['manager', 'admin', 'super_user'] },
-      { label: 'Audit Log', href: '/settings/audit', icon: 'ScrollText', roles: ['manager', 'admin', 'super_user'], capability: 'audit.user_view' },
+      { label: 'Audit Log', href: '/settings/audit', icon: 'ScrollText', roles: ['manager', 'admin', 'super_user'], capability: 'audit.view' },
     ],
   },
   {
