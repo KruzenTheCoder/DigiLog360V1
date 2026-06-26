@@ -4,97 +4,105 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, ClipboardCheck, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { TASK_PRIORITY_COLORS, TASK_PRIORITY_LABELS, type Task } from '@digilog/shared';
-
-type ToastTask = Pick<Task, 'id' | 'title' | 'priority' | 'due_at' | 'assigned_by_name' | 'ob_number'>;
+import { TASK_PRIORITY_COLORS, TASK_PRIORITY_LABELS, type TaskPriority } from '@digilog/shared';
 
 /**
  * Floating toast that pops up the moment a task lands in the user's queue.
  *
- * Listens for `INSERT`s on the tasks table where `assigned_to = me`, plus
- * `UPDATE`s where the row's new assigned_to is me. Falls back gracefully if
- * realtime isn't enabled on the table — a Postgres trigger (notifications
- * insert) still records the event and the bell counter picks it up.
+ * **How it works** — we subscribe to the `notifications` table, not the
+ * `tasks` table. The `audit_task_assignment` trigger writes one notification
+ * row of `kind='task.assigned'` per assignment, and the same publication is
+ * already used by the unread-bell counter in the header (so we know it
+ * works without extra setup). This avoids depending on Realtime being
+ * enabled on `tasks` separately.
  *
- * The toast lives at the root of the AppShell so it appears on every page.
- * Open → routes to /tasks/[id]. Dismiss → closes only this notification.
- * Auto-dismisses after 30 s if the user takes no action.
+ * The notification body carries the task id in its `data.task_id` field;
+ * Open routes to `/tasks/[id]`. Dismiss closes the toast.
+ * Auto-dismiss after 30 s if untouched.
  */
+interface ToastNotif {
+  notif_id: number;
+  task_id: number;
+  title: string;
+  body: string;
+  priority: TaskPriority;
+  due_at: string | null;
+  ob_number: string | null;
+}
+
 export function TaskAssignmentToast({ userId, userName }: { userId: string; userName: string }) {
   const router = useRouter();
-  const [queue, setQueue] = useState<ToastTask[]>([]);
-  // De-dupe IDs we've already shown — covers the case where INSERT and an
-  // immediate UPDATE both fire for the same row.
+  const [queue, setQueue] = useState<ToastNotif[]>([]);
+  // De-dupe so the same notification row never pops twice.
   const seenRef = useRef<Set<number>>(new Set());
 
-  const push = useCallback((task: ToastTask) => {
-    if (seenRef.current.has(task.id)) return;
-    seenRef.current.add(task.id);
-    setQueue((q) => [...q, task]);
-    // Auto-dismiss after 30 s if untouched.
-    setTimeout(() => {
-      setQueue((q) => q.filter((t) => t.id !== task.id));
-    }, 30_000);
+  const push = useCallback((n: ToastNotif) => {
+    if (seenRef.current.has(n.notif_id)) return;
+    seenRef.current.add(n.notif_id);
+    setQueue((q) => [...q, n]);
+    setTimeout(() => setQueue((q) => q.filter((x) => x.notif_id !== n.notif_id)), 30_000);
   }, []);
 
   useEffect(() => {
     if (!userId) return;
     const supabase = createClient();
-    let cancelled = false;
 
-    async function fetchTask(id: number) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase as any)
-        .from('tasks')
-        .select('id, title, priority, due_at, assigned_by_name, ob_number, assigned_to')
-        .eq('id', id)
-        .single();
-      if (!cancelled && data && data.assigned_to === userId) push(data as ToastTask);
+    function fromRow(row: Record<string, unknown>): ToastNotif | null {
+      // The trigger writes:
+      //   kind  = 'task.assigned'
+      //   data  = { task_id, priority, due_at }
+      //   title = 'New task: <title>'
+      //   body  = short description / OB reference
+      // The toast falls back to sensible defaults so it never silently skips.
+      const data = (row.data ?? {}) as Record<string, unknown>;
+      const taskId = Number(data.task_id);
+      if (!Number.isFinite(taskId) || taskId <= 0) return null;
+      return {
+        notif_id: Number(row.id),
+        task_id: taskId,
+        title: String(row.title ?? 'New task assigned'),
+        body: String(row.body ?? ''),
+        priority: (data.priority as TaskPriority | undefined) ?? 'normal',
+        due_at: (data.due_at as string | null | undefined) ?? null,
+        ob_number: (data.ob_number as string | null | undefined) ?? null,
+      };
     }
 
-    // One channel covers INSERT + UPDATE because the filter ensures we only
-    // get rows assigned to this user.
     const channel = supabase
       .channel(`task-toast-${userId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'tasks', filter: `assigned_to=eq.${userId}` },
-        (payload) => {
-          const row = payload.new as ToastTask;
-          push({
-            id: row.id,
-            title: row.title,
-            priority: row.priority,
-            due_at: row.due_at,
-            assigned_by_name: row.assigned_by_name,
-            ob_number: row.ob_number,
-          });
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
         },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'tasks', filter: `assigned_to=eq.${userId}` },
         (payload) => {
-          // UPDATE fires for any change on a row assigned to me. We only want
-          // pop-ups for fresh assignments — refetch and rely on the seen-set
-          // to avoid double-firing on subsequent edits.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const id = (payload.new as any)?.id;
-          if (typeof id === 'number') fetchTask(id);
+          const row = payload.new as Record<string, unknown>;
+          if (row.kind !== 'task.assigned') return;
+          const notif = fromRow(row);
+          if (notif) push(notif);
         },
       )
       .subscribe();
 
-    return () => { cancelled = true; supabase.removeChannel(channel); };
+    return () => { supabase.removeChannel(channel); };
   }, [userId, push]);
 
-  function dismiss(id: number) {
-    setQueue((q) => q.filter((t) => t.id !== id));
+  function dismiss(notifId: number) {
+    setQueue((q) => q.filter((t) => t.notif_id !== notifId));
   }
 
-  function open(id: number) {
-    dismiss(id);
-    router.push(`/tasks/${id}`);
+  async function open(n: ToastNotif) {
+    dismiss(n.notif_id);
+    // Mark the underlying notification as read so the bell counter stays accurate.
+    try {
+      const supabase = createClient();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from('notifications').update({ read_at: new Date().toISOString() }).eq('id', n.notif_id);
+    } catch { /* non-fatal — the inbox will mark it on next visit */ }
+    router.push(`/tasks/${n.task_id}`);
   }
 
   if (queue.length === 0) return null;
@@ -104,13 +112,13 @@ export function TaskAssignmentToast({ userId, userName }: { userId: string; user
       aria-live="polite"
       aria-atomic="false"
     >
-      {queue.map((t) => (
+      {queue.map((n) => (
         <ToastCard
-          key={t.id}
-          task={t}
+          key={n.notif_id}
+          notif={n}
           userName={userName}
-          onOpen={() => open(t.id)}
-          onDismiss={() => dismiss(t.id)}
+          onOpen={() => open(n)}
+          onDismiss={() => dismiss(n.notif_id)}
         />
       ))}
     </div>
@@ -118,20 +126,19 @@ export function TaskAssignmentToast({ userId, userName }: { userId: string; user
 }
 
 function ToastCard({
-  task, userName, onOpen, onDismiss,
+  notif, userName, onOpen, onDismiss,
 }: {
-  task: ToastTask;
+  notif: ToastNotif;
   userName: string;
   onOpen: () => void;
   onDismiss: () => void;
 }) {
-  const priorityColor = TASK_PRIORITY_COLORS[task.priority] ?? '#667eea';
+  const priorityColor = TASK_PRIORITY_COLORS[notif.priority] ?? '#667eea';
   return (
     <div
       className="pointer-events-auto w-full max-w-sm overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] shadow-2xl animate-in slide-in-from-bottom-4 fade-in"
       role="alert"
     >
-      {/* Accent bar */}
       <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, ${priorityColor}, ${priorityColor}99)` }} />
       <div className="flex items-start gap-3 p-4">
         <div
@@ -149,20 +156,20 @@ function ToastCard({
               className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
               style={{ background: `${priorityColor}22`, color: priorityColor }}
             >
-              {TASK_PRIORITY_LABELS[task.priority] ?? task.priority}
+              {TASK_PRIORITY_LABELS[notif.priority] ?? notif.priority}
             </span>
           </div>
           <p className="mt-1 line-clamp-2 text-sm font-semibold text-[hsl(var(--foreground))]">
-            {task.title}
+            {/* The trigger prepends "New task: " — strip it for cleaner copy. */}
+            {notif.title.replace(/^New task:\s*/i, '')}
           </p>
           <p className="mt-0.5 text-xs text-[hsl(var(--muted))]">
-            Hi {userName.split(' ')[0]} —
-            {task.assigned_by_name ? ` ${task.assigned_by_name} assigned this to you.` : ' assigned to you.'}
-            {task.ob_number && <> · Linked to <strong>{task.ob_number}</strong></>}
+            Hi {userName.split(' ')[0]} — {notif.body || 'You have been assigned a new task.'}
+            {notif.ob_number && <> · Linked to <strong>{notif.ob_number}</strong></>}
           </p>
-          {task.due_at && (
+          {notif.due_at && (
             <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
-              Due {new Date(task.due_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              Due {new Date(notif.due_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </p>
           )}
           <div className="mt-3 flex items-center gap-2">

@@ -37,19 +37,38 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
+  // Site scope — admin / super_user see everything they have RLS for.
+  // Everyone else is restricted to the sites they're assigned to
+  // (profile.site_ids[] union profile.site_id legacy column).
+  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
+  const ownSites = Array.from(new Set([
+    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
+    ...(profile.site_id ? [profile.site_id] : []),
+  ]));
+  const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
+
   // Run the two queries in parallel. The previous version waited on sites
   // first; sequencing them serially added a full round-trip on every page
   // load. Also: select only the columns the dashboard aggregates over —
   // pulling `select('*')` was returning ~25 KB per row × thousands of rows.
   let occQ = supabase
     .from('occurrences')
-    .select('id, status, severity, occurrence_type, site_name, incident_at, sla_due_at, last_sla_update_at, sla_hours, closed_at')
+    .select('id, status, severity, occurrence_type, site_name, site_id, incident_at, sla_due_at, last_sla_update_at, sla_hours, closed_at')
     .gte('incident_at', sixMonthsAgo.toISOString())
     .order('incident_at', { ascending: false });
+
+  // Constrain to the user's site scope FIRST, then narrow further if they
+  // picked a single site from the filter chips.
+  if (!isUnscopedRole && ownSites.length > 0) occQ = occQ.in('site_id', ownSites);
   if (siteParam) occQ = occQ.eq('site_id', siteParam);
 
+  // Visible sites in the chip row mirror the user's scope — admin/super_user
+  // see every site in the org; everyone else sees only their assigned sites.
+  let sitesQ = supabase.from('sites').select('id, name').order('name');
+  if (!isUnscopedRole && ownSites.length > 0) sitesQ = sitesQ.in('id', ownSites);
+
   const [{ data: allSites }, { data }] = await Promise.all([
-    supabase.from('sites').select('id, name').order('name'),
+    sitesQ,
     occQ,
   ]);
   const activeSite = siteParam ? (allSites ?? []).find((s) => s.id === siteParam) : null;

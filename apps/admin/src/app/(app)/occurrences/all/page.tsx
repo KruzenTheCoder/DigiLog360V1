@@ -24,11 +24,23 @@ export default async function AllOccurrencesPage({ searchParams }: PageProps) {
 
   const supabase = await createClient();
 
+  // Site scope — admin / super_user see every site; everyone else is
+  // restricted to the sites they're assigned to (profile.site_ids[] union
+  // legacy site_id column).
+  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
+  const ownSites = Array.from(new Set([
+    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
+    ...(profile.site_id ? [profile.site_id] : []),
+  ]));
+  const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
+
   // ---------- build the query ----------
   let q = supabase
     .from('occurrences')
     .select('*', { count: 'exact' })
     .order(sort, { ascending: dir === 'asc' });
+
+  if (!isUnscopedRole && ownSites.length > 0) q = q.in('site_id', ownSites);
 
   if (filter.q) {
     // Fuzzy match across ob_number / type / description (gin_trgm indices).

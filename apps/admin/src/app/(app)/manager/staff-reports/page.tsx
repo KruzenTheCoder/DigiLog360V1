@@ -97,12 +97,29 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const now = new Date();
 
+  // Site scope — admin / super_user see everything they have RLS for;
+  // everyone else is restricted to the sites they're assigned to.
+  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
+  const ownSites = Array.from(new Set([
+    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
+    ...(profile.site_id ? [profile.site_id] : []),
+  ]));
+  const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
+  const scopeSites = !isUnscopedRole && ownSites.length > 0 ? ownSites : null;
+
   // ----------------------------- core data -----------------------------------
 
   // Generated types lag behind a few recently-added columns (assigned_to,
   // etc.) — route through `any` so the page-level types stay clean.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb: any = supabase;
+  let occQ = sb
+    .from('occurrences')
+    .select('id, status, severity, occurrence_type, site_id, site_name, incident_at, closed_at, sla_due_at, last_sla_update_at, sla_hours, logged_by, assigned_to')
+    .gte('incident_at', since)
+    .order('incident_at', { ascending: false });
+  if (scopeSites) occQ = occQ.in('site_id', scopeSites);
+
   const [
     { data: occRaw },
     { data: profilesRaw },
@@ -113,11 +130,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
     { data: shiftsRaw },
     { data: tasksRaw },
   ] = await Promise.all([
-    sb
-      .from('occurrences')
-      .select('id, status, severity, occurrence_type, site_id, site_name, incident_at, closed_at, sla_due_at, last_sla_update_at, sla_hours, logged_by, assigned_to')
-      .gte('incident_at', since)
-      .order('incident_at', { ascending: false }),
+    occQ,
     sb.from('profiles').select('id, full_name, email, role, roles, site_id'),
     sb.from('sites').select('id, name'),
     sb.from('manager_acknowledgements').select('reviewed_by, reviewed_at, occurrence_id').gte('reviewed_at', since),
@@ -185,10 +198,12 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
 
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  const { data: trendRaw } = await supabase
+  let trendQ = supabase
     .from('occurrences')
-    .select('id, incident_at, status, sla_due_at')
+    .select('id, incident_at, status, sla_due_at, site_id')
     .gte('incident_at', sixMonthsAgo.toISOString());
+  if (scopeSites) trendQ = trendQ.in('site_id', scopeSites);
+  const { data: trendRaw } = await trendQ;
   const monthly = (() => {
     const map = new Map<string, { count: number; breached: number }>();
     for (let i = 5; i >= 0; i--) {
