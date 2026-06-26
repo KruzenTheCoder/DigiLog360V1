@@ -23,11 +23,15 @@ interface Profile {
 }
 
 export function AssigneeToggleForm({
-  rows, siteName,
+  rows, siteNames,
 }: {
   rows: Profile[];
-  siteName: (siteId: string | null) => string | null;
+  /** Plain serialisable map of site_id → name. Passed from the server
+   *  component as data, not as a closure (RSC won't serialise functions). */
+  siteNames: Record<string, string>;
 }) {
+  const siteName = (siteId: string | null): string | null =>
+    siteId ? siteNames[siteId] ?? null : null;
   const router = useRouter();
   const [state, setState] = useState<Record<string, boolean>>(
     Object.fromEntries(rows.map((r) => [r.id, r.is_assignable])),
