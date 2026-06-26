@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogIn, LogOut, Plus, Loader2, Users, Car } from 'lucide-react';
+import { LogIn, LogOut, Plus, Loader2, Users, Car, Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,9 +29,25 @@ export function VisitorsBoard({
   const router = useRouter();
   const [items, setItems] = useState<VisitorRow[]>(initial);
   const [addOpen, setAddOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [siteFilter, setSiteFilter] = useState('all');
 
-  const onsite = items.filter((v) => !v.signed_out_at);
-  const recent = items.filter((v) => v.signed_out_at);
+  const match = useMemo(() => {
+    const needle = q.toLowerCase().trim();
+    return (v: VisitorRow) => {
+      if (siteFilter !== 'all' && (v.site_name ?? '') !== siteFilter) return false;
+      if (!needle) return true;
+      const hay = `${v.full_name} ${v.id_number ?? ''} ${v.company ?? ''} ${v.vehicle_reg ?? ''} ${v.visiting ?? ''}`.toLowerCase();
+      return hay.includes(needle);
+    };
+  }, [q, siteFilter]);
+
+  const onsite = items.filter((v) => !v.signed_out_at && match(v));
+  const recent = items.filter((v) => v.signed_out_at && match(v));
+  const allSiteNames = useMemo(
+    () => Array.from(new Set(items.map((v) => v.site_name).filter(Boolean) as string[])).sort(),
+    [items],
+  );
 
   async function signOut(v: VisitorRow) {
     if (!confirm(`Sign ${v.full_name} out?`)) return;
@@ -47,12 +63,20 @@ export function VisitorsBoard({
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-4 text-sm">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className="flex items-center gap-1 font-semibold">
             <Users className="h-4 w-4 text-brand" /> {onsite.length} on site
           </span>
           <span className="text-[hsl(var(--muted))]">{recent.length} recent</span>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted))]" />
+            <Input className="w-56 pl-9" placeholder="Search name, ID, vehicle, company…" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <Select value={siteFilter} onChange={(e) => setSiteFilter(e.target.value)} className="w-auto">
+            <option value="all">All sites</option>
+            {allSiteNames.map((s) => <option key={s} value={s}>{s}</option>)}
+          </Select>
         </div>
         <Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Sign in visitor</Button>
       </div>

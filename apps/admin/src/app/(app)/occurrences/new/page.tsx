@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireProfile, loadMyCapabilities, can } from '@/lib/auth';
 import { PageHeader } from '@/components/page-header';
 import { LogIncidentForm } from '@/components/occurrences/log-incident-form';
-import type { Site } from '@digilog/shared';
+import type { LogFormConfig, Site } from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,22 +34,46 @@ export default async function NewOccurrencePage() {
     // route through `any` for this query only.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
-    let q = sb
+
+    // The "assignee allow-list" — only profiles flagged is_assignable=true.
+    // Super-user manages this list at /super/assignees. If no one is flagged
+    // (fresh installs), fall back to every reviewer-eligible role so the
+    // feature is fully opt-in and never returns an empty dropdown.
+    const { data: flagged } = await sb
       .from('profiles')
-      .select('id, full_name, email, role, job_title')
+      .select('id, full_name, email, role, job_title, site_id')
       .eq('is_active', true)
-      .in('role', ['guard', 'supervisor', 'control_room', 'manager', 'admin']);
-    if (profile.role !== 'admin' && profile.site_id) q = q.eq('site_id', profile.site_id);
-    q = q.order('full_name', { ascending: true, nullsFirst: false });
-    const { data } = await q;
-    assignees = ((data ?? []) as Array<{ id: string; full_name: string | null; email: string | null; role: string; job_title: string | null }>)
-      .map((r) => ({
-        id: r.id,
-        name: r.full_name ?? r.email ?? 'Unknown',
-        role: r.role,
-        jobTitle: r.job_title ?? null,
-      }));
+      .eq('is_assignable', true)
+      .order('full_name', { ascending: true, nullsFirst: false });
+
+    let rows = (flagged ?? []) as Array<{ id: string; full_name: string | null; email: string | null; role: string; job_title: string | null; site_id: string | null }>;
+
+    if (rows.length === 0) {
+      // Fallback to the broad reviewer pool (matches previous behaviour).
+      let q = sb
+        .from('profiles')
+        .select('id, full_name, email, role, job_title, site_id')
+        .eq('is_active', true)
+        .in('role', ['guard', 'supervisor', 'control_room', 'manager', 'admin']);
+      if (profile.role !== 'admin' && profile.site_id) q = q.eq('site_id', profile.site_id);
+      q = q.order('full_name', { ascending: true, nullsFirst: false });
+      const { data } = await q;
+      rows = (data ?? []) as typeof rows;
+    }
+
+    assignees = rows.map((r) => ({
+      id: r.id,
+      name: r.full_name ?? r.email ?? 'Unknown',
+      role: r.role,
+      jobTitle: r.job_title ?? null,
+    }));
   }
+
+  // Per-org form-builder config (which sections to show on this form).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: orgRow } = await (supabase as any)
+    .from('organizations').select('log_form_config').eq('id', profile.org_id).maybeSingle();
+  const formConfig: LogFormConfig = (orgRow?.log_form_config ?? {}) as LogFormConfig;
 
   return (
     <>
@@ -61,6 +85,7 @@ export default async function NewOccurrencePage() {
         assignees={assignees}
         canAssign={can(caps, 'occurrences.assign')}
         canLogManagementReport={can(caps, 'occurrences.log_management_report')}
+        formConfig={formConfig}
       />
     </>
   );

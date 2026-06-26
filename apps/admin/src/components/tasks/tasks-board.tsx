@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Plus, Filter, Loader2, AlertTriangle } from 'lucide-react';
+import { Plus, Filter, Loader2, AlertTriangle, Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ export function TasksBoard({
   const [items, setItems] = useState<Task[]>(initial);
   const [addOpen, setAddOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'open_only' | 'all'>('open_only');
+  const [q, setQ] = useState('');
 
   useEffect(() => { setItems(initial); }, [initial]);
 
@@ -62,10 +63,17 @@ export function TasksBoard({
   }
 
   const filtered = useMemo(() => {
-    if (statusFilter === 'all') return items;
-    if (statusFilter === 'open_only') return items.filter((t) => t.status !== 'done' && t.status !== 'cancelled');
-    return items.filter((t) => t.status === statusFilter);
-  }, [items, statusFilter]);
+    const needle = q.toLowerCase().trim();
+    return items.filter((t) => {
+      if (statusFilter === 'open_only' && (t.status === 'done' || t.status === 'cancelled')) return false;
+      if (statusFilter !== 'all' && statusFilter !== 'open_only' && t.status !== statusFilter) return false;
+      if (needle) {
+        const hay = `${t.title} ${t.description ?? ''} ${t.assigned_to_name ?? ''} ${t.ob_number ?? ''}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [items, statusFilter, q]);
 
   const now = Date.now();
   const overdue = filtered.filter((t) => t.due_at && new Date(t.due_at).getTime() < now && t.status !== 'done' && t.status !== 'cancelled');
@@ -84,7 +92,17 @@ export function TasksBoard({
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Text search across title / description / assignee / OB. */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted))]" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search title, assignee, OB…"
+              className="w-56 pl-9"
+            />
+          </div>
           <Filter className="h-4 w-4 text-[hsl(var(--muted))]" />
           <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'open_only' | 'all')}>
             <option value="open_only">Open (default)</option>

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Plus, Pencil } from 'lucide-react';
+import { Loader2, Plus, Pencil, Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,17 +16,58 @@ export function SitesManager({ sites }: { sites: Site[] }) {
   const router = useRouter();
   const [edit, setEdit] = useState<Site | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [active, setActive] = useState<'all' | 'active' | 'inactive'>('all');
+
+  const filtered = useMemo(() => {
+    const needle = q.toLowerCase().trim();
+    return sites.filter((s) => {
+      if (active === 'active' && !s.is_active) return false;
+      if (active === 'inactive' && s.is_active) return false;
+      if (needle) {
+        const hay = `${s.name} ${s.code ?? ''} ${s.address ?? ''}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [sites, q, active]);
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted))]" />
+            <Input className="w-64 pl-9" placeholder="Search name, code, address…" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <div role="tablist" className="inline-flex items-center gap-1 rounded-lg border bg-[hsl(var(--surface-alt))] p-1">
+            {[
+              { k: 'all', label: 'All' },
+              { k: 'active', label: 'Active' },
+              { k: 'inactive', label: 'Inactive' },
+            ].map((t) => {
+              const on = active === t.k;
+              return (
+                <button
+                  key={t.k}
+                  type="button"
+                  onClick={() => setActive(t.k as 'all' | 'active' | 'inactive')}
+                  className={`rounded-md px-3 py-1 text-xs font-semibold transition ${on ? 'bg-[hsl(var(--surface))] shadow-sm' : 'text-[hsl(var(--muted))]'}`}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-xs text-[hsl(var(--muted))]">{filtered.length} of {sites.length}</span>
+        </div>
         <Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Add Site</Button>
       </div>
       <Card className="p-4">
         <Table>
           <THead><TR><TH>Name</TH><TH>Code</TH><TH>Address</TH><TH>Status</TH><TH></TH></TR></THead>
           <TBody>
-            {sites.map((s) => (
+            {filtered.map((s) => (
               <TR key={s.id}>
                 <TD className="font-medium">{s.name}</TD>
                 <TD>{s.code ?? '—'}</TD>

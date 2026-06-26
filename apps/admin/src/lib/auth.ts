@@ -36,10 +36,18 @@ const getCachedProfile = cache(async (): Promise<Profile | null> => {
   return (data ?? null) as Profile | null;
 });
 
-/** Returns the signed-in user's profile, or redirects to /login. */
+/**
+ * Returns the signed-in user's profile, or redirects to /login.
+ *
+ * Every failure mode redirects with an explicit `?error=` param. The middleware
+ * uses the presence of any query param on /login to suppress the
+ * "you're signed in, go back to /menu" auto-redirect — without that, a user
+ * with no profile / no web role / inactive account would loop forever between
+ * the layout (kicks them out) and the middleware (sends them back).
+ */
 export const requireProfile = cache(async (): Promise<Profile> => {
   const profile = await getCachedProfile();
-  if (!profile) redirect('/login');
+  if (!profile) redirect('/login?error=no_profile');
   if (!profile.is_active) redirect('/login?error=deactivated');
 
   const myRoles = profileRoles(profile as unknown as { role?: AppRole; roles?: AppRole[] });

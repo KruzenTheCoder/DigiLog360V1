@@ -12,6 +12,8 @@ import { BRAND } from '@digilog/shared';
 const ERROR_MESSAGES: Record<string, string> = {
   deactivated: 'Your account has been deactivated. Contact an administrator.',
   no_web_access: 'This console is for control room staff. Guards use the mobile app.',
+  no_profile: 'Your sign-in succeeded but no profile was found. Please contact an administrator.',
+  session_expired: 'Your session has expired. Please sign in again.',
 };
 
 export default function LoginPage() {
@@ -37,6 +39,17 @@ function LoginForm() {
   // doesn't wait on a cold route compile + initial server render.
   useEffect(() => { router.prefetch(next); }, [router, next]);
 
+  // If the layout bounced the user here with an error, their auth cookie is
+  // probably still valid but the profile gate failed. Sign out client-side
+  // so the next attempt starts from a clean slate (otherwise the cookie
+  // would survive a manual /menu visit and the user would loop again).
+  useEffect(() => {
+    const errParam = params.get('error');
+    if (!errParam) return;
+    const supabase = createClient();
+    supabase.auth.signOut().catch(() => { /* non-fatal */ });
+  }, [params]);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -53,10 +66,11 @@ function LoginForm() {
       return;
     }
 
-    // router.replace honours the prefetched destination; refresh forces the
-    // middleware to pick up the new session cookie for the next paint.
-    router.replace(next);
-    router.refresh();
+    // Hard navigation — guarantees the freshly-set auth cookies are visible
+    // to the middleware on the next request. router.replace + router.refresh
+    // race the cookie write against the navigation and can produce a
+    // transient redirect loop on the first attempt.
+    window.location.replace(next);
   }
 
   return (

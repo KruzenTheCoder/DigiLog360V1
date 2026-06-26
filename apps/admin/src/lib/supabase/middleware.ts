@@ -109,9 +109,16 @@ export async function updateSession(request: NextRequest) {
     return staticResponse;
   }
 
-  // Handle login page
+  // Handle login page.
+  //
+  // Redirect to /menu only when the visit is "clean" — no query params at
+  // all. Any params (especially `?error=` or `?next=`) mean the user was
+  // bounced here on purpose (profile gate failed, deactivated, no web role,
+  // etc.) — auto-redirecting them back into the app would just bounce them
+  // straight back to /login and produce ERR_TOO_MANY_REDIRECTS.
   if (pathname === '/login') {
-    if (user && !userError) {
+    const hasParams = request.nextUrl.searchParams.size > 0;
+    if (user && !userError && !hasParams) {
       return NextResponse.redirect(new URL('/menu', request.url));
     }
     return supabaseResponse;

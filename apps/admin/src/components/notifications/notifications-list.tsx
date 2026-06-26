@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Bell, BellOff, Trash2, CheckCheck, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Bell, BellOff, Trash2, CheckCheck, AlertTriangle, ShieldCheck, Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input, Select } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/lib/utils';
 
@@ -32,6 +33,9 @@ const KIND_META: Record<string, { color: string; icon: typeof Bell }> = {
 
 export function NotificationsList({ initial }: { initial: NotificationRow[] }) {
   const [items, setItems] = useState<NotificationRow[]>(initial);
+  const [q, setQ] = useState('');
+  const [kindFilter, setKindFilter] = useState<string>('all');
+  const [showOnly, setShowOnly] = useState<'all' | 'unread'>('all');
   const supabase = createClient();
 
   // Realtime: append new notifications as they arrive.
@@ -72,6 +76,19 @@ export function NotificationsList({ initial }: { initial: NotificationRow[] }) {
   }
 
   const unread = items.filter((i) => !i.read_at).length;
+  const kinds = useMemo(() => Array.from(new Set(items.map((n) => n.kind))).sort(), [items]);
+  const filtered = useMemo(() => {
+    const needle = q.toLowerCase().trim();
+    return items.filter((n) => {
+      if (showOnly === 'unread' && n.read_at) return false;
+      if (kindFilter !== 'all' && n.kind !== kindFilter) return false;
+      if (needle) {
+        const hay = `${n.title} ${n.body ?? ''} ${n.kind}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [items, q, showOnly, kindFilter]);
 
   if (items.length === 0) {
     return (
@@ -85,10 +102,36 @@ export function NotificationsList({ initial }: { initial: NotificationRow[] }) {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-[hsl(var(--muted))]">
-          {unread} unread of {items.length}
-        </p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted))]" />
+            <Input className="w-56 pl-9" placeholder="Search title or body…" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <Select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)} className="w-auto">
+            <option value="all">All kinds</option>
+            {kinds.map((k) => <option key={k} value={k}>{k}</option>)}
+          </Select>
+          <div role="tablist" className="inline-flex items-center gap-1 rounded-lg border bg-[hsl(var(--surface-alt))] p-1">
+            {[
+              { k: 'all', label: 'All' },
+              { k: 'unread', label: 'Unread' },
+            ].map((t) => {
+              const on = showOnly === t.k;
+              return (
+                <button
+                  key={t.k}
+                  type="button"
+                  onClick={() => setShowOnly(t.k as 'all' | 'unread')}
+                  className={`rounded-md px-3 py-1 text-xs font-semibold transition ${on ? 'bg-[hsl(var(--surface))] shadow-sm' : 'text-[hsl(var(--muted))]'}`}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-xs text-[hsl(var(--muted))]">{filtered.length} of {items.length} · {unread} unread</span>
+        </div>
         {unread > 0 && (
           <Button variant="secondary" size="sm" onClick={markAllRead}>
             <CheckCheck className="h-4 w-4" /> Mark all read
@@ -97,7 +140,12 @@ export function NotificationsList({ initial }: { initial: NotificationRow[] }) {
       </div>
 
       <div className="space-y-2">
-        {items.map((n) => {
+        {filtered.length === 0 && (
+          <Card className="py-8 text-center text-sm text-[hsl(var(--muted))]">
+            Nothing matches these filters.
+          </Card>
+        )}
+        {filtered.map((n) => {
           const meta = KIND_META[n.kind] ?? KIND_META.system;
           const Icon = meta.icon;
           return (

@@ -15,8 +15,10 @@ import { OcrDropzone } from './ocr-dropzone';
 import {
   SEVERITIES, SEVERITY_LABELS, SEVERITY_COLORS, SLA_CONFIG, ROLE_LABELS,
   mergeIncidentCategories, mergeIncidentSubcategories, mergeIncidentTypes,
+  isSectionEnabled,
   type Profile, type Site, type SeverityLevel, type AppRole,
   type OrgIncidentType, type OrgIncidentCategory, type OrgIncidentSubcategory,
+  type LogFormConfig,
 } from '@digilog/shared';
 
 // Special-case subcategory + type used by the "Log management reports"
@@ -32,6 +34,7 @@ const EMERGENCY_OPTIONS = ['Police', 'Fire', 'Medical', 'Private Security', 'Oth
 export function LogIncidentForm({
   profile, sites, reporters, assignees = [],
   canAssign = false, canLogManagementReport = false,
+  formConfig = {},
 }: {
   profile: Profile;
   sites: Site[];
@@ -39,7 +42,21 @@ export function LogIncidentForm({
   assignees?: Assignee[];
   canAssign?: boolean;
   canLogManagementReport?: boolean;
+  /** Per-org form-builder config — hides sections + skips their validation. */
+  formConfig?: LogFormConfig;
 }) {
+  // Section visibility — defaults are "on", super_user toggles them off in
+  // /super/form-builder. Hidden sections also skip their validation so the
+  // form submits cleanly without them.
+  const showOperationalDetails    = isSectionEnabled(formConfig, 'operational_details');
+  const showCctv                  = showOperationalDetails && isSectionEnabled(formConfig, 'cctv');
+  const showStatusIndicator       = showOperationalDetails && isSectionEnabled(formConfig, 'status_indicator');
+  const showEmergencyServices     = showOperationalDetails && isSectionEnabled(formConfig, 'emergency_services');
+  const showAssignmentSection     = canAssign && isSectionEnabled(formConfig, 'assignment');
+  const showOcrUpload             = isSectionEnabled(formConfig, 'ocr_upload');
+  const showManagementReport      = canLogManagementReport && isSectionEnabled(formConfig, 'management_report_shortcut');
+  const showSeverityChips         = isSectionEnabled(formConfig, 'severity_chip_row');
+  const showReportedBy            = isSectionEnabled(formConfig, 'reported_by');
   const router = useRouter();
   const [category, setCategory] = useState('');
   const [subcategory, setSubcategory] = useState('');
@@ -94,10 +111,10 @@ export function LogIncidentForm({
   const categoryOptions = mergeIncidentCategories(orgCategories);
   const subcategoryOptions = useMemo(() => {
     const base = mergeIncidentSubcategories(category, orgSubcategories);
-    if (!canLogManagementReport || !category) return base;
+    if (!showManagementReport || !category) return base;
     if (base.some((s) => s.toLowerCase() === MGMT_REPORT_SUBCATEGORY.toLowerCase())) return base;
     return [...base, MGMT_REPORT_SUBCATEGORY];
-  }, [category, orgSubcategories, canLogManagementReport]);
+  }, [category, orgSubcategories, showManagementReport]);
   const typeOptions = useMemo(() => {
     if (subcategory === MGMT_REPORT_SUBCATEGORY) return [MGMT_REPORT_TYPE];
     return mergeIncidentTypes(category, subcategory, orgTypes);
@@ -156,15 +173,17 @@ export function LogIncidentForm({
       logged_by_name: reportedBy || profile.full_name || profile.email,
       status: 'open',
     };
-    if (assignee) {
+    // Only persist fields whose section is currently enabled — keeps hidden
+    // sections truly inert (no stray state leaks into the row when the
+    // section is toggled back off and on later).
+    if (showAssignmentSection && assignee) {
       insertPayload.assigned_to = assignee.id;
       insertPayload.assigned_to_name = assignee.name;
     }
-    // Operational details — only attach the ones the user actually answered.
-    if (statusIndicator) insertPayload.status_indicator = statusIndicator;
-    if (cctvAvailable !== null) insertPayload.cctv_available = cctvAvailable;
-    if (cctvTimes.trim()) insertPayload.cctv_times = cctvTimes.trim();
-    if (emergencyServices.length) insertPayload.emergency_services = emergencyServices;
+    if (showStatusIndicator && statusIndicator) insertPayload.status_indicator = statusIndicator;
+    if (showCctv && cctvAvailable !== null) insertPayload.cctv_available = cctvAvailable;
+    if (showCctv && cctvTimes.trim()) insertPayload.cctv_times = cctvTimes.trim();
+    if (showEmergencyServices && emergencyServices.length) insertPayload.emergency_services = emergencyServices;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error: insErr } = await (supabase as any)
@@ -230,31 +249,34 @@ export function LogIncidentForm({
             </div>
           </div>
 
-          {/* Severity as a touch-friendly chip row, not a select — lets users
-              compare options at a glance and matches mobile UX. */}
-          <div className="mt-5">
-            <Label>Severity *</Label>
-            <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {SEVERITIES.map((s) => {
-                const on = severity === s;
-                const color = SEVERITY_COLORS[s];
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setSeverity(s)}
-                    className="flex items-center justify-center gap-2 rounded-xl border-2 p-3 text-sm font-semibold transition"
-                    style={on
-                      ? { background: color, borderColor: color, color: '#fff', boxShadow: `0 4px 14px ${color}55` }
-                      : { borderColor: `${color}55`, color }}
-                  >
-                    <span className="h-2 w-2 rounded-full" style={{ background: on ? '#fff' : color }} />
-                    {SEVERITY_LABELS[s]}
-                  </button>
-                );
-              })}
+          {/* Severity chips — hide via form-builder. When hidden, the value
+              defaults to 'medium' (already the initial state) and the row
+              simply doesn't render. */}
+          {showSeverityChips && (
+            <div className="mt-5">
+              <Label>Severity *</Label>
+              <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {SEVERITIES.map((s) => {
+                  const on = severity === s;
+                  const color = SEVERITY_COLORS[s];
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setSeverity(s)}
+                      className="flex items-center justify-center gap-2 rounded-xl border-2 p-3 text-sm font-semibold transition"
+                      style={on
+                        ? { background: color, borderColor: color, color: '#fff', boxShadow: `0 4px 14px ${color}55` }
+                        : { borderColor: `${color}55`, color }}
+                    >
+                      <span className="h-2 w-2 rounded-full" style={{ background: on ? '#fff' : color }} />
+                      {SEVERITY_LABELS[s]}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </GradientSection>
 
         {/* 2. When & Where */}
@@ -294,17 +316,19 @@ export function LogIncidentForm({
                 </div>
               )}
             </div>
-            <div className="sm:col-span-2">
-              <Label>Reported By</Label>
-              {reporters.length > 0 ? (
-                <Select value={reportedBy} onChange={(e) => setReportedBy(e.target.value)}>
-                  <option value={profile.full_name ?? profile.email ?? ''}>{profile.full_name ?? profile.email} (me)</option>
-                  {reporters.map((r) => <option key={r.id} value={r.name}>{r.name}</option>)}
-                </Select>
-              ) : (
-                <Input value={reportedBy} onChange={(e) => setReportedBy(e.target.value)} />
-              )}
-            </div>
+            {showReportedBy && (
+              <div className="sm:col-span-2">
+                <Label>Reported By</Label>
+                {reporters.length > 0 ? (
+                  <Select value={reportedBy} onChange={(e) => setReportedBy(e.target.value)}>
+                    <option value={profile.full_name ?? profile.email ?? ''}>{profile.full_name ?? profile.email} (me)</option>
+                    {reporters.map((r) => <option key={r.id} value={r.name}>{r.name}</option>)}
+                  </Select>
+                ) : (
+                  <Input value={reportedBy} onChange={(e) => setReportedBy(e.target.value)} />
+                )}
+              </div>
+            )}
           </div>
         </GradientSection>
 
@@ -324,98 +348,109 @@ export function LogIncidentForm({
               <span>{charCount} characters</span>
               <span>{charCount === 0 ? 'Required.' : 'OCR a written note above or type directly — both work.'}</span>
             </div>
-            <div className="mt-4">
-              <OcrDropzone onText={(text) => setDescription((d) => d ? `${d}\n\n${text}` : text)} />
-            </div>
-          </div>
-        </GradientSection>
-
-        {/* 4. Operational details — CCTV, status, emergency services. All
-            optional. Mirrors the legacy occurrence fields so reviewers have
-            the operational picture without opening a separate report. */}
-        <GradientSection
-          title="Operational details (optional)"
-          icon="Radio"
-          tone="amber"
-          subtitle="CCTV, on-scene status, emergency services dispatched"
-        >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label>Site status at the time</Label>
-              <Select value={statusIndicator} onChange={(e) => setStatusIndicator(e.target.value as '' | 'active' | 'inactive')}>
-                <option value="">— Not recorded —</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </Select>
-            </div>
-            <div>
-              <Label>CCTV available?</Label>
-              <div className="mt-1 grid grid-cols-3 gap-2">
-                {[
-                  { val: null, label: '—' },
-                  { val: true, label: 'Yes' },
-                  { val: false, label: 'No' },
-                ].map((opt) => {
-                  const on = cctvAvailable === opt.val;
-                  return (
-                    <button
-                      key={String(opt.val)}
-                      type="button"
-                      onClick={() => setCctvAvailable(opt.val)}
-                      className={`rounded-lg border-2 px-3 py-2 text-sm font-semibold transition ${
-                        on
-                          ? 'border-amber-500 bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
-                          : 'border-[hsl(var(--border))] text-[hsl(var(--muted))] hover:border-amber-200'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
+            {showOcrUpload && (
+              <div className="mt-4">
+                <OcrDropzone onText={(text) => setDescription((d) => d ? `${d}\n\n${text}` : text)} />
               </div>
-            </div>
-          </div>
-
-          {cctvAvailable && (
-            <div className="mt-4">
-              <Label>CCTV time window</Label>
-              <Input
-                value={cctvTimes}
-                onChange={(e) => setCctvTimes(e.target.value)}
-                placeholder="e.g. 14:32 – 14:58, camera 03 (gate)"
-              />
-            </div>
-          )}
-
-          <div className="mt-4">
-            <Label>Emergency services on scene</Label>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {EMERGENCY_OPTIONS.map((s) => {
-                const on = emergencyServices.includes(s);
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => toggleEmergency(s)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                      on
-                        ? 'border-red-500 bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-200'
-                        : 'border-[hsl(var(--border))] text-[hsl(var(--muted))] hover:border-red-300'
-                    }`}
-                  >
-                    {on ? '✓ ' : ''}{s}
-                  </button>
-                );
-              })}
-            </div>
-            {emergencyServices.length === 0 && (
-              <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">Tap any that attended. Leave blank if none.</p>
             )}
           </div>
         </GradientSection>
 
-        {/* 5. Assignment — only renders when the caller has the capability */}
-        {canAssign && (
+        {/* 4. Operational details — CCTV, status, emergency services. All
+            optional. The whole section can be hidden via the per-org form
+            builder, and individual sub-fields (CCTV, status, emergency)
+            can be toggled independently. */}
+        {showOperationalDetails && (showStatusIndicator || showCctv || showEmergencyServices) && (
+          <GradientSection
+            title="Operational details (optional)"
+            icon="Radio"
+            tone="amber"
+            subtitle="CCTV, on-scene status, emergency services dispatched"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              {showStatusIndicator && (
+                <div>
+                  <Label>Site status at the time</Label>
+                  <Select value={statusIndicator} onChange={(e) => setStatusIndicator(e.target.value as '' | 'active' | 'inactive')}>
+                    <option value="">— Not recorded —</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </Select>
+                </div>
+              )}
+              {showCctv && (
+                <div>
+                  <Label>CCTV available?</Label>
+                  <div className="mt-1 grid grid-cols-3 gap-2">
+                    {[
+                      { val: null, label: '—' },
+                      { val: true, label: 'Yes' },
+                      { val: false, label: 'No' },
+                    ].map((opt) => {
+                      const on = cctvAvailable === opt.val;
+                      return (
+                        <button
+                          key={String(opt.val)}
+                          type="button"
+                          onClick={() => setCctvAvailable(opt.val)}
+                          className={`rounded-lg border-2 px-3 py-2 text-sm font-semibold transition ${
+                            on
+                              ? 'border-amber-500 bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
+                              : 'border-[hsl(var(--border))] text-[hsl(var(--muted))] hover:border-amber-200'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {showCctv && cctvAvailable && (
+              <div className="mt-4">
+                <Label>CCTV time window</Label>
+                <Input
+                  value={cctvTimes}
+                  onChange={(e) => setCctvTimes(e.target.value)}
+                  placeholder="e.g. 14:32 – 14:58, camera 03 (gate)"
+                />
+              </div>
+            )}
+
+            {showEmergencyServices && (
+              <div className="mt-4">
+                <Label>Emergency services on scene</Label>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {EMERGENCY_OPTIONS.map((s) => {
+                    const on = emergencyServices.includes(s);
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => toggleEmergency(s)}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          on
+                            ? 'border-red-500 bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-200'
+                            : 'border-[hsl(var(--border))] text-[hsl(var(--muted))] hover:border-red-300'
+                        }`}
+                      >
+                        {on ? '✓ ' : ''}{s}
+                      </button>
+                    );
+                  })}
+                </div>
+                {emergencyServices.length === 0 && (
+                  <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">Tap any that attended. Leave blank if none.</p>
+                )}
+              </div>
+            )}
+          </GradientSection>
+        )}
+
+        {/* 5. Assignment — gated by capability AND the form-builder flag. */}
+        {showAssignmentSection && (
           <GradientSection title="Assignment (optional)" icon="UserPlus" tone="green"
             subtitle="Hand this incident to a specific person on duty">
             <div>
@@ -539,7 +574,7 @@ export function LogIncidentForm({
                 </span>
               } />
               <SummaryRow label="Reported by" value={reportedBy || '—'} />
-              {canAssign && (
+              {showAssignmentSection && (
                 <SummaryRow
                   label="Assigned to"
                   value={selectedAssignee
@@ -558,10 +593,10 @@ export function LogIncidentForm({
             <ul className="space-y-1 pl-5 list-disc marker:text-sky-500">
               <li>Use Critical / High only for genuine safety events — they shorten SLAs.</li>
               <li>OCR a written report to fast-track typing.</li>
-              {canLogManagementReport && (
+              {showManagementReport && (
                 <li>Pick the <strong>Management Reports</strong> sub-category for monthly write-ups.</li>
               )}
-              {canAssign && <li>Assigning routes a push notification to the recipient.</li>}
+              {showAssignmentSection && <li>Assigning routes a push notification to the recipient.</li>}
             </ul>
           </div>
         </div>
