@@ -200,16 +200,17 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
       <PageHeader
         title="Performance Dashboard"
         description={`Real-time analytics & key performance indicators — last 30 days${activeSite ? ` · ${activeSite.name}` : profile.role === 'admin' ? ' · all sites' : ''}`}
-      >
-        {profile.capabilities?.includes('audit.user_view') && (
-          <Link href="/settings/audit">
-            <Button variant="outline" size="sm">
-              <FileText className="h-4 w-4 mr-2" />
-              Audit Log
-            </Button>
-          </Link>
-        )}
-      </PageHeader>
+        action={
+          profile.capabilities?.includes('audit.user_view') ? (
+            <Link href="/settings/audit">
+              <Button variant="outline" size="sm">
+                <FileText className="h-4 w-4 mr-2" />
+                Audit Log
+              </Button>
+            </Link>
+          ) : undefined
+        }
+      />
 
       {(allSites ?? []).length > 1 && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
