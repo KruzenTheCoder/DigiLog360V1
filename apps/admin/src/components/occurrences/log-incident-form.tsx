@@ -15,10 +15,10 @@ import { OcrDropzone } from './ocr-dropzone';
 import {
   SEVERITIES, SEVERITY_LABELS, SEVERITY_COLORS, SLA_CONFIG, ROLE_LABELS,
   mergeIncidentCategories, mergeIncidentSubcategories, mergeIncidentTypes,
-  isSectionEnabled,
+  isSectionEnabled, isCustomSectionEnabled,
   type Profile, type Site, type SeverityLevel, type AppRole,
   type OrgIncidentType, type OrgIncidentCategory, type OrgIncidentSubcategory,
-  type LogFormConfig,
+  type LogFormConfig, type CustomSection, type CustomField,
 } from '@digilog/shared';
 
 // Special-case subcategory + type used by the "Log management reports"
@@ -80,6 +80,11 @@ export function LogIncidentForm({
   const [cctvAvailable, setCctvAvailable] = useState<boolean | null>(null);
   const [cctvTimes, setCctvTimes] = useState('');
   const [emergencyServices, setEmergencyServices] = useState<string[]>([]);
+  // Custom field values, keyed by `${sectionId}.${fieldKey}`. The form
+  // builder configures these per-org; we render them after the built-in
+  // sections and persist them into occurrences.custom_fields jsonb.
+  const [customValues, setCustomValues] = useState<Record<string, string | number | boolean>>({});
+  const customSections: CustomSection[] = (formConfig.customSections ?? []).filter(isCustomSectionEnabled);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -133,8 +138,15 @@ export function LogIncidentForm({
     setOverride('');
     setStatusIndicator(''); setCctvAvailable(null); setCctvTimes('');
     setEmergencyServices([]);
+    setCustomValues({});
     setOk(null); setError(null);
   }
+
+  // Look up a custom field's value or undefined.
+  const getCustomValue = (sectionId: string, fieldKey: string) =>
+    customValues[`${sectionId}.${fieldKey}`];
+  const setCustomValue = (sectionId: string, fieldKey: string, v: string | number | boolean) =>
+    setCustomValues((prev) => ({ ...prev, [`${sectionId}.${fieldKey}`]: v }));
 
   function toggleEmergency(s: string) {
     setEmergencyServices((cur) => cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]);
@@ -147,6 +159,19 @@ export function LogIncidentForm({
     if (!subcategory) { setError('Pick a sub-category.'); return; }
     if (!type) { setError('Pick the specific type.'); return; }
     if (!description) { setError('Fill in all required fields.'); return; }
+    // Custom-section required validation — skipped for hidden sections.
+    for (const section of customSections) {
+      for (const field of section.fields) {
+        if (!field.required) continue;
+        const v = customValues[`${section.id}.${field.key}`];
+        const missing = v === undefined || v === '' || v === null ||
+          (field.type === 'checkbox' && v === false);
+        if (missing) {
+          setError(`"${field.label}" is required (in section "${section.title}").`);
+          return;
+        }
+      }
+    }
     setSaving(true);
 
     // Stamp the incident time at the exact moment Submit fires (or use the
@@ -184,6 +209,22 @@ export function LogIncidentForm({
     if (showCctv && cctvAvailable !== null) insertPayload.cctv_available = cctvAvailable;
     if (showCctv && cctvTimes.trim()) insertPayload.cctv_times = cctvTimes.trim();
     if (showEmergencyServices && emergencyServices.length) insertPayload.emergency_services = emergencyServices;
+
+    // Custom sections — collect into a single jsonb keyed by sectionId →
+    // fieldKey → value. Only include enabled sections and their required
+    // fields are validated below before we get here.
+    if (customSections.length > 0) {
+      const custom: Record<string, Record<string, unknown>> = {};
+      for (const section of customSections) {
+        const bag: Record<string, unknown> = {};
+        for (const field of section.fields) {
+          const v = customValues[`${section.id}.${field.key}`];
+          if (v !== undefined && v !== '' && v !== null) bag[field.key] = v;
+        }
+        if (Object.keys(bag).length > 0) custom[section.id] = bag;
+      }
+      if (Object.keys(custom).length > 0) insertPayload.custom_fields = custom;
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error: insErr } = await (supabase as any)
@@ -479,6 +520,33 @@ export function LogIncidentForm({
           </GradientSection>
         )}
 
+        {/* 6. Custom sections (user-defined via /super/form-builder). */}
+        {customSections.map((section) => (
+          <GradientSection
+            key={section.id}
+            title={section.title}
+            subtitle={section.subtitle}
+            icon={section.icon || 'ClipboardList'}
+            tone={section.tone ?? 'sky'}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              {section.fields.map((field) => (
+                <CustomFieldRow
+                  key={field.key}
+                  field={field}
+                  value={getCustomValue(section.id, field.key)}
+                  onChange={(v) => setCustomValue(section.id, field.key, v)}
+                />
+              ))}
+              {section.fields.length === 0 && (
+                <p className="text-xs italic text-[hsl(var(--muted))]">
+                  This section has no fields yet — configure it at <strong>Super User → Form Builder</strong>.
+                </p>
+              )}
+            </div>
+          </GradientSection>
+        ))}
+
         {/* Inline messages */}
         {error && (
           <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
@@ -632,6 +700,73 @@ export function LogIncidentForm({
         </div>
       </div>
     </form>
+  );
+}
+
+// Renders one custom field — text / textarea / number / select / checkbox / date.
+// All fields are 2-col by default; textareas span the full row.
+function CustomFieldRow({
+  field, value, onChange,
+}: {
+  field: CustomField;
+  value: string | number | boolean | undefined;
+  onChange: (next: string | number | boolean) => void;
+}) {
+  const labelText = `${field.label}${field.required ? ' *' : ''}`;
+  if (field.type === 'textarea') {
+    return (
+      <div className="sm:col-span-2">
+        <Label>{labelText}</Label>
+        <Textarea
+          value={(value as string | undefined) ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={field.placeholder}
+          className="min-h-[100px]"
+        />
+        {field.hint && <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">{field.hint}</p>}
+      </div>
+    );
+  }
+  if (field.type === 'select') {
+    return (
+      <div>
+        <Label>{labelText}</Label>
+        <Select value={(value as string | undefined) ?? ''} onChange={(e) => onChange(e.target.value)}>
+          <option value="">— Select —</option>
+          {(field.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
+        </Select>
+        {field.hint && <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">{field.hint}</p>}
+      </div>
+    );
+  }
+  if (field.type === 'checkbox') {
+    return (
+      <div>
+        <Label>&nbsp;</Label>
+        <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border px-3">
+          <input
+            type="checkbox"
+            checked={!!value}
+            onChange={(e) => onChange(e.target.checked)}
+            className="h-4 w-4"
+          />
+          <span className="text-sm">{labelText}</span>
+        </label>
+        {field.hint && <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">{field.hint}</p>}
+      </div>
+    );
+  }
+  return (
+    <div>
+      <Label>{labelText}</Label>
+      <Input
+        type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+        value={value === undefined || value === null ? '' : String(value)}
+        onChange={(e) => onChange(field.type === 'number' ? Number(e.target.value) : e.target.value)}
+        placeholder={field.placeholder}
+      />
+      {field.hint && <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">{field.hint}</p>}
+    </div>
   );
 }
 

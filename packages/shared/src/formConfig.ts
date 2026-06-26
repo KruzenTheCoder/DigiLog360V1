@@ -5,7 +5,7 @@
 // section keys and defaults stay in sync between writer and reader.
 // ============================================================================
 
-/** Every toggleable section/feature on the Log New Occurrence form. */
+/** Every toggleable BUILT-IN section/feature on the Log New Occurrence form. */
 export const LOG_FORM_SECTIONS = [
   'operational_details',          // Operational Details panel (CCTV / status / emergency)
   'cctv',                         // CCTV-available + time window subfield (inside operational_details)
@@ -21,11 +21,50 @@ export const LOG_FORM_SECTIONS = [
 export type LogFormSection = (typeof LOG_FORM_SECTIONS)[number];
 
 export interface LogFormSectionConfig { enabled: boolean }
-export interface LogFormConfig {
-  sections?: Partial<Record<LogFormSection, LogFormSectionConfig>>;
+
+/** Field types supported in custom sections. */
+export const CUSTOM_FIELD_TYPES = ['text', 'textarea', 'number', 'select', 'checkbox', 'date'] as const;
+export type CustomFieldType = (typeof CUSTOM_FIELD_TYPES)[number];
+
+export interface CustomField {
+  /** Stable id — used as the key in occurrences.custom_fields jsonb. Snake-case. */
+  key: string;
+  /** Human-readable label shown above the input. */
+  label: string;
+  type: CustomFieldType;
+  /** Required for submit. Hidden sections always skip validation regardless. */
+  required?: boolean;
+  /** Placeholder for text / textarea / number / date inputs. */
+  placeholder?: string;
+  /** Options for `type === 'select'`. */
+  options?: string[];
+  /** Helper text shown beneath the input. */
+  hint?: string;
 }
 
-/** Human-readable label + helper text for each toggle on the settings page. */
+/** A super-user-defined section that renders at the bottom of the form. */
+export interface CustomSection {
+  /** Stable id — used to dedupe + as React key. */
+  id: string;
+  /** Section heading (gradient bar). */
+  title: string;
+  /** Sub-headline under the title. */
+  subtitle?: string;
+  /** Lucide icon name (e.g. 'Car', 'ClipboardList'). Falls back to a default. */
+  icon?: string;
+  /** Header gradient tone (matches GradientSection). */
+  tone?: 'brand' | 'green' | 'amber' | 'red' | 'sky' | 'violet' | 'slate';
+  /** Off = hidden + validation skipped + values not submitted. Default true. */
+  enabled?: boolean;
+  fields: CustomField[];
+}
+
+export interface LogFormConfig {
+  sections?: Partial<Record<LogFormSection, LogFormSectionConfig>>;
+  customSections?: CustomSection[];
+}
+
+/** Human-readable label + helper text for each built-in toggle. */
 export const LOG_FORM_SECTION_LABELS: Record<LogFormSection, { label: string; hint: string }> = {
   operational_details: {
     label: 'Operational Details panel',
@@ -72,7 +111,20 @@ export const LOG_FORM_SECTION_LABELS: Record<LogFormSection, { label: string; hi
  */
 export function isSectionEnabled(config: LogFormConfig | null | undefined, key: LogFormSection): boolean {
   const s = config?.sections?.[key];
-  // Treat absent / null / undefined as enabled (opt-out, not opt-in).
   if (!s) return true;
   return s.enabled !== false;
+}
+
+/** Same resolver for a custom section — default-on. */
+export function isCustomSectionEnabled(section: CustomSection): boolean {
+  return section.enabled !== false;
+}
+
+/** Slugify a label into a safe snake_case key for a custom field. */
+export function toFieldKey(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 48) || `field_${Date.now().toString(36)}`;
 }
