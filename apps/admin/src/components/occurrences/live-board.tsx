@@ -171,28 +171,25 @@ export function LiveBoard({ initial, profile }: { initial: LiveOccurrence[]; pro
             <tbody className="divide-y divide-[hsl(var(--border))]">
               {filtered.map((o) => {
                 const updateTarget = updateDueAt(o);
-                const sevColor = SEVERITY_COLORS[o.severity];
-                // Base row tint = SLA state (breached/due > severity), with a
-                // severity-coloured left rail in all cases. Click anywhere on
-                // the row to open the detail page; inline action buttons stop
-                // propagation so they still work.
-                const slaBgClass = o.is_sla_breached
-                  ? 'bg-red-50/60 dark:bg-red-950/30'
+                // SLA state wins over severity for the row colour: a breached
+                // row goes red (rail + tint), an update-due row goes amber, and
+                // everything else shows its severity colour. This makes the
+                // "needs attention" rows jump out at a glance.
+                const railColor = o.is_sla_breached
+                  ? '#dc2626'                       // red
                   : o.is_sla_update_due
-                    ? 'bg-amber-50/50 dark:bg-amber-950/25'
-                    : '';
+                    ? '#d97706'                     // amber
+                    : SEVERITY_COLORS[o.severity];
                 return (
                   <tr
                     key={o.id}
                     onClick={() => router.push(`/occurrences/${o.id}`)}
-                    className={`cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${slaBgClass}`}
+                    className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
                     style={{
-                      borderLeft: `5px solid ${sevColor}`,
-                      // Darker tonal wash so the row colour reads at a glance
-                      // even on white backgrounds (per user request).
-                      background: slaBgClass
-                        ? undefined
-                        : `linear-gradient(90deg, ${sevColor}2a 0%, ${sevColor}10 40%, transparent 75%)`,
+                      borderLeft: `5px solid ${railColor}`,
+                      // Tonal wash in the row colour — stronger for breached/due
+                      // so they read instantly even on white backgrounds.
+                      background: `linear-gradient(90deg, ${railColor}${(o.is_sla_breached || o.is_sla_update_due) ? '38' : '2a'} 0%, ${railColor}12 45%, transparent 78%)`,
                     }}
                   >
                     <td className="whitespace-nowrap px-4 py-3">

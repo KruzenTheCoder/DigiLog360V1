@@ -13,7 +13,7 @@ import { formatDateTime } from '@/lib/utils';
 import { toCsv, downloadCsv } from '@/lib/csv';
 import {
   OCCURRENCE_STATUSES, SEVERITIES, STATUS_LABELS, SEVERITY_LABELS, SEVERITY_COLORS,
-  type Occurrence,
+  isSlaBreached, type Occurrence,
 } from '@digilog/shared';
 
 export function OccurrencesTable({ rows }: { rows: Occurrence[] }) {
@@ -93,18 +93,20 @@ export function OccurrencesTable({ rows }: { rows: Occurrence[] }) {
         </THead>
         <TBody>
           {filtered.map((r) => {
-            const sevColor = SEVERITY_COLORS[r.severity];
+            // Breached open rows go red and override the severity colour, so
+            // "needs attention" jumps out. Resolved/closed rows never breach.
+            const breached = isSlaBreached(r);
+            const railColor = breached ? '#dc2626' : SEVERITY_COLORS[r.severity];
             return (
               <TR
                 key={r.id}
                 onClick={() => router.push(`/occurrences/${r.id}`)}
                 className="cursor-pointer"
-                // Severity-tinted left rail + faint row tint. Reads at a glance,
-                // doesn't fight the rest of the page. Hover layer in the base TR
-                // class still applies on top.
+                // Coloured left rail + tonal row wash. Reads at a glance, doesn't
+                // fight the rest of the page. Hover layer still applies on top.
                 style={{
-                  borderLeft: `5px solid ${sevColor}`,
-                  background: `linear-gradient(90deg, ${sevColor}33 0%, ${sevColor}11 40%, transparent 70%)`,
+                  borderLeft: `5px solid ${railColor}`,
+                  background: `linear-gradient(90deg, ${railColor}${breached ? '38' : '33'} 0%, ${railColor}11 40%, transparent 70%)`,
                 }}
               >
                 <TD>

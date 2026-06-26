@@ -20,7 +20,7 @@ function Icon({ name, className }: { name: string; className?: string }) {
 
 export function AppShell({
   profile, siteName, children, capabilities = [],
-  showNetstreamLogo = true, netstreamLogoUrl = null,
+  showNetstreamLogo = true, netstreamLogoUrl = null, siteCount = 0,
 }: {
   profile: Profile;
   siteName: string | null;
@@ -31,6 +31,8 @@ export function AppShell({
   showNetstreamLogo?: boolean;
   /** Optional uploaded override (from organizations.netstream_logo_url). */
   netstreamLogoUrl?: string | null;
+  /** Number of sites assigned (0 = unscoped / all sites). */
+  siteCount?: number;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -158,13 +160,13 @@ export function AppShell({
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-[hsl(var(--surface))]/80 px-4 backdrop-blur lg:px-6 relative">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 bg-brand-gradient px-4 shadow-md lg:px-6 relative">
           {hideSidebar ? (
             <Link href="/menu" className="flex items-center" aria-label={`${BRAND.name} home`}>
-              <Logo className="text-xl" />
+              <Logo className="text-xl" onDark />
             </Link>
           ) : (
-            <button className="lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
+            <button className="lg:hidden text-white" onClick={() => setOpen(true)} aria-label="Open menu">
               <Icons.Menu className="h-6 w-6" />
             </button>
           )}
@@ -185,7 +187,7 @@ export function AppShell({
                   className="h-10 w-auto object-contain"
                 />
               ) : (
-                <NetstreamLogo height={40} />
+                <NetstreamLogo height={40} onDark />
               )}
             </div>
           )}
@@ -213,37 +215,43 @@ export function AppShell({
             />
           </div>
 
-          <div className="hidden items-center gap-2 text-sm text-[hsl(var(--muted))] sm:flex">
+          <div
+            className="hidden items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-sm font-medium text-white backdrop-blur-sm sm:flex"
+            title={siteCount > 1 ? `Assigned to ${siteCount} sites` : undefined}
+          >
             <Icons.MapPin className="h-4 w-4" />
             {siteName ?? 'All sites'}
+            {siteCount > 1 && (
+              <span className="rounded-full bg-white/25 px-1.5 text-[10px] font-bold">{siteCount}</span>
+            )}
           </div>
           <div className="ml-auto flex items-center gap-2">
             <Link
               href="/notifications"
-              className="relative rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="relative rounded-lg p-2 text-white hover:bg-white/15"
               aria-label="Notifications"
               title="Notifications"
             >
               <Icons.Bell className="h-5 w-5" />
               {unread > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white/30">
                   {unread > 99 ? '99+' : unread}
                 </span>
               )}
             </Link>
-            <button onClick={toggleTheme} className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Toggle theme">
+            <button onClick={toggleTheme} className="rounded-lg p-2 text-white hover:bg-white/15" aria-label="Toggle theme">
               {dark ? <Icons.Sun className="h-5 w-5" /> : <Icons.Moon className="h-5 w-5" />}
             </button>
-            <div className="flex items-center gap-2 rounded-lg border px-2 py-1.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-gradient text-xs font-semibold text-white">
+            <div className="flex items-center gap-2 rounded-lg border border-white/25 bg-white/10 px-2 py-1.5 backdrop-blur-sm">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-semibold text-brand">
                 {initials(profile.full_name || profile.email)}
               </div>
               <div className="hidden text-left sm:block">
-                <p className="text-xs font-medium leading-tight">{profile.full_name ?? profile.email}</p>
-                <p className="text-[10px] text-[hsl(var(--muted))]">{ROLE_LABELS[profile.role]}</p>
+                <p className="text-xs font-medium leading-tight text-white">{profile.full_name ?? profile.email}</p>
+                <p className="text-[10px] text-white/75">{ROLE_LABELS[profile.role]}</p>
               </div>
             </div>
-            <button onClick={signOut} className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Sign out" title="Sign out">
+            <button onClick={signOut} className="rounded-lg p-2 text-white hover:bg-white/15" aria-label="Sign out" title="Sign out">
               <Icons.LogOut className="h-5 w-5" />
             </button>
           </div>
@@ -283,8 +291,8 @@ function NavBtn({
       className={cn(
         'rounded-lg p-2 transition-colors',
         active
-          ? 'bg-brand/15 text-brand'
-          : 'text-[hsl(var(--muted))] hover:bg-slate-100 hover:text-[hsl(var(--foreground))] dark:hover:bg-slate-800',
+          ? 'bg-white/25 text-white'
+          : 'text-white/80 hover:bg-white/15 hover:text-white',
       )}
     >
       {icon}

@@ -11,18 +11,39 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb: any = supabase;
-  const [capsSet, siteRow, orgRow] = await Promise.all([
+
+  // Union of the user's assigned sites (site_ids[] + legacy site_id).
+  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
+  const ownSiteIds = Array.from(new Set([
+    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
+    ...(profile.site_id ? [profile.site_id] : []),
+  ]));
+
+  const [capsSet, sitesRows, orgRow] = await Promise.all([
     loadMyCapabilities(),
-    profile.site_id
-      ? supabase.from('sites').select('name').eq('id', profile.site_id).single()
-      : Promise.resolve({ data: null }),
+    ownSiteIds.length > 0
+      ? supabase.from('sites').select('id, name').in('id', ownSiteIds)
+      : Promise.resolve({ data: [] }),
     sb.from('organizations').select('show_netstream_logo, netstream_logo_url').eq('id', profile.org_id).maybeSingle(),
   ]);
+
+  // Header site label:
+  //   • admin / super_user → "All sites"
+  //   • multiple assigned   → "Multi-site"
+  //   • exactly one         → that site's name
+  const siteList = (sitesRows.data ?? []) as Array<{ id: string; name: string }>;
+  const isUnscoped = profile.role === 'admin' || profile.role === 'super_user';
+  const siteLabel = isUnscoped
+    ? 'All sites'
+    : siteList.length > 1
+      ? 'Multi-site'
+      : siteList[0]?.name ?? 'All sites';
 
   return (
     <AppShell
       profile={profile}
-      siteName={profile.role === 'admin' ? null : (siteRow.data?.name ?? null)}
+      siteName={siteLabel}
+      siteCount={isUnscoped ? 0 : siteList.length}
       capabilities={Array.from(capsSet)}
       showNetstreamLogo={orgRow.data?.show_netstream_logo !== false}
       netstreamLogoUrl={orgRow.data?.netstream_logo_url ?? null}
