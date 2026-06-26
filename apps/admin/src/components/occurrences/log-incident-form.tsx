@@ -230,11 +230,39 @@ export function LogIncidentForm({
     const { data, error: insErr } = await (supabase as any)
       .from('occurrences')
       .insert(insertPayload)
-      .select('ob_number')
+      .select('id, ob_number')
       .single();
 
+    if (insErr) {
+      setSaving(false);
+      setError(insErr.message);
+      return;
+    }
+
+    // Create a task if assigned to someone
+    if (showAssignmentSection && assignee && data?.id) {
+      const { error: taskErr } = await (supabase as any)
+        .from('tasks')
+        .insert({
+          title: `Investigate: ${type}`,
+          description: description.trim(),
+          status: 'todo',
+          priority: severity === 'critical' || severity === 'high' ? 'high' : 'normal',
+          assigned_to: assignee.id,
+          assigned_to_name: assignee.name,
+          assigned_by: profile.id,
+          assigned_by_name: profile.full_name || profile.email,
+          occurrence_id: data.id,
+          site_id: siteId || null,
+          due_at: null,
+        });
+
+      if (taskErr) {
+        console.error('Failed to create task:', taskErr);
+      }
+    }
+
     setSaving(false);
-    if (insErr) { setError(insErr.message); return; }
     setOk(`Occurrence ${data?.ob_number} logged successfully.`);
     reset();
     router.refresh();
