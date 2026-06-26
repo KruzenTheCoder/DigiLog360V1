@@ -132,14 +132,16 @@ export function LogIncidentForm({
     setType(s === MGMT_REPORT_SUBCATEGORY ? MGMT_REPORT_TYPE : '');
   }
 
-  function reset() {
+  function reset(options?: { clearMessages?: boolean }) {
     setCategory(''); setSubcategory(''); setType(''); setDescription('');
     setSeverity('medium'); setAssignedTo('');
     setOverride('');
     setStatusIndicator(''); setCctvAvailable(null); setCctvTimes('');
     setEmergencyServices([]);
     setCustomValues({});
-    setOk(null); setError(null);
+    if (options?.clearMessages ?? true) {
+      setOk(null); setError(null);
+    }
   }
 
   // Look up a custom field's value or undefined.
@@ -245,26 +247,31 @@ export function LogIncidentForm({
         .from('tasks')
         .insert({
           title: `Investigate: ${type}`,
-          description: description.trim(),
-          status: 'todo',
+          description: description.trim() || null,
+          status: 'open',
           priority: severity === 'critical' || severity === 'high' ? 'high' : 'normal',
           assigned_to: assignee.id,
           assigned_to_name: assignee.name,
           assigned_by: profile.id,
           assigned_by_name: profile.full_name || profile.email,
           occurrence_id: data.id,
-          site_id: siteId || null,
+          ob_number: data.ob_number ?? null,
           due_at: null,
         });
 
       if (taskErr) {
         console.error('Failed to create task:', taskErr);
+        setSaving(false);
+        reset({ clearMessages: false });
+        setError(`Occurrence ${data.ob_number} logged, but the assigned task could not be created: ${taskErr.message}`);
+        router.refresh();
+        return;
       }
     }
 
     setSaving(false);
+    reset({ clearMessages: false });
     setOk(`Occurrence ${data?.ob_number} logged successfully.`);
-    reset();
     router.refresh();
   }
 
@@ -716,7 +723,7 @@ export function LogIncidentForm({
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Button type="button" variant="secondary" onClick={reset} disabled={saving}>
+              <Button type="button" variant="secondary" onClick={() => reset()} disabled={saving}>
                 <RotateCcw className="h-4 w-4" /> Reset
               </Button>
               <Button type="submit" disabled={saving}>
