@@ -66,15 +66,16 @@ const svg = `
   <!-- deep navy background -->
   <rect width="${SIZE}" height="${SIZE}" fill="url(#bgGlow)"/>
 
-  <!-- blurred glow halo behind the disc -->
-  <circle cx="512" cy="470" r="300" fill="#2563eb" opacity="0.55" filter="url(#soft)"/>
+  <!-- blurred glow halo behind the disc (smaller so the whole logo fits with
+       comfortable padding inside the icon's safe area) -->
+  <circle cx="512" cy="500" r="250" fill="#2563eb" opacity="0.5" filter="url(#soft)"/>
 
   <!-- the bright blue disc -->
-  <circle cx="512" cy="470" r="250" fill="url(#discGlow)"/>
-  <circle cx="512" cy="470" r="250" fill="none" stroke="#60a5fa" stroke-opacity="0.35" stroke-width="6"/>
+  <circle cx="512" cy="500" r="200" fill="url(#discGlow)"/>
+  <circle cx="512" cy="500" r="200" fill="none" stroke="#60a5fa" stroke-opacity="0.35" stroke-width="5"/>
 
-  <!-- white shield mark -->
-  <g transform="translate(0 -10) scale(0.62) translate(316 300)">
+  <!-- white shield mark — scaled down + centred inside the disc -->
+  <g transform="translate(512 500) scale(0.46) translate(-512 -512) translate(0 -10)">
     <path d="${shieldPath}" fill="#ffffff"/>
     <path d="${tickPath}" fill="none" stroke="#2563eb" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
   </g>

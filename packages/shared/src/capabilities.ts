@@ -67,6 +67,7 @@ export const CAPABILITY_KEYS = [
   // Mobile home containers — each gates a portal card on the guard home.
   'mobile.home.new_occurrence',
   'mobile.home.shift',
+  'mobile.home.duty',
   'mobile.home.patrol',
   'mobile.home.scan',
   'mobile.home.visitors',

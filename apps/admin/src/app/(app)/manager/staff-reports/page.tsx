@@ -472,45 +472,51 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
         <GradientSection title="High-Frequency Incidents" icon="Flame" tone="red">
           <div className="space-y-3.5">
             {typeBreakdown.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
-            {typeBreakdown.slice(0, 7).map((t, i) => {
-              const pct = total30 ? Math.round((t.count / total30) * 100) : 0;
-              const color = PALETTE[i % PALETTE.length];
-              return (
-                <div key={t.name} className="flex items-center gap-3">
-                  <span
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm"
-                    style={{ background: color }}
-                  >
-                    {i + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-center justify-between gap-2 text-sm">
-                      <span className="truncate font-medium">{t.name}</span>
-                      <span className="shrink-0 text-xs text-[hsl(var(--muted))]">
-                        <span className="font-semibold text-[hsl(var(--foreground))]">{t.count}</span> · {pct}%
-                      </span>
-                    </div>
-                    <div
-                      className="h-3 overflow-hidden rounded-full"
-                      style={{ background: `${color}22`, boxShadow: `inset 0 0 0 1px ${color}33` }}
+            {(() => {
+              // Scale bars relative to the top type so they fill visibly.
+              const top = typeBreakdown.slice(0, 7);
+              const maxCount = top[0]?.count || 1;
+              return top.map((t, i) => {
+                const pct = total30 ? Math.round((t.count / total30) * 100) : 0;
+                const barWidth = Math.max(Math.round((t.count / maxCount) * 100), 8);
+                const color = PALETTE[i % PALETTE.length];
+                return (
+                  <div key={t.name} className="flex items-center gap-3">
+                    <span
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm"
+                      style={{ background: color }}
                     >
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                        <span className="truncate font-medium">{t.name}</span>
+                        <span className="shrink-0 text-xs text-[hsl(var(--muted))]">
+                          <span className="font-semibold text-[hsl(var(--foreground))]">{t.count}</span> · {pct}%
+                        </span>
+                      </div>
                       <div
-                        className="flex h-full items-center justify-end rounded-full pr-2 text-[10px] font-semibold text-white transition-all"
-                        style={{
-                          width: `${Math.max(pct, 6)}%`,
-                          background: `linear-gradient(90deg, ${color}cc, ${color})`,
-                        }}
+                        className="h-3.5 overflow-hidden rounded-full"
+                        style={{ background: `${color}1f`, boxShadow: `inset 0 0 0 1px ${color}33` }}
                       >
-                        {pct >= 18 ? `${pct}%` : ''}
+                        <div
+                          className="flex h-full items-center justify-end rounded-full pr-2 text-[10px] font-bold text-white transition-all"
+                          style={{
+                            width: `${barWidth}%`,
+                            background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+                          }}
+                        >
+                          {barWidth >= 22 ? `${pct}%` : ''}
+                        </div>
+                      </div>
+                      <div className="mt-1 text-right text-[10px] font-medium text-[hsl(var(--muted))]">
+                        {pct}% of total incidents
                       </div>
                     </div>
-                    <div className="mt-1 text-right text-[10px] font-medium text-[hsl(var(--muted))]">
-                      {pct}% of total incidents
-                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         </GradientSection>
       </div>

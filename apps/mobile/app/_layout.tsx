@@ -113,6 +113,7 @@ function RootNavigator() {
       <Stack.Screen name="settings" options={{ presentation: 'card' }} />
       <Stack.Screen name="inbox" options={{ presentation: 'card' }} />
       <Stack.Screen name="shift" options={{ presentation: 'card' }} />
+      <Stack.Screen name="duty" options={{ presentation: 'card' }} />
       <Stack.Screen name="handovers" options={{ presentation: 'card' }} />
       <Stack.Screen name="gate/visitors" options={{ presentation: 'card' }} />
       <Stack.Screen name="gate/keys" options={{ presentation: 'card' }} />
