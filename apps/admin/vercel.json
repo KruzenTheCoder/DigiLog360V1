@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "_comment_region": "Pin serverless functions to ONE region, co-located with the Supabase DB. Your Supabase project is in US-East today, so functions stay in iad1 (US-East) — server↔DB is fast. AFTER you migrate Supabase to EU, change this to 'fra1' (Frankfurt) or 'lhr1' (London) so functions stay co-located AND your SA users get ~175ms instead of ~235ms. Never split functions from the DB region.",
+  "regions": ["iad1"]
+}

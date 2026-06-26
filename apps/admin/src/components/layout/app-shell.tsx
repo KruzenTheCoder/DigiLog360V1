@@ -10,6 +10,7 @@ import { visibleSections } from './nav-config';
 import { Logo } from '@/components/brand/logo';
 import { NetstreamLogo } from '@/components/brand/netstream-logo';
 import { TaskAssignmentToast } from '@/components/tasks/task-assignment-toast';
+import { invalidateCache } from '@/lib/use-cached-query';
 import { BRAND, ROLE_LABELS, type Profile } from '@digilog/shared';
 
 function Icon({ name, className }: { name: string; className?: string }) {
@@ -101,6 +102,9 @@ export function AppShell({
   }
 
   async function signOut() {
+    // Drop the client-side data cache so the next user never sees the
+    // previous user's cached rows.
+    invalidateCache();
     await createClient().auth.signOut();
     router.replace('/login');
     router.refresh();
