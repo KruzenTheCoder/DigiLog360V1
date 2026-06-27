@@ -14,7 +14,7 @@
       "fallbackToCacheTimeout": 0,
       "url": "https://u.expo.dev/a3324b4b-ca5f-4950-b2a8-c1f1acaf79a8"
     },
-    "icon": "./assets/branding/digilog-launcher-app.png",
+    "icon": "./assets/branding/digilog-icon.png",
     "splash": {
       "image": "./assets/splash.png",
       "backgroundColor": "#0b1020",
@@ -29,7 +29,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.netstream.digilog360",
-      "icon": "./assets/branding/digilog-launcher-app.png",
+      "icon": "./assets/branding/digilog-icon.png",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan checkpoint QR codes and capture incident photos.",
         "NSLocationWhenInUseUsageDescription": "Verify your presence at patrol checkpoints.",
@@ -56,8 +56,8 @@
     "android": {
       "package": "com.netstream.digilog360",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/branding/digilog-launcher-foreground.png",
-        "backgroundColor": "#0b1020"
+        "foregroundImage": "./assets/branding/digilog-icon.png",
+        "backgroundColor": "#1c243e"
       },
       "permissions": [
         "CAMERA",
