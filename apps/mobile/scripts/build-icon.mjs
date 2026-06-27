@@ -24,7 +24,7 @@ const SIZE = 1024;
 const SOURCE = resolve(A, 'DigilogIconV2.jpg');
 const APP_OUT = resolve(A, 'digilog-icon.png');
 const FG_OUT = resolve(A, 'digilog-icon-foreground.png');
-const ADAPTIVE_FRACTION = 0.96;
+const ADAPTIVE_FRACTION = 1.1;
 
 async function main() {
   const { data } = await sharp(SOURCE)
@@ -62,17 +62,28 @@ async function main() {
     .png()
     .toBuffer();
 
-  const foreground = await sharp({
-    create: {
-      width: SIZE,
-      height: SIZE,
-      channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    },
-  })
-    .composite([{ input: insetIcon, gravity: 'center' }])
-    .png()
-    .toBuffer();
+  const foreground =
+    inset <= SIZE
+      ? await sharp({
+          create: {
+            width: SIZE,
+            height: SIZE,
+            channels: 4,
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          },
+        })
+          .composite([{ input: insetIcon, gravity: 'center' }])
+          .png()
+          .toBuffer()
+      : await sharp(insetIcon)
+          .extract({
+            left: Math.floor((inset - SIZE) / 2),
+            top: Math.floor((inset - SIZE) / 2),
+            width: SIZE,
+            height: SIZE,
+          })
+          .png()
+          .toBuffer();
 
   await sharp(square).toFile(APP_OUT);
   await sharp(foreground).toFile(FG_OUT);
