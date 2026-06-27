@@ -51,14 +51,15 @@ async function compose({ logoFraction, navyBg, border }) {
 }
 
 async function main() {
-  // App icon (iOS + install dialog): navy bg, logo ~72% (trimmed), soft border.
-  const icon = await compose({ logoFraction: 0.72, navyBg: true, border: true });
+  // App icon (iOS + install dialog): navy bg, big logo (~86%) that nearly
+  // fills the inner border, soft border ring.
+  const icon = await compose({ logoFraction: 0.86, navyBg: true, border: true });
   await sharp(icon).toFile(resolve(A, 'digilog-app-icon-padded.png'));
 
-  // Android adaptive foreground: transparent, logo ~64% so it sits just inside
-  // the mask's safe zone after the ~10% system zoom — nothing clips. Navy comes
-  // from the adaptiveIcon.backgroundColor.
-  const fg = await compose({ logoFraction: 0.64, navyBg: false, border: false });
+  // Android adaptive foreground: transparent, logo ~80%. The mark is roughly
+  // round so the mask only trims the empty corners — the logo itself stays
+  // fully visible while reading much larger on the launcher.
+  const fg = await compose({ logoFraction: 0.80, navyBg: false, border: false });
   await sharp(fg).toFile(resolve(A, 'digilog-adaptive-foreground-padded.png'));
 
   console.log('✓ Wrote digilog-app-icon-padded.png + digilog-adaptive-foreground-padded.png');

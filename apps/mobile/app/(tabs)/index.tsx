@@ -36,7 +36,7 @@ const ZERO_STATS: Stats = {
 };
 
 export default function Home() {
-  const { profile, can } = useAuth();
+  const { profile, can, capabilities } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<Stats>(ZERO_STATS);
   const [loading, setLoading] = useState(true);
@@ -143,36 +143,21 @@ export default function Home() {
   const firstName = (profile.full_name ?? profile.email ?? 'Guard').split(/\s+/)[0];
   const myRoles = profileRoles(profile);
 
-  // A card shows only when its container toggle AND functional capability are
-  // both granted. `funcCap = true` means "no extra functional gate".
-  const showCard = (containerCap: string, funcCap: boolean) => can(containerCap) && funcCap;
+  // A card shows when its container toggle AND functional capability are both
+  // granted. While capabilities are still loading (`null`) we show
+  // optimistically so cards never flash empty; once resolved, the super-user's
+  // toggles take effect. Every mobile.home.* toggle therefore controls a card
+  // for guards AND supervisors.
+  const showCard = (containerCap: string, funcCap: boolean) =>
+    capabilities === null ? true : (can(containerCap) && funcCap);
 
-  // Guard home — the three core cards always render (no fragile container-cap
-  // gating that could hide them): Log Occurrence, Duty Maintenance, History.
-  const guardCards: PortalCardConfig[] = [
-    {
-      id: 'new', icon: 'document-text', tint: theme.danger,
-      title: 'Log Occurrence', subtitle: 'Report an incident or security event',
-      onPress: () => router.push('/(tabs)/new'),
-    },
-    {
-      id: 'duty', icon: 'shield-half', tint: stats.activePatrol ? theme.success : theme.brand,
-      title: 'Duty Maintenance',
-      subtitle: stats.activePatrol ? 'On duty — tap to go off duty' : 'Go on / off duty',
-      badge: stats.activePatrol ? 'ON' : undefined, badgeTint: theme.success,
-      onPress: () => router.push('/duty'),
-    },
-    {
-      id: 'history', icon: 'time-outline', tint: theme.info,
-      title: 'History', subtitle: 'View all your logged occurrences',
-      onPress: () => router.push('/(tabs)/logs?filter=all'),
-    },
-  ];
-
-  const supervisorCards: PortalCardConfig[] = [
+  // Unified home card list — gated by capability so the Mobile Layout toggles
+  // drive exactly what each role sees. Supervisor-only cards are additionally
+  // gated on isSupervisor.
+  const allCards: PortalCardConfig[] = [
     showCard('mobile.home.new_occurrence', can('occurrences.log')) && {
       id: 'new', icon: 'document-text', tint: theme.danger,
-      title: 'New Occurrence', subtitle: 'Report an incident or security event',
+      title: 'Log Occurrence', subtitle: 'Report an incident or security event',
       onPress: () => router.push('/(tabs)/new'),
     },
     showCard('mobile.home.shift', can('shifts.clock')) && {
@@ -181,10 +166,10 @@ export default function Home() {
       badge: stats.onShift ? 'ON' : undefined, badgeTint: theme.success,
       onPress: () => router.push('/shift'),
     },
-    showCard('mobile.home.duty', can('patrols.run')) && {
+    showCard('mobile.home.duty', true) && {
       id: 'duty', icon: 'shield-half', tint: stats.activePatrol ? theme.success : theme.brand,
-      title: stats.activePatrol ? 'On Patrol' : 'Duty',
-      subtitle: stats.activePatrol ? 'Tap to go off patrol' : 'Go on / off patrol',
+      title: 'Duty Maintenance',
+      subtitle: stats.activePatrol ? 'On duty — tap to go off duty' : 'Go on / off duty',
       badge: stats.activePatrol ? 'ON' : undefined, badgeTint: theme.success,
       onPress: () => router.push('/duty'),
     },
@@ -219,7 +204,7 @@ export default function Home() {
     },
     showCard('mobile.home.history', true) && {
       id: 'history', icon: 'time-outline', tint: theme.info,
-      title: 'History', subtitle: 'View your incident history',
+      title: 'History', subtitle: 'View all your logged occurrences',
       onPress: () => router.push('/(tabs)/logs?filter=all'),
     },
     // Supervisor extras
@@ -236,7 +221,7 @@ export default function Home() {
     },
   ].filter(Boolean) as PortalCardConfig[];
 
-  const cards = isGuardOnly ? guardCards : supervisorCards;
+  const cards = allCards;
 
   const showKpi = can('mobile.home.kpi') || can('mobile.kpi_visible');
 
@@ -284,7 +269,7 @@ export default function Home() {
         </View>
 
         {/* ----- KPI strip (container toggle) ----- */}
-        {!isGuardOnly && showKpi && (
+        {showKpi && (
           <View style={styles.kpiRow}>
             <Stat label="My open" value={stats.open} icon="alert-circle-outline" tint={theme.warning} loading={loading} />
             <Stat label="Today" value={stats.today} icon="time-outline" tint={theme.brand} loading={loading} />
