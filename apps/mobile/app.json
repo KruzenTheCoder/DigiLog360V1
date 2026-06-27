@@ -56,7 +56,7 @@
     "android": {
       "package": "com.netstream.digilog360",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/branding/digilog-adaptive-foreground-padded.png",
+        "foregroundImage": "./assets/branding/digilog-app-icon-padded.png",
         "backgroundColor": "#0b1020"
       },
       "permissions": [

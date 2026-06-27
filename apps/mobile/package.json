@@ -11,10 +11,10 @@
     "ios": "expo run:ios",
     "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
-    "build:preview": "eas build --profile preview --platform android",
-    "build:production": "eas build --profile production --platform android",
-    "update:preview": "eas update --branch preview",
-    "update:production": "eas update --branch production"
+    "build:preview": "npx eas-cli build --profile preview --platform android",
+    "build:production": "npx eas-cli build --profile production --platform android",
+    "update:preview": "npx eas-cli update --branch preview",
+    "update:production": "npx eas-cli update --branch production"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
