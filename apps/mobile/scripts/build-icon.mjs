@@ -24,7 +24,7 @@ const SIZE = 1024;
 const SOURCE = resolve(A, 'DigilogIconV2.jpg');
 const APP_OUT = resolve(A, 'digilog-icon.png');
 const FG_OUT = resolve(A, 'digilog-icon-foreground.png');
-const ADAPTIVE_FRACTION = 0.82;
+const ADAPTIVE_FRACTION = 0.96;
 
 async function main() {
   const { data } = await sharp(SOURCE)
@@ -38,7 +38,14 @@ async function main() {
     b: data[2],
   };
 
-  const square = await sharp(SOURCE)
+  // Trim the flat outer background first so the approved icon artwork reads
+  // larger before we place it into the final launcher canvases.
+  const trimmed = await sharp(SOURCE)
+    .trim({ background: bg })
+    .png()
+    .toBuffer();
+
+  const square = await sharp(trimmed)
     .resize(SIZE, SIZE, {
       fit: 'contain',
       background: { ...bg, alpha: 1 },
@@ -47,7 +54,7 @@ async function main() {
     .toBuffer();
 
   const inset = Math.round(SIZE * ADAPTIVE_FRACTION);
-  const insetIcon = await sharp(SOURCE)
+  const insetIcon = await sharp(trimmed)
     .resize(inset, inset, {
       fit: 'contain',
       background: { ...bg, alpha: 1 },
