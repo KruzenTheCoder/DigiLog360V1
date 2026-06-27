@@ -223,7 +223,10 @@ export default function Home() {
 
   const cards = allCards;
 
-  const showKpi = can('mobile.home.kpi') || can('mobile.kpi_visible');
+  // Gate purely on the canonical container cap — the legacy alias used to be
+  // OR-ed in here, which meant turning off mobile.home.kpi had no effect while
+  // mobile.kpi_visible was still granted.
+  const showKpi = capabilities === null ? false : can('mobile.home.kpi');
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
