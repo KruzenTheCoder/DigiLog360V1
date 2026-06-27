@@ -56,8 +56,8 @@
     "android": {
       "package": "com.netstream.digilog360",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/branding/digilog-icon.png",
-        "backgroundColor": "#1c243e"
+        "foregroundImage": "./assets/branding/digilog-icon-foreground.png",
+        "backgroundColor": "#0b1020"
       },
       "permissions": [
         "CAMERA",

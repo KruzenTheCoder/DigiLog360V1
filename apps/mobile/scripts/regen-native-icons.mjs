@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 /**
- * Regenerate the NATIVE Android launcher icons from the padded brand images.
+ * Regenerate the native Android launcher icons from the final committed
+ * launcher assets.
  *
  * This project is prebuilt (has an android/ folder), so the launcher icon
  * comes from android/app/src/main/res/mipmap-*  — NOT app.json. We rewrite
  * every density's ic_launcher / ic_launcher_round (legacy) and
- * ic_launcher_foreground (adaptive) as webp, from the padded sources, so the
- * whole logo shows with a border and nothing clips.
+ * ic_launcher_foreground (adaptive) as webp from the same final source files
+ * that Expo references, so there is no mismatch between local Android builds
+ * and EAS builds.
  *
  * Run: node scripts/regen-native-icons.mjs
  */
@@ -18,8 +20,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const A = resolve(here, '../assets/branding');
 const RES = resolve(here, '../android/app/src/main/res');
 
-const LEGACY_SRC = resolve(A, 'digilog-app-icon-padded.png');        // navy bg + border + logo
-const FG_SRC = resolve(A, 'digilog-adaptive-foreground-padded.png'); // transparent + logo (~64%)
+const LEGACY_SRC = resolve(A, 'digilog-icon.png');
+const FG_SRC = resolve(A, 'digilog-icon-foreground.png');
 
 // Legacy launcher icon densities (48dp base).
 const LAUNCHER = { 'mipmap-mdpi': 48, 'mipmap-hdpi': 72, 'mipmap-xhdpi': 96, 'mipmap-xxhdpi': 144, 'mipmap-xxxhdpi': 192 };
