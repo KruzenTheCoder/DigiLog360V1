@@ -11,7 +11,8 @@
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/02fe466c-d7af-4dc2-b584-746c9e947b47"
     },
     "icon": "./assets/branding/digilog-icon.png",
     "splash": {
@@ -36,6 +37,18 @@
         "NSMicrophoneUsageDescription": "Record voice notes for incidents.",
         "NFCReaderUsageDescription": "Tap NFC checkpoint tags to log your patrol.",
         "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "remote-notification",
+          "location",
+          "fetch",
+          "remote-notification",
+          "location",
+          "fetch",
+          "remote-notification",
+          "location",
+          "fetch",
+          "remote-notification",
           "location",
           "fetch",
           "remote-notification",
@@ -73,19 +86,24 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.NFC",
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "NFC",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "FOREGROUND_SERVICE",
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.NFC"
       ],
       "intentFilters": [
-        {
-          "action": "android.intent.action.VIEW",
-          "data": {
-            "scheme": "digilog360"
-          },
-          "category": [
-            "android.intent.category.DEFAULT",
-            "android.intent.category.BROWSABLE"
-          ]
-        },
         {
           "action": "android.intent.action.VIEW",
           "data": {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -37,6 +37,12 @@ function RootNavigator() {
   const ota = useOtaUpdates();
   const segments = useSegments();
   const router = useRouter();
+  const [bootSplashReady, setBootSplashReady] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setBootSplashReady(true), 2400);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Auth gating
   useEffect(() => {
@@ -92,7 +98,7 @@ function RootNavigator() {
   // the session. The OTA hook fails open, so this never blocks boot when the
   // device is offline.
   const updating = ota === 'checking' || ota === 'downloading';
-  if (updating || loading) {
+  if (!bootSplashReady || updating || loading) {
     return (
       <BrandSplash
         status={

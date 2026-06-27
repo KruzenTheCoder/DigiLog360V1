@@ -118,7 +118,7 @@ export default function Login() {
       return;
     }
     setShowLoginSplash(true);
-    const timer = setTimeout(() => setShowLoginSplash(false), 1400);
+    const timer = setTimeout(() => setShowLoginSplash(false), 2400);
     return () => clearTimeout(timer);
   }, [orgSlug]);
 

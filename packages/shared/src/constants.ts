@@ -420,7 +420,7 @@ export const isValidPinFormat = (pin: string) => /^\d{4}$/.test(pin);
 export const BRAND = {
   name: 'DigiLog 360',
   tagline: 'Security Operations Platform',
-  company: 'Netstream Integrated Solutions',
+  company: 'Netstream Intergrated Solutions',
   // Signature gradient carried over from the legacy console.
   gradientFrom: '#667eea',
   gradientTo: '#764ba2',
