@@ -50,6 +50,7 @@ const DESCRIPTIONS: Record<string, string> = {
   '/super/health': 'Platform health and diagnostics.',
   '/super/permissions': 'Toggle what each role can see and do.',
   '/super/branding': 'Toggle the parent-company logo per organisation.',
+  '/super/mobile-layout': 'Control the mobile bottom bar and home cards per role.',
   '/super/assignees': 'Choose who appears in the Assign-to dropdown.',
   '/super/form-builder': 'Toggle which sections show on the Log Occurrence form.',
 };

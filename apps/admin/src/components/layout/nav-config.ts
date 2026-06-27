@@ -85,6 +85,7 @@ export const NAV: NavSection[] = [
       { label: 'Platform Health', href: '/super/health', icon: 'Activity', roles: ['super_user'], capability: 'super.platform_health' },
       { label: 'Permissions', href: '/super/permissions', icon: 'SlidersHorizontal', roles: ['super_user'], capability: 'super.permissions_manage' },
       { label: 'Branding', href: '/super/branding', icon: 'Palette', roles: ['super_user'] },
+      { label: 'Mobile Layout', href: '/super/mobile-layout', icon: 'Smartphone', roles: ['super_user'] },
       { label: 'Assignment Allow-list', href: '/super/assignees', icon: 'UserCheck', roles: ['super_user'] },
       { label: 'Form Builder', href: '/super/form-builder', icon: 'LayoutTemplate', roles: ['super_user'] },
     ],
