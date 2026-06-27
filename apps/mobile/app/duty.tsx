@@ -120,7 +120,7 @@ export default function DutyScreen() {
               <Ionicons name="shield-half" size={24} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>Duty Maintenance</Text>
+              <Text style={styles.headerTitle}>Shift Maintenance</Text>
               <Text style={styles.headerSub}>Go on / off duty</Text>
             </View>
           </View>

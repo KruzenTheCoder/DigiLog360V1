@@ -168,7 +168,7 @@ export default function Home() {
     },
     showCard('mobile.home.duty', true) && {
       id: 'duty', icon: 'shield-half', tint: stats.activePatrol ? theme.success : theme.brand,
-      title: 'Duty Maintenance',
+      title: 'Shift Maintenance',
       subtitle: stats.activePatrol ? 'On duty — tap to go off duty' : 'Go on / off duty',
       badge: stats.activePatrol ? 'ON' : undefined, badgeTint: theme.success,
       onPress: () => router.push('/duty'),
