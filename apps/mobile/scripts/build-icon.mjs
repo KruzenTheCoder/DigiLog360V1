@@ -24,7 +24,7 @@ const SIZE = 1024;
 const SOURCE = resolve(A, 'DigilogIconV2.jpg');
 const APP_OUT = resolve(A, 'digilog-icon.png');
 const FG_OUT = resolve(A, 'digilog-icon-foreground.png');
-const ADAPTIVE_FRACTION = 1.1;
+const ADAPTIVE_FRACTION = 1.43;
 
 async function main() {
   const { data } = await sharp(SOURCE)
