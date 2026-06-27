@@ -89,11 +89,14 @@ export default function Login() {
   // device's New Architecture renderer, so we lay out with absolute pixels.
   // 3 columns, 14px gaps, scroll padding 24px each side, capped at 96px so
   // tablets don't get goofy.
-  const { width: winWidth } = useWindowDimensions();
-  const KEYPAD_GAP = 14;
+  const { width: winWidth, height: winHeight } = useWindowDimensions();
+  const compactLogin = winHeight <= 760;
+  const KEYPAD_GAP = compactLogin ? 10 : 14;
   const KEYPAD_OUTER_PADDING = spacing.xl * 2; // matches styles.scroll padding
   const computedKey = Math.floor((winWidth - KEYPAD_OUTER_PADDING - KEYPAD_GAP * 2) / 3);
-  const keySize = Math.max(64, Math.min(96, computedKey));
+  const maxKeySize = compactLogin ? 82 : 96;
+  const minKeySize = compactLogin ? 58 : 64;
+  const keySize = Math.max(minKeySize, Math.min(maxKeySize, computedKey));
 
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
@@ -237,15 +240,11 @@ export default function Login() {
       style={{ flex: 1, backgroundColor: theme.bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={[styles.loginScreen, compactLogin && styles.loginScreenCompact]}>
         {/* ----- brand ----- */}
-        <View style={styles.brand}>
-          <Image source={shield} style={styles.shield} resizeMode="contain" />
-          <Image source={wordmark} style={styles.wordmark} resizeMode="contain" />
+        <View style={[styles.brand, compactLogin && styles.brandCompact]}>
+          <Image source={shield} style={[styles.shield, compactLogin && styles.shieldCompact]} resizeMode="contain" />
+          <Image source={wordmark} style={[styles.wordmark, compactLogin && styles.wordmarkCompact]} resizeMode="contain" />
           <Text style={styles.subtitle} allowFontScaling={false}>Field Security App</Text>
         </View>
 
@@ -261,8 +260,8 @@ export default function Login() {
         </TouchableOpacity>
 
         {/* ----- PIN display ----- */}
-        <Text style={styles.pinHeading} allowFontScaling={false}>Enter your PIN</Text>
-        <View style={styles.pinRow}>
+        <Text style={[styles.pinHeading, compactLogin && styles.pinHeadingCompact]} allowFontScaling={false}>Enter your PIN</Text>
+        <View style={[styles.pinRow, compactLogin && styles.pinRowCompact]}>
           {pinDisplay.map((d, i) => (
             <View
               key={i}
@@ -276,14 +275,14 @@ export default function Login() {
         </View>
 
         {error && (
-          <View style={styles.errorPill}>
+          <View style={[styles.errorPill, compactLogin && styles.errorPillCompact]}>
             <Ionicons name="alert-circle" size={14} color="#fff" />
             <Text style={styles.errorText} allowFontScaling={false}>{error}</Text>
           </View>
         )}
 
         {/* ----- keypad ----- */}
-        <View style={[styles.keypad, { gap: KEYPAD_GAP }]}>
+        <View style={[styles.keypad, compactLogin && styles.keypadCompact, { gap: KEYPAD_GAP }]}>
           {['1','2','3','4','5','6','7','8','9'].map((d) => (
             <DigitKey key={d} d={d} size={keySize} onPress={tapDigit} disabled={loading} />
           ))}
@@ -299,7 +298,7 @@ export default function Login() {
           </Key>
         </View>
 
-        <View style={styles.signInWrap}>
+        <View style={[styles.signInWrap, compactLogin && styles.signInWrapCompact]}>
           <Button
             title="Sign In"
             onPress={() => submit(pin)}
@@ -308,10 +307,10 @@ export default function Login() {
           />
         </View>
 
-        <Text style={styles.footer} allowFontScaling={false}>
+        <Text style={[styles.footer, compactLogin && styles.footerCompact]} allowFontScaling={false}>
           © {new Date().getFullYear()} {BRAND.company}
         </Text>
-      </ScrollView>
+      </View>
 
       <toast.ToastView />
     </KeyboardAvoidingView>
@@ -414,13 +413,27 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl * 2,
     paddingBottom: spacing.xl,
   },
+  loginScreen: {
+    flex: 1,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xl * 1.5,
+    paddingBottom: spacing.lg,
+    justifyContent: 'space-between',
+  },
+  loginScreenCompact: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+  },
 
   // Brand
   brand: { alignItems: 'center', marginBottom: spacing.xl },
+  brandCompact: { marginBottom: spacing.md },
   shield: { width: 84, height: 84, marginBottom: spacing.sm },
+  shieldCompact: { width: 68, height: 68, marginBottom: spacing.xs },
   // Wordmark stays in aspect ratio. The source image is ~4:1, so 220×56
   // keeps the "DigiLog360" letters crisp without scaling artifacts.
   wordmark: { width: 220, height: 56, marginBottom: spacing.xs },
+  wordmarkCompact: { width: 200, height: 48, marginBottom: 2 },
   subtitle: { color: theme.textMuted, fontSize: 13, letterSpacing: 0.5 },
 
   // Org chip — small pill under the brand, shows the saved slug and lets
@@ -464,6 +477,7 @@ const styles = StyleSheet.create({
   // PIN dots — solid fill on press, hollow otherwise. No text inside the
   // dots = nothing that can drift off-centre.
   pinHeading: { ...type.h2, textAlign: 'center', marginBottom: spacing.lg },
+  pinHeadingCompact: { marginBottom: spacing.md },
   pinRow: {
     flexDirection: 'row',
     gap: 18,
@@ -472,6 +486,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     minHeight: PIN_DOT_SIZE + 4,
   },
+  pinRowCompact: { marginBottom: spacing.lg },
   pinDot: {
     width: PIN_DOT_SIZE,
     height: PIN_DOT_SIZE,
@@ -490,6 +505,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.danger, borderRadius: radius.pill,
     marginBottom: spacing.md,
   },
+  errorPillCompact: { marginBottom: spacing.sm },
   errorText: { color: '#fff', fontSize: 12, fontWeight: '600' },
 
   // Keypad — fixed pixel sizes computed at render time, centered as a block.
@@ -501,6 +517,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: spacing.sm,
   },
+  keypadCompact: { marginTop: 0 },
   // Width / height / borderRadius are injected inline from the computed
   // keySize so the layout doesn't depend on Yoga resolving percentages.
   key: {
@@ -539,6 +556,7 @@ const styles = StyleSheet.create({
 
   // Sign In
   signInWrap: { marginTop: spacing.xl },
+  signInWrapCompact: { marginTop: spacing.md },
 
   footer: {
     color: theme.textFaint,
@@ -546,4 +564,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xl,
   },
+  footerCompact: { marginTop: spacing.md },
 });
