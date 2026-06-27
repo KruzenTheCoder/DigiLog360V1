@@ -147,19 +147,27 @@ export default function Home() {
   // both granted. `funcCap = true` means "no extra functional gate".
   const showCard = (containerCap: string, funcCap: boolean) => can(containerCap) && funcCap;
 
+  // Guard home — the three core cards always render (no fragile container-cap
+  // gating that could hide them): Log Occurrence, Duty Maintenance, History.
   const guardCards: PortalCardConfig[] = [
-    showCard('mobile.home.new_occurrence', can('occurrences.log')) && {
+    {
       id: 'new', icon: 'document-text', tint: theme.danger,
-      title: 'New Occurrence', subtitle: 'Report an incident or security event',
+      title: 'Log Occurrence', subtitle: 'Report an incident or security event',
       onPress: () => router.push('/(tabs)/new'),
     },
-    showCard('mobile.home.shift', can('shifts.clock')) && {
-      id: 'shift', icon: 'time', tint: theme.success,
-      title: 'Shift Duty', subtitle: stats.onShift ? 'Tap to go on or off duty' : 'Go to the duty toggle',
-      badge: stats.onShift ? 'ON' : undefined, badgeTint: theme.success,
-      onPress: () => router.push('/shift'),
+    {
+      id: 'duty', icon: 'shield-half', tint: stats.activePatrol ? theme.success : theme.brand,
+      title: 'Duty Maintenance',
+      subtitle: stats.activePatrol ? 'On duty — tap to go off duty' : 'Go on / off duty',
+      badge: stats.activePatrol ? 'ON' : undefined, badgeTint: theme.success,
+      onPress: () => router.push('/duty'),
     },
-  ].filter(Boolean) as PortalCardConfig[];
+    {
+      id: 'history', icon: 'time-outline', tint: theme.info,
+      title: 'History', subtitle: 'View all your logged occurrences',
+      onPress: () => router.push('/(tabs)/logs?filter=all'),
+    },
+  ];
 
   const supervisorCards: PortalCardConfig[] = [
     showCard('mobile.home.new_occurrence', can('occurrences.log')) && {

@@ -66,6 +66,8 @@ export default function DutyScreen() {
         await startPatrol(profile, null); // ad-hoc patrol
         await load();
         toast.show('You are now ON patrol', 'ok');
+        // Going on duty takes you straight to the dashboard.
+        setTimeout(() => router.replace('/(tabs)'), 350);
       } catch (e: unknown) {
         Alert.alert('Could not go on duty', e instanceof Error ? e.message : '');
       } finally { setBusy(false); }
@@ -114,15 +116,12 @@ export default function DutyScreen() {
             <Rect x="0" y="0" width="100%" height="100%" fill="url(#dutyHdr)" />
           </Svg>
           <View style={styles.headerRow}>
-            <TouchableOpacity onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
-              <Ionicons name="chevron-back" size={24} color="#fff" />
-            </TouchableOpacity>
             <View style={styles.headerIcon}>
               <Ionicons name="shield-half" size={24} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>Duty</Text>
-              <Text style={styles.headerSub}>Go on / off patrol</Text>
+              <Text style={styles.headerTitle}>Duty Maintenance</Text>
+              <Text style={styles.headerSub}>Go on / off duty</Text>
             </View>
           </View>
         </View>
@@ -165,10 +164,23 @@ export default function DutyScreen() {
           </Text>
         </View>
 
-        {/* Link to full patrol screen for routes + scanning */}
+        {/* Always-available way through to the dashboard, whether or not
+            you go on duty (e.g. you just need to log something quickly). */}
+        <TouchableOpacity onPress={() => router.replace('/(tabs)')} activeOpacity={0.85} style={styles.linkCard}>
+          <View style={[styles.linkIcon, { backgroundColor: theme.brand }]}>
+            <Ionicons name="grid" size={22} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.linkTitle}>Continue to Dashboard</Text>
+            <Text style={styles.linkHint}>Open the guard portal without changing duty</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
+        </TouchableOpacity>
+
+        {/* Route patrol shortcut for guards who run checkpoint routes */}
         {(can('patrols.run') || can('patrols.scan')) && (
-          <TouchableOpacity onPress={() => router.push('/(tabs)/patrol')} activeOpacity={0.85} style={styles.linkCard}>
-            <View style={[styles.linkIcon, { backgroundColor: theme.brand }]}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/patrol')} activeOpacity={0.85} style={[styles.linkCard, { marginTop: spacing.md }]}>
+            <View style={[styles.linkIcon, { backgroundColor: theme.info }]}>
               <Ionicons name="map" size={22} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>

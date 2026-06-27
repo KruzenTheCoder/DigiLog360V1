@@ -43,7 +43,9 @@ function RootNavigator() {
     if (loading) return;
     const inAuthGroup = segments[0] === 'login';
     if (!session && !inAuthGroup) router.replace('/login');
-    else if (session && profile && inAuthGroup) router.replace('/(tabs)');
+    // After signing in, land on the Duty Maintenance gateway (on/off-duty
+    // toggle) rather than straight into the dashboard.
+    else if (session && profile && inAuthGroup) router.replace('/duty');
   }, [session, profile, loading, segments, router]);
 
   // Push token registration
