@@ -77,6 +77,12 @@ export const CAPABILITY_KEYS = [
   'mobile.home.kpi',
   'mobile.home.supervisor_board',
   'mobile.home.team',
+  // Mobile bottom tab bar — master switch + per-tab visibility.
+  'mobile.tab_bar',
+  'mobile.tab.home',
+  'mobile.tab.patrol',
+  'mobile.tab.log',
+  'mobile.tab.logs',
   // Super user
   'super.orgs_manage',
   'super.users_cross_org',

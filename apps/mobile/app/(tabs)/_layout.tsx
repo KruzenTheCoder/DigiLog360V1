@@ -1,6 +1,15 @@
-// Tab layout — 4 tabs: Home, Patrol, Log, My Logs.
+// Tab layout — Home, Patrol, Log, My Logs.
 // "Log" is the central + button — primary entry to record an occurrence.
-// (Home also has a Log-occurrence tile as a secondary path.)
+//
+// Every tab is controllable from the super-user permissions matrix:
+//   • mobile.tab_bar      — master switch; off ⇒ the whole bottom bar is hidden
+//                           (the app is then navigated entirely from the home
+//                           portal cards).
+//   • mobile.tab.home     — Home tab
+//   • mobile.tab.patrol   — Patrol tab   (+ patrols.run / patrols.view)
+//   • mobile.tab.log      — Log (+) tab  (+ occurrences.log)
+//   • mobile.tab.logs     — My Logs tab  (+ occurrences.view_*)
+// A tab needs BOTH its visibility toggle AND its functional capability.
 
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,30 +20,31 @@ import { haptic } from '@/components/primitives';
 import { useAuth } from '@/lib/auth';
 import { hasAnyCapability, type CapabilityKey } from '@digilog/shared';
 
-// React-Navigation listener that fires a haptic on every tab tap (including
-// re-taps of the current tab). Shared across all four tab screens so the
-// feedback is identical on every press.
 const TAB_HAPTIC_LISTENERS = {
   tabPress: () => haptic('medium'),
 };
 
 export default function TabsLayout() {
-  // Push the tab bar above the Android system nav (3-button or gesture pill)
-  // and the iOS home indicator. Without this, the OS chrome overlaps the
-  // tab icons and labels — especially obvious on gesture-nav Android devices
-  // where the OS draws a translucent pill across the bottom of the screen.
   const insets = useSafeAreaInsets();
   const { capabilities } = useAuth();
   const baseHeight = 60;
   const basePaddingBottom = 8;
 
-  // A tab is shown if the user holds any of its capabilities. While caps are
-  // still loading (`null`), show optimistically so the bar doesn't flash empty;
-  // once resolved, ungranted tabs disappear. Passing `href: null` removes the
-  // tab from the bar (the route stays reachable only by explicit deep link).
-  const allow = (keys: CapabilityKey[]) =>
+  // While caps load (`null`) show optimistically so the bar doesn't flash
+  // empty; once resolved, ungranted tabs disappear via `href: null`.
+  const has = (keys: CapabilityKey[]) =>
     capabilities === null || hasAnyCapability(capabilities, keys);
-  const hideUnless = (keys: CapabilityKey[]) => (allow(keys) ? undefined : { href: null as null });
+
+  // A tab is visible only when BOTH its visibility toggle AND (optionally) its
+  // functional capability are granted.
+  const showTab = (visKey: CapabilityKey, funcKeys?: CapabilityKey[]) =>
+    has([visKey]) && (!funcKeys || has(funcKeys));
+  const tabHref = (visKey: CapabilityKey, funcKeys?: CapabilityKey[]) =>
+    showTab(visKey, funcKeys) ? undefined : { href: null as null };
+
+  // Master switch: hide the entire bottom bar (resolved caps only — never hide
+  // it while still loading, or the user could be left with no navigation).
+  const barHidden = capabilities !== null && !hasAnyCapability(capabilities, ['mobile.tab_bar']);
 
   return (
     <Tabs
@@ -42,13 +52,15 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: theme.brand,
         tabBarInactiveTintColor: theme.textMuted,
-        tabBarStyle: {
-          backgroundColor: theme.surface,
-          borderTopColor: theme.borderSoft,
-          height: baseHeight + insets.bottom,
-          paddingBottom: basePaddingBottom + insets.bottom,
-          paddingTop: 6,
-        },
+        tabBarStyle: barHidden
+          ? { display: 'none' }
+          : {
+              backgroundColor: theme.surface,
+              borderTopColor: theme.borderSoft,
+              height: baseHeight + insets.bottom,
+              paddingBottom: basePaddingBottom + insets.bottom,
+              paddingTop: 6,
+            },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
@@ -58,6 +70,7 @@ export default function TabsLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+          ...tabHref('mobile.tab.home'),
         }}
       />
       <Tabs.Screen
@@ -66,21 +79,20 @@ export default function TabsLayout() {
         options={{
           title: 'Patrol',
           tabBarIcon: ({ color, size }) => <Ionicons name="walk" size={size} color={color} />,
-          ...hideUnless(['patrols.run', 'patrols.view']),
+          ...tabHref('mobile.tab.patrol', ['patrols.run', 'patrols.view']),
         }}
       />
       <Tabs.Screen
         name="new"
         listeners={TAB_HAPTIC_LISTENERS}
         options={{
-          // Central "Log" button — primary entry point to record an occurrence.
           title: 'Log',
           tabBarIcon: ({ color, size }) => (
             <View style={styles.centerIcon}>
               <Ionicons name="add-circle" size={size + 6} color={color} />
             </View>
           ),
-          ...hideUnless(['occurrences.log']),
+          ...tabHref('mobile.tab.log', ['occurrences.log']),
         }}
       />
       <Tabs.Screen
@@ -89,7 +101,7 @@ export default function TabsLayout() {
         options={{
           title: 'My Logs',
           tabBarIcon: ({ color, size }) => <Ionicons name="list" size={size} color={color} />,
-          ...hideUnless(['occurrences.view_assigned', 'occurrences.view_all']),
+          ...tabHref('mobile.tab.logs', ['occurrences.view_assigned', 'occurrences.view_all']),
         }}
       />
     </Tabs>
