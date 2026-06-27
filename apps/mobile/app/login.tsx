@@ -13,6 +13,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
+import { BrandSplash } from '@/components/splash';
 import { Button, Field } from '@/components/ui';
 import { useToast } from '@/components/primitives';
 import { theme, spacing, radius, type } from '@/lib/theme';
@@ -97,6 +98,7 @@ export default function Login() {
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLoginSplash, setShowLoginSplash] = useState(true);
 
   // Org slug — null while loading from AsyncStorage, '' if never set
   // (triggers the setup screen), or a real slug.
@@ -108,6 +110,17 @@ export default function Login() {
       .then((stored) => setOrgSlug(stored ?? ''))
       .catch(() => setOrgSlug(''));
   }, []);
+
+  useEffect(() => {
+    if (orgSlug === null) return;
+    if (orgSlug === '') {
+      setShowLoginSplash(false);
+      return;
+    }
+    setShowLoginSplash(true);
+    const timer = setTimeout(() => setShowLoginSplash(false), 1400);
+    return () => clearTimeout(timer);
+  }, [orgSlug]);
 
   const submittingRef = useRef(false);
 
@@ -213,6 +226,10 @@ export default function Login() {
         notifyError={(m) => toast.show(m, 'error')}
       />
     );
+  }
+
+  if (showLoginSplash) {
+    return <BrandSplash status="Preparing secure sign in…" />;
   }
 
   return (
