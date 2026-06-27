@@ -63,19 +63,19 @@ const svg = `
     </filter>
   </defs>
 
-  <!-- deep navy background -->
+  <!-- deep navy background that matches the logo's glow palette -->
   <rect width="${SIZE}" height="${SIZE}" fill="url(#bgGlow)"/>
 
-  <!-- blurred glow halo behind the disc (smaller so the whole logo fits with
-       comfortable padding inside the icon's safe area) -->
-  <circle cx="512" cy="500" r="250" fill="#2563eb" opacity="0.5" filter="url(#soft)"/>
+  <!-- soft blue glow halo behind the disc -->
+  <circle cx="512" cy="512" r="210" fill="#2563eb" opacity="0.45" filter="url(#soft)"/>
 
-  <!-- the bright blue disc -->
-  <circle cx="512" cy="500" r="200" fill="url(#discGlow)"/>
-  <circle cx="512" cy="500" r="200" fill="none" stroke="#60a5fa" stroke-opacity="0.35" stroke-width="5"/>
+  <!-- the bright blue disc — smaller, with generous padding so the whole
+       mark is comfortably inside the icon safe area -->
+  <circle cx="512" cy="512" r="160" fill="url(#discGlow)"/>
+  <circle cx="512" cy="512" r="160" fill="none" stroke="#60a5fa" stroke-opacity="0.35" stroke-width="4"/>
 
-  <!-- white shield mark — scaled down + centred inside the disc -->
-  <g transform="translate(512 500) scale(0.46) translate(-512 -512) translate(0 -10)">
+  <!-- white shield mark — smaller, centred inside the disc -->
+  <g transform="translate(512 512) scale(0.36) translate(-512 -512) translate(0 -6)">
     <path d="${shieldPath}" fill="#ffffff"/>
     <path d="${tickPath}" fill="none" stroke="#2563eb" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
