@@ -239,7 +239,6 @@ export default function Home() {
   const cards = isGuardOnly ? guardCards : supervisorCards;
 
   const showKpi = can('mobile.home.kpi') || can('mobile.kpi_visible');
-  const showGuardDutyGate = isGuardOnly && !loading && !stats.onShift;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
@@ -284,39 +283,6 @@ export default function Home() {
           </View>
         </View>
 
-        {showGuardDutyGate ? (
-          <Card style={styles.dutyGateCard}>
-            <Text style={styles.dutyGateTitle}>Duty Status</Text>
-            <Text style={styles.dutyGateSubtitle}>
-              Toggle on when you are ready to start your shift and open the guard dashboard.
-            </Text>
-            <View style={styles.dutyToggleContainer}>
-              <View style={styles.dutyToggle}>
-                <TouchableOpacity
-                  style={[styles.dutyButton, styles.dutyButtonActiveOff]}
-                  activeOpacity={0.85}
-                >
-                  <View style={[styles.indicatorDot, { backgroundColor: theme.danger }]} />
-                  <Text style={[styles.dutyButtonText, styles.dutyButtonTextActive]}>Off Duty</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={clockInFromHome}
-                  style={[styles.dutyButton, dutyBusy && styles.dutyButtonDisabled]}
-                  activeOpacity={0.85}
-                  disabled={dutyBusy}
-                >
-                  <View style={[styles.indicatorDot, { backgroundColor: theme.success }]} />
-                  <Text style={styles.dutyButtonText}>{dutyBusy ? 'Starting...' : 'On Duty'}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-            <Text style={styles.dutyGateHint}>
-              After you go on duty, your dashboard will show only `New Occurrence` and `Shift Duty`.
-            </Text>
-          </Card>
-        ) : null}
-
         {/* ----- KPI strip (container toggle) ----- */}
         {!isGuardOnly && showKpi && (
           <View style={styles.kpiRow}>
@@ -344,24 +310,20 @@ export default function Home() {
         )}
 
         {/* ----- Portal cards ----- */}
-        {!showGuardDutyGate && (
-          <>
-            <SectionTitle>{isGuardOnly ? 'Guard Dashboard' : 'What would you like to do?'}</SectionTitle>
-            {loading && cards.length === 0 ? (
-              <><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
-            ) : (
-              cards.map((c) => <PortalCard key={c.id} {...c} />)
-            )}
+        <SectionTitle>{isGuardOnly ? 'Guard Dashboard' : 'What would you like to do?'}</SectionTitle>
+        {loading && cards.length === 0 ? (
+          <><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
+        ) : (
+          cards.map((c) => <PortalCard key={c.id} {...c} />)
+        )}
 
-            {cards.length === 0 && !loading && (
-              <Card style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
-                <Ionicons name="lock-closed-outline" size={28} color={theme.textMuted} />
-                <Text style={[type.muted, { marginTop: 8, textAlign: 'center' }]}>
-                  No actions enabled for your role yet.{'\n'}Ask an admin to enable your containers.
-                </Text>
-              </Card>
-            )}
-          </>
+        {cards.length === 0 && !loading && (
+          <Card style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
+            <Ionicons name="lock-closed-outline" size={28} color={theme.textMuted} />
+            <Text style={[type.muted, { marginTop: 8, textAlign: 'center' }]}>
+              No actions enabled for your role yet.{'\n'}Ask an admin to enable your containers.
+            </Text>
+          </Card>
         )}
       </ScrollView>
     </View>
