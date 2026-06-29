@@ -28,6 +28,8 @@ interface AuditRow {
   created_at: string;
 }
 
+const AUDIT_BATCH_SIZE = 1000;
+
 const ACTION_COLORS: Record<string, string> = {
   'user.create': '#16a34a',
   'user.update': '#3b82f6',
@@ -91,13 +93,29 @@ export default function AuditLogPage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient();
-      const { data } = await (supabase as any)
-        .from('audit_log')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1000);
-      
-      setRows((data ?? []) as AuditRow[]);
+      const allRows: AuditRow[] = [];
+      let from = 0;
+
+      while (true) {
+        const { data, error } = await (supabase as any)
+          .from('audit_log')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + AUDIT_BATCH_SIZE - 1);
+
+        if (error) {
+          console.error('Failed to load audit log batch', error);
+          break;
+        }
+
+        const batch = (data ?? []) as AuditRow[];
+        allRows.push(...batch);
+
+        if (batch.length < AUDIT_BATCH_SIZE) break;
+        from += AUDIT_BATCH_SIZE;
+      }
+
+      setRows(allRows);
       setLoading(false);
     }
     load();
@@ -254,7 +272,7 @@ export default function AuditLogPage() {
         </div>
         <div className="flex justify-between items-center mt-4 pt-4 border-t">
           <span className="text-sm text-muted-foreground">
-            Showing {filteredRows.length} of {rows.length} entries
+            {loading ? 'Loading audit log…' : `Showing ${filteredRows.length} of ${rows.length} entries`}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={clearFilters}>
@@ -282,6 +300,11 @@ export default function AuditLogPage() {
             </TR>
           </THead>
           <TBody>
+            {loading && (
+              <TR><TD colSpan={6} className="py-8 text-center text-muted-foreground">
+                Loading audit log…
+              </TD></TR>
+            )}
             {filteredRows.map((r) => (
               <TR key={r.id}>
                 <TD className="whitespace-nowrap text-xs text-muted-foreground">
@@ -305,7 +328,7 @@ export default function AuditLogPage() {
                 <TD className="font-mono text-xs">{r.ip_address ?? '—'}</TD>
               </TR>
             ))}
-            {filteredRows.length === 0 && (
+            {!loading && filteredRows.length === 0 && (
               <TR><TD colSpan={6} className="py-8 text-center text-muted-foreground">
                 No audit events recorded.
               </TD></TR>
