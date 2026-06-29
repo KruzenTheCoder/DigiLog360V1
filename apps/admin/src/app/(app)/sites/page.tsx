@@ -14,11 +14,20 @@ export default async function SitesPage() {
   const isSuperUser = checkIsSuperUser(profile);
 
   const supabase = await createClient();
-  const { data } = await supabase.from('sites').select('*').order('name');
+  // Super-user sees every site across tenants and needs the org list to assign
+  // sites to organisations; org admins only ever see their own org's sites.
+  const [{ data }, orgsRes] = await Promise.all([
+    supabase.from('sites').select('*').order('name'),
+    isSuperUser
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase as any).from('organizations').select('id, name').order('name')
+      : Promise.resolve({ data: [] }),
+  ]);
+  const orgs = (orgsRes.data ?? []) as { id: string; name: string }[];
   return (
     <>
       <PageHeader title="Sites" description="Manage operational sites within your organisation." />
-      <SitesManager sites={(data ?? []) as Site[]} isSuperUser={isSuperUser} />
+      <SitesManager sites={(data ?? []) as Site[]} isSuperUser={isSuperUser} orgs={orgs} />
     </>
   );
 }

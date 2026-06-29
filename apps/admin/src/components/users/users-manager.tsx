@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, UserPlus, Pencil, Search, KeyRound, Download, Smartphone } from 'lucide-react';
+import { Loader2, UserPlus, Pencil, Search, KeyRound, Download, Smartphone, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { toCsv, downloadCsv } from '@/lib/csv';
 import { Card } from '@/components/ui/card';
@@ -14,10 +14,13 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { Dialpad } from '@/components/ui/dialpad';
 import {
   APP_ROLES, ROLE_LABELS, ROLE_COLORS, ROLE_DESCRIPTIONS, roleRank, profileRoles,
-  type AppRole, type Profile, type Site,
+  type AppRole, type Profile, type Site, type Organization,
 } from '@digilog/shared';
 
 type Row = Profile & { sites: { name: string } | null };
+type OrgOption = Pick<Organization, 'id' | 'name'>;
+/** A site row always carries org_id (selected via `*`); the generated Site type may lag. */
+type SiteWithOrg = Site & { org_id: string | null };
 
 /**
  * Resolve a user's assigned sites with the default-site flagged first.
@@ -59,9 +62,14 @@ interface UsersManagerProps {
   /** Caller's full role set — controls which roles they can grant. */
   callerRoles: AppRole[];
   callerOrgId: string | null;
+  /** Caller's own user id — used to stop them deleting themselves. */
+  callerId: string;
+  /** All organisations — only passed in the super-user (cross-org) view. When
+   *  present, the create dialog shows an org picker and scopes sites to it. */
+  orgs?: OrgOption[];
 }
 
-export function UsersManager({ users, sites, callerRoles, callerOrgId }: UsersManagerProps) {
+export function UsersManager({ users, sites, callerRoles, callerOrgId, callerId, orgs }: UsersManagerProps) {
   const callerIsSuper = callerRoles.includes('super_user');
   const callerMaxRank = Math.max(0, ...callerRoles.map(roleRank));
   const router = useRouter();
@@ -70,6 +78,7 @@ export function UsersManager({ users, sites, callerRoles, callerOrgId }: UsersMa
   const [q, setQ] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [edit, setEdit] = useState<Row | null>(null);
+  const [del, setDel] = useState<Row | null>(null);
   const [pinTarget, setPinTarget] = useState<Row | null>(null);
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<{
@@ -186,6 +195,16 @@ export function UsersManager({ users, sites, callerRoles, callerOrgId }: UsersMa
                     <Button variant="ghost" size="icon" onClick={() => setEdit(u)} title="Edit">
                       <Pencil className="h-4 w-4" />
                     </Button>
+                    {/* Delete: never yourself; org admins can't delete super users. */}
+                    {u.id !== callerId && (callerIsSuper || !profileRoles(u).includes('super_user')) && (
+                      <Button
+                        variant="ghost" size="icon"
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => setDel(u)} title="Delete user"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </TD>
               </TR>
@@ -201,25 +220,30 @@ export function UsersManager({ users, sites, callerRoles, callerOrgId }: UsersMa
         key={addOpen ? 'create-open' : 'create'}
         mode="create" open={addOpen} onClose={() => setAddOpen(false)}
         sites={sites} allowedRoles={allowedRoles}
-        callerOrgId={callerOrgId} onDone={() => router.refresh()}
+        callerOrgId={callerOrgId} orgs={orgs} onDone={() => router.refresh()}
       />
       <UserDialog
         key={edit?.id ?? 'edit'}
         mode="edit" open={!!edit} onClose={() => setEdit(null)}
         sites={sites} user={edit} allowedRoles={allowedRoles}
-        callerOrgId={callerOrgId} onDone={() => router.refresh()}
+        callerOrgId={callerOrgId} orgs={orgs} onDone={() => router.refresh()}
       />
       <PinResetDialog
         key={pinTarget?.id ?? 'pin'}
         open={!!pinTarget} onClose={() => setPinTarget(null)}
         user={pinTarget} onDone={() => router.refresh()}
       />
+      <DeleteUserDialog
+        key={del?.id ?? 'del'}
+        open={!!del} onClose={() => setDel(null)}
+        user={del} onDone={() => router.refresh()}
+      />
     </>
   );
 }
 
 function UserDialog({
-  mode, open, onClose, sites, user, allowedRoles, callerOrgId, onDone,
+  mode, open, onClose, sites, user, allowedRoles, callerOrgId, orgs, onDone,
 }: {
   mode: 'create' | 'edit';
   open: boolean;
@@ -228,8 +252,21 @@ function UserDialog({
   user?: Row | null;
   allowedRoles: AppRole[];
   callerOrgId: string | null;
+  orgs?: OrgOption[];
   onDone: () => void;
 }) {
+  // Super-user (cross-org) view: the new user must be placed in an org, and the
+  // assignable sites are scoped to that org. Org admins are locked to their own
+  // org (no picker).
+  const superContext = !!orgs && orgs.length > 0;
+  const [orgId, setOrgId] = useState<string>(
+    user?.org_id ?? (superContext ? (orgs![0]?.id ?? '') : (callerOrgId ?? '')),
+  );
+  // The org this user belongs to (or will). Drives which sites can be ticked.
+  const effectiveOrgId = superContext ? orgId : callerOrgId;
+  const availableSites: Site[] = superContext && effectiveOrgId
+    ? (sites as SiteWithOrg[]).filter((s) => s.org_id === effectiveOrgId)
+    : sites;
   const initialRole = user?.role ?? (allowedRoles.includes('guard') ? 'guard' : allowedRoles[allowedRoles.length - 1]);
   const initialRoles: AppRole[] = profileRoles(user).length > 0
     ? profileRoles(user)
@@ -343,6 +380,7 @@ function UserDialog({
   }, [roles]);
 
   async function submit() {
+    if (mode === 'create' && superContext && !orgId) { setError('Select an organisation for this user.'); return; }
     if (mode === 'create' && !email.trim() && !mobileOnly) { setError('Email is required.'); return; }
     if (pin && !/^\d{4}$/.test(pin)) { setError('PIN must be exactly 4 digits.'); return; }
     if (mode === 'create' && isPinRole && !pin) { 
@@ -364,7 +402,7 @@ function UserDialog({
         phone: phone || null,
         employee_number: employeeNumber.trim() || null,
         pin: pin || undefined,
-        org_id: callerOrgId ?? undefined,
+        org_id: (superContext ? orgId : callerOrgId) ?? undefined,
       }
       : {
         user_id: user!.id,
@@ -415,6 +453,32 @@ function UserDialog({
   return (
     <Dialog open={open} onClose={onClose} title={mode === 'create' ? 'Add User' : 'Edit User'}>
       <div className="space-y-3">
+        {superContext && (
+          <div>
+            <Label>Organisation {mode === 'create' ? '*' : ''}</Label>
+            {mode === 'create' ? (
+              <Select
+                value={orgId}
+                onChange={(e) => {
+                  // Switching org invalidates any site picks from the old org.
+                  setOrgId(e.target.value);
+                  setSiteId('');
+                  setSiteIds([]);
+                }}
+              >
+                <option value="">— Select organisation —</option>
+                {orgs!.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </Select>
+            ) : (
+              <Input value={orgs!.find((o) => o.id === orgId)?.name ?? '—'} disabled />
+            )}
+            {mode === 'create' && (
+              <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">
+                The user is created in this organisation; only its sites can be assigned below.
+              </p>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>{mobileOnly && mode === 'create' ? 'Email' : 'Email *'}</Label>
@@ -501,7 +565,7 @@ function UserDialog({
             <Label>Default site (optional)</Label>
             <Select value={siteId ?? ''} onChange={(e) => setSiteId(e.target.value)}>
               <option value="">— None —</option>
-              {sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {availableSites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
             <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">
               Optional default for new occurrences this user logs. Change it any time.
@@ -515,13 +579,15 @@ function UserDialog({
             Tick every site this user should see data for. Sites can be ticked
             and unticked freely at any time. Admins always see all sites in the org.
           </p>
-          {sites.length === 0 ? (
+          {availableSites.length === 0 ? (
             <p className="text-sm text-[hsl(var(--muted))]">
-              No sites configured yet — create one under Sites first.
+              {superContext && effectiveOrgId
+                ? 'This organisation has no sites yet — add one under Sites first.'
+                : 'No sites configured yet — create one under Sites first.'}
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-1 rounded-lg border p-2 sm:grid-cols-2">
-              {sites.map((s) => {
+              {availableSites.map((s) => {
                 const checked = siteIds.includes(s.id);
                 const isDefault = siteId === s.id;
                 return (
@@ -660,6 +726,54 @@ function UserDialog({
           <Button onClick={submit} disabled={busy}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             {mode === 'create' ? 'Create' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+function DeleteUserDialog({
+  open, onClose, user, onDone,
+}: { open: boolean; onClose: () => void; user: Row | null; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!user) return;
+    setBusy(true); setError(null);
+    const supabase = createClient();
+    const { error: fnErr } = await supabase.functions.invoke('admin-delete-user', {
+      body: { user_id: user.id },
+    });
+    if (fnErr) {
+      let detail: string | null = null;
+      try {
+        const ctx = (fnErr as unknown as { context?: Response }).context;
+        if (ctx?.json) { const b = await ctx.json() as { error?: string }; detail = b?.error ?? null; }
+      } catch { /* fall back to wrapper message */ }
+      setBusy(false);
+      setError(detail ?? fnErr.message);
+      return;
+    }
+    setBusy(false);
+    onClose(); onDone();
+  }
+
+  if (!user) return null;
+  return (
+    <Dialog open={open} onClose={onClose} title="Delete User">
+      <div className="space-y-3">
+        <p className="text-sm text-[hsl(var(--muted))]">
+          Permanently delete <strong>{user.full_name ?? user.email}</strong>? Their login,
+          profile and PIN are removed. Occurrences and logs they created are kept for the record.
+          This cannot be undone.
+        </p>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="destructive" onClick={submit} disabled={busy}>
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Delete user
           </Button>
         </div>
       </div>

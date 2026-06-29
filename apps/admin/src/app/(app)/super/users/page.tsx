@@ -66,6 +66,8 @@ export default async function AllUsersPage() {
         sites={(sites ?? []) as Site[]}
         callerRoles={Array.isArray(profile.roles) && profile.roles.length > 0 ? profile.roles : [profile.role]}
         callerOrgId={null}
+        callerId={profile.id}
+        orgs={orgList.map((o) => ({ id: o.id, name: o.name }))}
       />
     </>
   );

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Plus, Pencil, Building2 } from 'lucide-react';
+import { Loader2, Plus, Pencil, Building2, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,10 +18,13 @@ type Counts = {
   occurrences: Record<string, number>;
 };
 
-export function OrganizationsManager({ orgs, counts }: { orgs: Organization[]; counts: Counts }) {
+export function OrganizationsManager({
+  orgs, counts, callerOrgId,
+}: { orgs: Organization[]; counts: Counts; callerOrgId: string | null }) {
   const router = useRouter();
   const [addOpen, setAddOpen] = useState(false);
   const [edit, setEdit] = useState<Organization | null>(null);
+  const [del, setDel] = useState<Organization | null>(null);
 
   return (
     <>
@@ -52,9 +55,28 @@ export function OrganizationsManager({ orgs, counts }: { orgs: Organization[]; c
                 <TD>{counts.occurrences[o.id] ?? 0}</TD>
                 <TD>{o.is_active ? <Badge color="#16a34a">Active</Badge> : <Badge color="#dc2626">Suspended</Badge>}</TD>
                 <TD className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => setEdit(o)} title="Edit">
-                    <Pencil className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => setEdit(o)} title="Edit">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    {o.id === callerOrgId ? (
+                      <Button
+                        variant="ghost" size="icon" disabled
+                        title="You can't delete your own organisation"
+                        className="opacity-40"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost" size="icon"
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => setDel(o)} title="Delete organisation"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </TD>
               </TR>
             ))}
@@ -75,7 +97,80 @@ export function OrganizationsManager({ orgs, counts }: { orgs: Organization[]; c
         mode="edit" open={!!edit} onClose={() => setEdit(null)} org={edit}
         onDone={() => router.refresh()}
       />
+      <DeleteOrgDialog
+        key={del?.id ?? 'org-del'}
+        org={del}
+        userCount={del ? (counts.users[del.id] ?? 0) : 0}
+        siteCount={del ? (counts.sites[del.id] ?? 0) : 0}
+        onClose={() => setDel(null)}
+        onDone={() => router.refresh()}
+      />
     </>
+  );
+}
+
+function DeleteOrgDialog({
+  org, userCount, siteCount, onClose, onDone,
+}: {
+  org: Organization | null;
+  userCount: number;
+  siteCount: number;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!org) return;
+    setBusy(true); setError(null);
+    const supabase = createClient();
+    const { error: fnErr } = await supabase.functions.invoke('admin-delete-org', {
+      body: { org_id: org.id },
+    });
+    if (fnErr) {
+      // Surface the real error body (supabase-js wraps non-2xx generically).
+      let detail: string | null = null;
+      try {
+        const ctx = (fnErr as unknown as { context?: Response }).context;
+        if (ctx?.json) { const b = await ctx.json() as { error?: string }; detail = b?.error ?? null; }
+      } catch { /* fall back */ }
+      setBusy(false);
+      setError(detail ?? fnErr.message);
+      return;
+    }
+    setBusy(false);
+    setConfirm('');
+    onClose(); onDone();
+  }
+
+  if (!org) return null;
+  const match = confirm.trim() === org.name;
+  return (
+    <Dialog open={!!org} onClose={onClose} title="Delete Organisation">
+      <div className="space-y-3">
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+          <p className="font-semibold">This permanently deletes everything in this organisation.</p>
+          <p className="mt-1">
+            All <strong>{userCount}</strong> user account(s), <strong>{siteCount}</strong> site(s),
+            and every occurrence, patrol, report and setting under <strong>{org.name}</strong> will be
+            removed. This cannot be undone.
+          </p>
+        </div>
+        <div>
+          <Label>Type the organisation name to confirm</Label>
+          <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={org.name} />
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="destructive" onClick={submit} disabled={busy || !match}>
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Delete organisation
+          </Button>
+        </div>
+      </div>
+    </Dialog>
   );
 }
 

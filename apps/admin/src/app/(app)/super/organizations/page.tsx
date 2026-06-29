@@ -51,6 +51,7 @@ export default async function OrganizationsPage() {
           sites: Object.fromEntries(counts.sites),
           occurrences: Object.fromEntries(counts.occurrences),
         }}
+        callerOrgId={profile.org_id}
       />
     </>
   );

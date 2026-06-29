@@ -7,13 +7,18 @@ import { createClient } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
-import { Input, Label } from '@/components/ui/input';
+import { Input, Label, Select } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import type { Site } from '@digilog/shared';
 
-export function SitesManager({ sites, isSuperUser = false }: { sites: Site[]; isSuperUser?: boolean }) {
+type OrgOption = { id: string; name: string };
+
+export function SitesManager({
+  sites, isSuperUser = false, orgs = [],
+}: { sites: Site[]; isSuperUser?: boolean; orgs?: OrgOption[] }) {
   const router = useRouter();
+  const orgNameById = new Map(orgs.map((o) => [o.id, o.name]));
   const [edit, setEdit] = useState<Site | null>(null);
   const [deleteSite, setDeleteSite] = useState<Site | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -78,12 +83,21 @@ export function SitesManager({ sites, isSuperUser = false }: { sites: Site[]; is
       </div>
       <Card className="p-4">
         <Table>
-          <THead><TR><TH>Name</TH><TH>Code</TH><TH>Address</TH><TH>Status</TH><TH></TH></TR></THead>
+          <THead><TR>
+            <TH>Name</TH><TH>Code</TH>
+            {isSuperUser && <TH>Organisation</TH>}
+            <TH>Address</TH><TH>Status</TH><TH></TH>
+          </TR></THead>
           <TBody>
             {filtered.map((s) => (
               <TR key={s.id}>
                 <TD className="font-medium">{s.name}</TD>
                 <TD>{s.code ?? '—'}</TD>
+                {isSuperUser && (
+                  <TD className="text-xs">
+                    {orgNameById.get((s as unknown as { org_id: string }).org_id) ?? '—'}
+                  </TD>
+                )}
                 <TD>{s.address ?? '—'}</TD>
                 <TD>{s.is_active ? <Badge color="#16a34a">Active</Badge> : <Badge color="#64748b">Inactive</Badge>}</TD>
                 <TD className="text-right">
@@ -102,8 +116,8 @@ export function SitesManager({ sites, isSuperUser = false }: { sites: Site[]; is
         </Table>
       </Card>
 
-      <SiteDialog key={addOpen ? 'site-open' : 'site'} open={addOpen} onClose={() => setAddOpen(false)} onDone={() => router.refresh()} />
-      <SiteDialog key={edit?.id ?? 'site-edit'} open={!!edit} onClose={() => setEdit(null)} site={edit} onDone={() => router.refresh()} />
+      <SiteDialog key={addOpen ? 'site-open' : 'site'} open={addOpen} onClose={() => setAddOpen(false)} onDone={() => router.refresh()} isSuperUser={isSuperUser} orgs={orgs} />
+      <SiteDialog key={edit?.id ?? 'site-edit'} open={!!edit} onClose={() => setEdit(null)} site={edit} onDone={() => router.refresh()} isSuperUser={isSuperUser} orgs={orgs} />
       
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteSite} onClose={() => setDeleteSite(null)} title="Delete Site">
@@ -121,19 +135,40 @@ export function SitesManager({ sites, isSuperUser = false }: { sites: Site[]; is
   );
 }
 
-function SiteDialog({ open, onClose, site, onDone }: { open: boolean; onClose: () => void; site?: Site | null; onDone: () => void }) {
+function SiteDialog({
+  open, onClose, site, onDone, isSuperUser = false, orgs = [],
+}: {
+  open: boolean;
+  onClose: () => void;
+  site?: Site | null;
+  onDone: () => void;
+  isSuperUser?: boolean;
+  orgs?: OrgOption[];
+}) {
   const [name, setName] = useState(site?.name ?? '');
   const [code, setCode] = useState(site?.code ?? '');
   const [address, setAddress] = useState(site?.address ?? '');
   const [active, setActive] = useState(site?.is_active ?? true);
+  // Super-user picks which organisation the site belongs to. For org admins the
+  // DB defaults org_id to their own org, so we leave it unset.
+  const [orgId, setOrgId] = useState(
+    (site as unknown as { org_id?: string })?.org_id ?? (isSuperUser ? (orgs[0]?.id ?? '') : ''),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
     if (!name.trim()) { setError('Name is required.'); return; }
+    if (isSuperUser && !orgId) { setError('Choose an organisation for this site.'); return; }
     setBusy(true); setError(null);
-    const supabase = createClient();
-    const payload = { name: name.trim(), code: code || null, address: address || null, is_active: active };
+    // org_id isn't in the generated `sites` type yet, so route the write
+    // through `any` (matches the pattern used elsewhere for lagging columns).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createClient() as any;
+    const payload: Record<string, unknown> = { name: name.trim(), code: code || null, address: address || null, is_active: active };
+    // Only the super-user sets org_id explicitly (to place the site in another
+    // tenant); for admins the column default (current_org_id()) handles it.
+    if (isSuperUser && orgId) payload.org_id = orgId;
     const { error: e } = site
       ? await supabase.from('sites').update(payload).eq('id', site.id)
       : await supabase.from('sites').insert(payload);
@@ -145,6 +180,15 @@ function SiteDialog({ open, onClose, site, onDone }: { open: boolean; onClose: (
   return (
     <Dialog open={open} onClose={onClose} title={site ? 'Edit Site' : 'Add Site'}>
       <div className="space-y-3">
+        {isSuperUser && (
+          <div>
+            <Label>Organisation *</Label>
+            <Select value={orgId} onChange={(e) => setOrgId(e.target.value)}>
+              <option value="">— Select organisation —</option>
+              {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </Select>
+          </div>
+        )}
         <div><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
         <div><Label>Code</Label><Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. SAN" /></div>
         <div><Label>Address</Label><Input value={address} onChange={(e) => setAddress(e.target.value)} /></div>

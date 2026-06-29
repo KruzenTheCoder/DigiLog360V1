@@ -29,6 +29,7 @@ export default async function UsersPage() {
         sites={(sites ?? []) as Site[]}
         callerRoles={profileRoles(profile)}
         callerOrgId={profile.org_id}
+        callerId={profile.id}
       />
     </>
   );

@@ -22,6 +22,8 @@
     "functions:deploy:admin-api-token": "supabase functions deploy admin-api-token",
     "functions:deploy:admin-create-org": "supabase functions deploy admin-create-org",
     "functions:deploy:admin-create-user": "supabase functions deploy admin-create-user",
+    "functions:deploy:admin-delete-org": "supabase functions deploy admin-delete-org",
+    "functions:deploy:admin-delete-user": "supabase functions deploy admin-delete-user",
     "functions:deploy:admin-role-capability": "supabase functions deploy admin-role-capability",
     "functions:deploy:admin-update-user": "supabase functions deploy admin-update-user",
     "functions:deploy:health-check": "supabase functions deploy health-check",
