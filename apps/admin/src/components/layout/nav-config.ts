@@ -33,6 +33,7 @@ export const NAV: NavSection[] = [
       { label: 'Log New Occurrence', href: '/occurrences/new', icon: 'PlusCircle', capability: 'occurrences.log' },
       { label: 'Reports', href: '/reports', icon: 'FileText', roles: REVIEWERS, capability: 'reports.view' },
       { label: 'History', href: '/occurrences/history', icon: 'Archive', capability: 'occurrences.view_all' },
+      { label: 'Evidence Photos', href: '/occurrences/evidence', icon: 'Images', roles: REVIEWERS, capability: 'reports.view' },
       { label: 'Assigned to Me', href: '/my-queue', icon: 'Inbox', roles: REVIEWERS, capability: 'occurrences.view_assigned' },
       { label: 'Tasks', href: '/tasks', icon: 'CheckCircle' },
     ],

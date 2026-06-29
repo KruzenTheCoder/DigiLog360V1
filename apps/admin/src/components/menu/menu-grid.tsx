@@ -22,6 +22,7 @@ const DESCRIPTIONS: Record<string, string> = {
   '/occurrences/new': 'Log a new occurrence.',
   '/reports': 'Search, view and export occurrence reports.',
   '/occurrences/history': 'View and filter past occurrences.',
+  '/occurrences/evidence': 'Review occurrence evidence photos by OB number.',
   '/my-queue': 'Occurrences assigned to you.',
   '/patrols': 'Monitor active and recent patrols.',
   '/checkpoints': 'Manage patrol checkpoints and tags.',

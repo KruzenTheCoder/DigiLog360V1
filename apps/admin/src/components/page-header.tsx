@@ -13,6 +13,7 @@ const PATH_ICON: Record<string, string> = {
   '/occurrences/all': 'ClipboardList',
   '/occurrences/new': 'PlusCircle',
   '/occurrences/history': 'Archive',
+  '/occurrences/evidence': 'Images',
   '/my-queue': 'Inbox',
   '/tasks': 'CheckCircle',
   '/reports': 'FileText',
@@ -107,4 +108,3 @@ export function PageHeader({
     </div>
   );
 }
-
