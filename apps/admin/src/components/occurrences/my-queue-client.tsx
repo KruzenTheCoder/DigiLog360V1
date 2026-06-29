@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -13,7 +14,7 @@ import { SEVERITY_COLORS, isSlaBreached, type Occurrence } from '@digilog/shared
 /** Client-cached "Assigned to me" queue — instant on revisit. */
 export function MyQueueClient({ userId }: { userId: string }) {
   const router = useRouter();
-  const { data, loading } = useCachedQuery<Occurrence[]>(
+  const { data, loading, refresh } = useCachedQuery<Occurrence[]>(
     `my-queue:${userId}`,
     async () => {
       const sb = createClient();
@@ -28,6 +29,17 @@ export function MyQueueClient({ userId }: { userId: string }) {
     },
     { staleMs: 15_000 },
   );
+
+  // Live updates: re-fetch when any occurrence changes (assignment, status, new
+  // incident). Cheap re-query keeps "Assigned to me" current without a refresh.
+  useEffect(() => {
+    const sb = createClient();
+    const channel = sb
+      .channel(`my-queue-live:${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'occurrences' }, () => refresh())
+      .subscribe();
+    return () => { sb.removeChannel(channel); };
+  }, [userId, refresh]);
 
   if (loading && !data) {
     return <div className="h-96 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-slate-800/60" />;

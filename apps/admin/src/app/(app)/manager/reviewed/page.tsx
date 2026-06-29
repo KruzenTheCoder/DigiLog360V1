@@ -72,17 +72,20 @@ export default async function ReviewedLogsPage({ searchParams }: PageProps) {
   }
   // scope === 'all' (or 'by' with no reviewer chosen) → no extra filter.
 
-  const { data } = await q;
-  const acks = (data ?? []) as unknown as AckWithBulk[];
-
-  // Build the reviewer dropdown options from the org's manager-ish users so
-  // the "By Person" tab can show real names, not just whoever has acked.
+  // The acks query and the reviewer dropdown query are independent — run them
+  // in parallel instead of one after the other.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: reviewersRaw } = await (supabase as any)
+  const reviewersQuery = (supabase as any)
     .from('profiles')
     .select('id, full_name, email, role, roles')
     .eq('org_id', profile.org_id)
     .order('full_name', { ascending: true, nullsFirst: false });
+
+  const [{ data }, { data: reviewersRaw }] = await Promise.all([q, reviewersQuery]);
+  const acks = (data ?? []) as unknown as AckWithBulk[];
+
+  // Build the reviewer dropdown options from the org's manager-ish users so
+  // the "By Person" tab can show real names, not just whoever has acked.
   const reviewers = ((reviewersRaw ?? []) as Array<{
     id: string; full_name: string | null; email: string | null; role: string; roles: string[] | null;
   }>)

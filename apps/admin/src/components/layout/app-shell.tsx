@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import * as Icons from 'lucide-react';
+import { Icon } from '@/lib/icons';
 import { createClient } from '@/lib/supabase/client';
 import { cn, initials } from '@/lib/utils';
 import { visibleSections } from './nav-config';
@@ -12,12 +12,6 @@ import { NetstreamLogo } from '@/components/brand/netstream-logo';
 import { TaskAssignmentToast } from '@/components/tasks/task-assignment-toast';
 import { invalidateCache } from '@/lib/use-cached-query';
 import { BRAND, ROLE_LABELS, type Profile } from '@digilog/shared';
-
-function Icon({ name, className }: { name: string; className?: string }) {
-  const C = (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[name]
-    ?? Icons.Circle;
-  return <C className={className} />;
-}
 
 export function AppShell({
   profile, siteName, children, capabilities = [],
@@ -172,7 +166,7 @@ export function AppShell({
             </Link>
           ) : (
             <button className="lg:hidden text-white" onClick={() => setOpen(true)} aria-label="Open menu">
-              <Icons.Menu className="h-6 w-6" />
+              <Icon name="Menu" className="h-6 w-6" />
             </button>
           )}
 
@@ -204,17 +198,17 @@ export function AppShell({
           <div className="flex items-center gap-0.5">
             <NavBtn
               onClick={() => router.back()}
-              icon={<Icons.ArrowLeft className="h-5 w-5" />}
+              icon={<Icon name="ArrowLeft" className="h-5 w-5" />}
               label="Back"
             />
             <NavBtn
               onClick={() => router.forward()}
-              icon={<Icons.ArrowRight className="h-5 w-5" />}
+              icon={<Icon name="ArrowRight" className="h-5 w-5" />}
               label="Forward"
             />
             <NavBtn
               onClick={() => router.push('/menu')}
-              icon={<Icons.Home className="h-5 w-5" />}
+              icon={<Icon name="Home" className="h-5 w-5" />}
               label="Home (menu)"
               active={pathname === '/menu'}
             />
@@ -224,7 +218,7 @@ export function AppShell({
             className="hidden items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-sm font-medium text-white backdrop-blur-sm sm:flex"
             title={siteCount > 1 ? `Assigned to ${siteCount} sites` : undefined}
           >
-            <Icons.MapPin className="h-4 w-4" />
+            <Icon name="MapPin" className="h-4 w-4" />
             {siteName ?? 'All sites'}
             {siteCount > 1 && (
               <span className="rounded-full bg-white/25 px-1.5 text-[10px] font-bold">{siteCount}</span>
@@ -237,7 +231,7 @@ export function AppShell({
               aria-label="Notifications"
               title="Notifications"
             >
-              <Icons.Bell className="h-5 w-5" />
+              <Icon name="Bell" className="h-5 w-5" />
               {unread > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white/30">
                   {unread > 99 ? '99+' : unread}
@@ -245,7 +239,7 @@ export function AppShell({
               )}
             </Link>
             <button onClick={toggleTheme} className="rounded-lg p-2 text-white hover:bg-white/15" aria-label="Toggle theme">
-              {dark ? <Icons.Sun className="h-5 w-5" /> : <Icons.Moon className="h-5 w-5" />}
+              {dark ? <Icon name="Sun" className="h-5 w-5" /> : <Icon name="Moon" className="h-5 w-5" />}
             </button>
             <div className="flex items-center gap-2 rounded-lg border border-white/25 bg-white/10 px-2 py-1.5 backdrop-blur-sm">
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-semibold text-brand">
@@ -257,7 +251,7 @@ export function AppShell({
               </div>
             </div>
             <button onClick={signOut} className="rounded-lg p-2 text-white hover:bg-white/15" aria-label="Sign out" title="Sign out">
-              <Icons.LogOut className="h-5 w-5" />
+              <Icon name="LogOut" className="h-5 w-5" />
             </button>
           </div>
         </header>

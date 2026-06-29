@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import * as Icons from 'lucide-react';
+import { getIcon } from '@/lib/icons';
 import { cn } from '@/lib/utils';
 
 type Tone = 'brand' | 'green' | 'amber' | 'red' | 'sky' | 'violet' | 'slate';
@@ -33,10 +33,7 @@ export function GradientSection({
   children: ReactNode;
   className?: string;
 }) {
-  const C = icon
-    ? (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[icon]
-      ?? Icons.LayoutDashboard
-    : null;
+  const C = icon ? getIcon(icon, 'LayoutDashboard') : null;
   const t = TONES[tone];
   return (
     <section className={cn('overflow-hidden rounded-2xl border bg-[hsl(var(--surface))] shadow-sm ring-1', t.ring, className)}>

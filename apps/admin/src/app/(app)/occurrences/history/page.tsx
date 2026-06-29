@@ -5,6 +5,7 @@ import { requireProfile } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { HistoryOccurrences, type HistoryRow } from '@/components/occurrences/history-occurrences';
 import { CompletedPatrols } from '@/components/occurrences/completed-patrols';
+import { RealtimeRefresh } from '@/components/realtime/realtime-refresh';
 import type { PatrolDetailed } from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,7 @@ export default async function HistoryPage() {
 
   return (
     <>
+      <RealtimeRefresh tables={['occurrences', 'patrols', 'checkpoint_scans']} />
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">History — Closed Occurrences &amp; Completed Patrols</h1>

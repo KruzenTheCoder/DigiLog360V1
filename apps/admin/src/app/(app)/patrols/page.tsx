@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { EndPatrolButton } from '@/components/patrols/end-patrol-button';
+import { RealtimeRefresh } from '@/components/realtime/realtime-refresh';
 import { formatDateTime } from '@/lib/utils';
 import type { PatrolDetailed } from '@digilog/shared';
 
@@ -21,6 +22,7 @@ export default async function PatrolsPage() {
 
   return (
     <>
+      <RealtimeRefresh tables={['patrols', 'checkpoint_scans']} />
       <PageHeader title="Patrols" description="Live patrol monitoring and checkpoint progress." />
 
       <Card className="mb-5">

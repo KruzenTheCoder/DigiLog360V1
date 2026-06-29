@@ -1,4 +1,4 @@
-import * as Icons from 'lucide-react';
+import { getIcon } from '@/lib/icons';
 import { cn } from '@/lib/utils';
 
 type HeroTone = 'red' | 'blue' | 'green' | 'violet';
@@ -25,8 +25,7 @@ export function HeroKpi({
   value: string | number;
   footer?: React.ReactNode;
 }) {
-  const C = (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[icon]
-    ?? Icons.Activity;
+  const C = getIcon(icon, 'Activity');
 
   return (
     <div

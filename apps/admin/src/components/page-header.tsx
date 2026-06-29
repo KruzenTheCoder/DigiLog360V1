@@ -1,6 +1,6 @@
 'use client';
 
-import * as Icons from 'lucide-react';
+import { getIcon } from '@/lib/icons';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
@@ -81,9 +81,7 @@ export function PageHeader({
 }) {
   const path = usePathname();
   const iconName = resolveIconName(path ?? '/', icon);
-  const I = iconName
-    ? ((Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[iconName] ?? Icons.LayoutDashboard)
-    : null;
+  const I = iconName ? getIcon(iconName, 'LayoutDashboard') : null;
 
   return (
     <div

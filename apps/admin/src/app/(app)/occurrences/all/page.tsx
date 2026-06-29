@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
 import { PageHeader } from '@/components/page-header';
 import { OccurrencesExplorer } from '@/components/occurrences/occurrences-explorer';
+import { RealtimeRefresh } from '@/components/realtime/realtime-refresh';
 import {
   parseOccurrencesFilter, clampPage, clampPageSize, type Occurrence, type SavedView,
 } from '@digilog/shared';
@@ -73,39 +74,52 @@ export default async function AllOccurrencesPage({ searchParams }: PageProps) {
   const offset = (page - 1) * pageSize;
   q = q.range(offset, offset + pageSize - 1);
 
-  const { data, count } = await q;
-
-  // ---------- sites + distinct types pickers + assignables ----------
-  const { data: sites } = await supabase.from('sites').select('id, name').order('name');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: assignables } = await (supabase as any)
-    .from('profiles').select('id, full_name, email, role')
-    .in('role', ['admin', 'manager', 'control_room', 'supervisor'])
-    .order('full_name');
-  // PostgREST has no DISTINCT — sample a window and unique client-side.
-  const { data: typeRows } = await supabase
-    .from('occurrences')
-    .select('occurrence_type')
-    .limit(2000);
-  const distinctTypes = Array.from(
-    new Set((typeRows ?? []).map((t) => t.occurrence_type).filter(Boolean) as string[]),
-  ).sort();
-
   // ---------- saved views (graceful if migration not deployed yet) ----------
-  let views: unknown[] | null = [];
-  try {
+  // Wrapped so a missing table resolves to [] instead of rejecting the batch.
+  const savedViewsQuery = (async (): Promise<unknown[]> => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await (supabase as any)
+        .from('saved_views')
+        .select('*')
+        .eq('scope', 'occurrences')
+        .order('is_pinned', { ascending: false })
+        .order('updated_at', { ascending: false });
+      return res.error ? [] : (res.data ?? []);
+    } catch {
+      return [];
+    }
+  })();
+
+  // These reads are independent of one another — run them as a single parallel
+  // batch instead of a serial waterfall. From SA→US that turns ~5 sequential
+  // round-trips (~1s+) into one.
+  const [
+    { data, count },
+    { data: sites },
+    { data: assignables },
+    { data: typeRows },
+    views,
+  ] = await Promise.all([
+    q,
+    supabase.from('sites').select('id, name').order('name'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (supabase as any)
-      .from('saved_views')
-      .select('*')
-      .eq('scope', 'occurrences')
-      .order('is_pinned', { ascending: false })
-      .order('updated_at', { ascending: false });
-    if (!res.error) views = res.data ?? [];
-  } catch { /* table not deployed yet */ }
+    (supabase as any)
+      .from('profiles').select('id, full_name, email, role')
+      .in('role', ['admin', 'manager', 'control_room', 'supervisor'])
+      .order('full_name'),
+    // PostgREST has no DISTINCT — sample a window and unique client-side.
+    supabase.from('occurrences').select('occurrence_type').limit(2000),
+    savedViewsQuery,
+  ]);
+
+  const distinctTypes = Array.from(
+    new Set((typeRows ?? []).map((t: { occurrence_type: string | null }) => t.occurrence_type).filter(Boolean) as string[]),
+  ).sort();
 
   return (
     <>
+      <RealtimeRefresh tables={['occurrences']} />
       <PageHeader
         title="All Occurrences"
         description="Complete occurrence book — search, filter and export."

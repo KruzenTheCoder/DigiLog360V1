@@ -1,4 +1,4 @@
-import * as Icons from 'lucide-react';
+import { getIcon } from '@/lib/icons';
 import { SEVERITIES, SEVERITY_LABELS, type SeverityLevel } from '@digilog/shared';
 
 // Per-severity presentation: icon + the soft tonal surface used behind the
@@ -16,8 +16,7 @@ export function SeverityCards({ counts }: { counts: Record<SeverityLevel, number
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       {SEVERITIES.map((key) => {
         const m = META[key];
-        const C = (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[m.icon]
-          ?? Icons.Circle;
+        const C = getIcon(m.icon, 'Circle');
         return (
           <div
             key={key}

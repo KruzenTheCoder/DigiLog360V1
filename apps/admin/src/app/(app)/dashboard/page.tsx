@@ -3,10 +3,11 @@ import { requireProfile } from '@/lib/auth';
 import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { GradientSection } from '@/components/ui/gradient-section';
-import { MonthlyTrendChart, CategoryDonut } from '@/components/dashboard/dashboard-charts';
+import { MonthlyTrendChart, CategoryDonut } from '@/components/dashboard/dashboard-charts-lazy';
 import { HeroKpi } from '@/components/dashboard/hero-kpi';
 import { SeverityCards } from '@/components/dashboard/severity-cards';
 import { SlaComplianceReport } from '@/components/dashboard/sla-compliance';
+import { RealtimeRefresh } from '@/components/realtime/realtime-refresh';
 import {
   isSlaBreached, isSlaUpdateDue, SEVERITIES, SEVERITY_LABELS,
   OCCURRENCE_STATUSES, STATUS_LABELS, STATUS_COLORS,
@@ -201,6 +202,9 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
 
   return (
     <>
+      {/* Live KPIs — coalesce bursts with a longer debounce since each refresh
+          re-runs the 6-month aggregate query. */}
+      <RealtimeRefresh tables={['occurrences']} debounceMs={2000} />
       <PageHeader
         title="Control Room Performance Dashboard"
         description={`Real-time analytics & key performance indicators — last 30 days${activeSite ? ` · ${activeSite.name}` : profile.role === 'admin' ? ' · all sites' : ''}`}

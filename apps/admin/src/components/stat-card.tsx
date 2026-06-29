@@ -1,4 +1,4 @@
-import * as Icons from 'lucide-react';
+import { getIcon } from '@/lib/icons';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 
@@ -11,8 +11,7 @@ export function StatCard({
   hint?: string;
   tone?: 'default' | 'danger' | 'warning' | 'success' | 'brand';
 }) {
-  const C = (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[icon]
-    ?? Icons.Activity;
+  const C = getIcon(icon, 'Activity');
 
   const tones: Record<string, string> = {
     default: 'text-slate-500 bg-slate-100 dark:bg-slate-800',

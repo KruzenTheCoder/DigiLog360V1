@@ -15,9 +15,14 @@ export default async function NewReportPage({
   if (!occId) redirect('/reports');
 
   const supabase = await createClient();
-  const { data: occ } = await supabase.from('occurrences').select('*').eq('id', Number(occId)).single();
+  // Both reads key off the same occurrence id and don't depend on each other —
+  // fetch them together. (Worst case we fetch a report for a missing occurrence,
+  // which is harmless; we guard on `occ` immediately after.)
+  const [{ data: occ }, { data: report }] = await Promise.all([
+    supabase.from('occurrences').select('*').eq('id', Number(occId)).single(),
+    supabase.from('occurrence_reports').select('*').eq('occurrence_id', Number(occId)).maybeSingle(),
+  ]);
   if (!occ) notFound();
-  const { data: report } = await supabase.from('occurrence_reports').select('*').eq('occurrence_id', Number(occId)).maybeSingle();
 
   return (
     <div className="mx-auto max-w-3xl">

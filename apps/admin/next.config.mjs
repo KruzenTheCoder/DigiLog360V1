@@ -110,59 +110,21 @@ const nextConfig = {
     reactRemoveProperties: process.env.NODE_ENV === 'production',
   },
   
-  // ===== CUSTOM WEBPACK CONFIG FOR ADVANCED OPTIMIZATIONS =====
-  webpack: (config, { dev, isServer }) => {
-    // Optimize bundle splitting
-    if (!dev && !isServer) {
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          chunks: 'all',
-          cacheGroups: {
-            // Vendor chunk for node_modules
-            vendor: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'vendors',
-              chunks: 'all',
-              priority: 10,
-            },
-            // Recharts chunk
-            recharts: {
-              test: /[\\/]node_modules[\\/]recharts/,
-              name: 'recharts',
-              chunks: 'all',
-              priority: 20,
-            },
-            // Leaflet chunk
-            leaflet: {
-              test: /[\\/]node_modules[\\/]leaflet/,
-              name: 'leaflet',
-              chunks: 'all',
-              priority: 20,
-            },
-            // Supabase chunk
-            supabase: {
-              test: /[\\/]node_modules[\\/]@supabase/,
-              name: 'supabase',
-              chunks: 'all',
-              priority: 15,
-            },
-          },
-        },
-        runtimeChunk: { name: 'runtime' },
-      };
-    }
+  // NOTE: We deliberately do NOT override webpack's splitChunks here.
+  //
+  // The previous config forced ALL of node_modules into a single `vendors`
+  // cacheGroup with `chunks: 'all'`, which produced one ~423 kB chunk that was
+  // loaded as "First Load JS shared by all" on EVERY route — even a 1.5 kB page
+  // like /shifts pulled the whole blob. Next.js's default chunking is smarter:
+  // it splits react/react-dom into a `framework` chunk, hashes each large lib
+  // separately, and keeps single-route libs (recharts, leaflet, tesseract) in
+  // that route's own chunk so they're only downloaded where used. Removing the
+  // override lets that default kick in and shrinks the shared baseline.
+  //
+  // recharts (dashboard), leaflet (guards-map) and tesseract.js (OCR) are all
+  // already dynamically imported / route-scoped, so they stay out of the shared
+  // bundle on their own.
 
-    // Enable persistent caching for faster rebuilds
-    if (dev) {
-      config.cache = {
-        type: 'filesystem',
-      };
-    }
-
-    return config;
-  },
-  
   // ===== SECURITY HEADERS =====
   async headers() {
     return [
@@ -181,13 +143,23 @@ const nextConfig = {
           // No browser features the console doesn't need.
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
-          // Cache control for static assets
+        ],
+      },
+      // Long-lived immutable cache ONLY for fingerprinted build assets. The
+      // previous config applied this to `/:path*` — i.e. every authenticated
+      // HTML page — which served stale (and cross-user) content from shared
+      // caches. Next already sends immutable headers for /_next/static; this
+      // makes that explicit and keeps it off everything else.
+      {
+        source: '/_next/static/:path*',
+        headers: [
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
-      // Dynamic pages should not be cached
+      // Authenticated app pages must never be cached by the browser or any
+      // shared/CDN cache — they are per-user and change in realtime.
       {
-        source: '/(dashboard|occurrences|patrols|reports)/:path*',
+        source: '/(dashboard|occurrences|patrols|reports|tasks|users|sites|team|keys|visitors|manager|super|settings|my-queue|notifications)/:path*',
         headers: [
           { key: 'Cache-Control', value: 'private, no-cache, no-store, must-revalidate' },
         ],

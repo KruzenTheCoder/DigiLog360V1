@@ -240,7 +240,12 @@ export default function Login() {
       style={{ flex: 1, backgroundColor: theme.bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[styles.loginScreen, compactLogin && styles.loginScreenCompact]}>
+      <ScrollView
+        contentContainerStyle={[styles.loginScreen, compactLogin && styles.loginScreenCompact]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
         {/* ----- brand ----- */}
         <View style={[styles.brand, compactLogin && styles.brandCompact]}>
           <Image source={shield} style={[styles.shield, compactLogin && styles.shieldCompact]} resizeMode="contain" />
@@ -310,7 +315,7 @@ export default function Login() {
         <Text style={[styles.footer, compactLogin && styles.footerCompact]} allowFontScaling={false}>
           © {new Date().getFullYear()} {BRAND.company}
         </Text>
-      </View>
+      </ScrollView>
 
       <toast.ToastView />
     </KeyboardAvoidingView>
@@ -414,7 +419,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   loginScreen: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.xl * 1.5,
     paddingBottom: spacing.lg,

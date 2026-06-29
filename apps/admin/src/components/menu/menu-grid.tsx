@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import * as Icons from 'lucide-react';
+import { Icon } from '@/lib/icons';
 import type { NavSection } from '@/components/layout/nav-config';
 
 // Accent colours cycled across the action cards — echoes the multi-coloured
@@ -55,12 +55,6 @@ const DESCRIPTIONS: Record<string, string> = {
   '/super/form-builder': 'Toggle which sections show on the Log Occurrence form.',
 };
 
-function Icon({ name, className }: { name: string; className?: string }) {
-  const C = (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[name]
-    ?? Icons.Circle;
-  return <C className={className} />;
-}
-
 /** Renders the user's permitted nav sections as a grid of accent action cards. */
 export function MenuGrid({ sections }: { sections: NavSection[] }) {
   let idx = 0;
@@ -91,7 +85,7 @@ export function MenuGrid({ sections }: { sections: NavSection[] }) {
                       {DESCRIPTIONS[item.href] ?? 'Open'}
                     </p>
                   </div>
-                  <Icons.ChevronRight className="h-4 w-4 self-center text-[hsl(var(--muted))] opacity-0 transition group-hover:opacity-100" />
+                  <Icon name="ChevronRight" className="h-4 w-4 self-center text-[hsl(var(--muted))] opacity-0 transition group-hover:opacity-100" />
                 </Link>
               );
             })}

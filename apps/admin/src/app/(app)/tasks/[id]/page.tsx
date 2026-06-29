@@ -14,13 +14,16 @@ export default async function TaskDetailPage({
   const profile = await requireProfile();
   const supabase = await createClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: task } = await (supabase as any).from('tasks').select('*').eq('id', Number(id)).maybeSingle();
+  // Task + its update history both key off the id and don't depend on each
+  // other — fetch in parallel, then guard on the task.
+  const [{ data: task }, { data: updates }] = await Promise.all([
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('tasks').select('*').eq('id', Number(id)).maybeSingle(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('task_updates')
+      .select('*').eq('task_id', Number(id)).order('created_at', { ascending: false }),
+  ]);
   if (!task) notFound();
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: updates } = await (supabase as any).from('task_updates')
-    .select('*').eq('task_id', Number(id)).order('created_at', { ascending: false });
 
   return (
     <>

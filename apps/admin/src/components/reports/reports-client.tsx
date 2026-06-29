@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCachedQuery } from '@/lib/use-cached-query';
 import { ReportsTable } from '@/components/reports/reports-table';
@@ -26,7 +27,7 @@ export function ReportsClient({
   const scoped = !isUnscoped && ownSites.length > 0;
   const cacheKey = `reports:${isUnscoped ? 'all' : ownSites.slice().sort().join(',') || 'none'}`;
 
-  const { data, loading } = useCachedQuery<OccurrenceReport[]>(
+  const { data, loading, refresh } = useCachedQuery<OccurrenceReport[]>(
     cacheKey,
     async () => {
       const sb = createClient();
@@ -47,6 +48,16 @@ export function ReportsClient({
     },
     { staleMs: 20_000 },
   );
+
+  // Live updates: re-fetch when a report is created/changed by anyone.
+  useEffect(() => {
+    const sb = createClient();
+    const channel = sb
+      .channel('reports-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'occurrence_reports' }, () => refresh())
+      .subscribe();
+    return () => { sb.removeChannel(channel); };
+  }, [refresh]);
 
   if (loading && !data) {
     return (

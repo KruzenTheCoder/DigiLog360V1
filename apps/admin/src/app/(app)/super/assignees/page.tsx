@@ -38,6 +38,13 @@ export default async function AssigneesPage() {
   let rows: ProfileRow[] = [];
   let schemaMissing: string | null = null;
 
+  // Sites lookup is independent of the profiles query — start it now so it
+  // runs in parallel rather than after.
+  const sitesPromise = (async () => {
+    const { data } = await sb.from('sites').select('id, name');
+    return (data ?? []) as Array<{ id: string; name: string }>;
+  })();
+
   const { data: full, error: fullErr } = await sb
     .from('profiles')
     .select(FULL_COLS)
@@ -63,12 +70,12 @@ export default async function AssigneesPage() {
     }
   }
 
-  const { data: sites } = await sb.from('sites').select('id, name');
+  const sites = await sitesPromise;
   // Plain object — server-to-client props must be serialisable. Passing a
   // function (the previous siteName lookup helper) trips the RSC boundary
   // and produces "An error occurred in the Server Components render".
   const siteNames: Record<string, string> = {};
-  for (const s of ((sites ?? []) as Array<{ id: string; name: string }>)) {
+  for (const s of sites) {
     siteNames[s.id] = s.name;
   }
 

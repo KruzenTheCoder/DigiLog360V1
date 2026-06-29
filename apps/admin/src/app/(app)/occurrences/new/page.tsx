@@ -11,25 +11,33 @@ export default async function NewOccurrencePage() {
   const supabase = await createClient();
   const caps = await loadMyCapabilities();
 
+  // These four reads are independent of one another, so run them as one
+  // parallel batch rather than a serial waterfall (this is a high-traffic
+  // page — guards/control room log incidents constantly, and from SA→US every
+  // serial round-trip is ~235 ms of dead time).
+
   // RLS only lets non-admins log occurrences for their own site, so only offer that.
-  let sitesQuery = supabase.from('sites').select('*').eq('is_active', true).order('name');
-  if (profile.role !== 'admin' && profile.site_id) sitesQuery = sitesQuery.eq('id', profile.site_id);
-  const { data: sites } = await sitesQuery;
+  const sitesQuery = (async (): Promise<Site[]> => {
+    let sq = supabase.from('sites').select('*').eq('is_active', true).order('name');
+    if (profile.role !== 'admin' && profile.site_id) sq = sq.eq('id', profile.site_id);
+    const { data } = await sq;
+    return (data ?? []) as Site[];
+  })();
 
   // Same-site guards/supervisors who can be credited as the reporter.
-  let reporters: { id: string; name: string }[] = [];
-  if (profile.site_id || profile.role === 'admin') {
+  const reportersQuery = (async (): Promise<{ id: string; name: string }[]> => {
+    if (!(profile.site_id || profile.role === 'admin')) return [];
     let query = supabase.from('profiles').select('id, full_name, email').in('role', ['guard', 'supervisor']);
     if (profile.role !== 'admin' && profile.site_id) query = query.eq('site_id', profile.site_id);
     const { data } = await query;
-    reporters = (data ?? []).map((r) => ({ id: r.id, name: r.full_name ?? r.email ?? 'Unknown' }));
-  }
+    return (data ?? []).map((r) => ({ id: r.id, name: r.full_name ?? r.email ?? 'Unknown' }));
+  })();
 
   // Assignable users — only fetched when the caller can actually assign.
   // We offer anyone who can act on an occurrence (guard, supervisor, control
   // room, manager, admin) within the same site/org.
-  let assignees: { id: string; name: string; role: string; jobTitle: string | null }[] = [];
-  if (can(caps, 'occurrences.assign')) {
+  const assigneesQuery = (async (): Promise<{ id: string; name: string; role: string; jobTitle: string | null }[]> => {
+    if (!can(caps, 'occurrences.assign')) return [];
     // The generated AppRoleEnum lags behind the live `app_role` enum, so we
     // route through `any` for this query only.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -61,19 +69,25 @@ export default async function NewOccurrencePage() {
       rows = (data ?? []) as typeof rows;
     }
 
-    assignees = rows.map((r) => ({
+    return rows.map((r) => ({
       id: r.id,
       name: r.full_name ?? r.email ?? 'Unknown',
       role: r.role,
       jobTitle: r.job_title ?? null,
     }));
-  }
+  })();
 
   // Per-org form-builder config (which sections to show on this form).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: orgRow } = await (supabase as any)
-    .from('organizations').select('log_form_config').eq('id', profile.org_id).maybeSingle();
-  const formConfig: LogFormConfig = (orgRow?.log_form_config ?? {}) as LogFormConfig;
+  const orgConfigQuery = (async (): Promise<LogFormConfig> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: orgRow } = await (supabase as any)
+      .from('organizations').select('log_form_config').eq('id', profile.org_id).maybeSingle();
+    return (orgRow?.log_form_config ?? {}) as LogFormConfig;
+  })();
+
+  const [sites, reporters, assignees, formConfig] = await Promise.all([
+    sitesQuery, reportersQuery, assigneesQuery, orgConfigQuery,
+  ]);
 
   return (
     <>

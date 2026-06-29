@@ -1,5 +1,53 @@
 # DigiLog 360 - Performance Optimizations Summary
 
+> ## 2026-06-29 — Bundle + realtime pass (measured)
+>
+> A focused pass that fixed the things actually causing the "jag" on page loads,
+> plus made the operational pages update live (no manual refresh). All numbers
+> below are from `next build` output, not estimates.
+>
+> **JavaScript shipped per page (First Load JS):**
+>
+> | Page | Before | After |
+> |------|--------|-------|
+> | Shared by every page | **426 kB** | **104 kB** |
+> | `/shifts` (light page) | 427 kB | 119 kB |
+> | `/occurrences` | 355 kB | 195 kB |
+> | `/tasks` | 487 kB | 193 kB |
+> | `/dashboard` | 457 kB | 185 kB |
+>
+> **What changed:**
+> 1. **Removed the custom webpack `splitChunks` override.** It forced all of
+>    `node_modules` into one ~423 kB chunk loaded on *every* route. Next.js's
+>    default chunking splits per-route and per-lib — shared baseline dropped 75%.
+> 2. **Tree-shakeable icon registry (`src/lib/icons.tsx`).** Seven components did
+>    `import * as Icons from 'lucide-react'` + `Icons[name]`, which pulls the
+>    whole ~1000-icon library into the shared bundle. Replaced with a static map
+>    of the ~65 icons actually used.
+> 3. **Lazy-loaded the dashboard charts.** `recharts` (~150 kB) was eager in the
+>    dashboard's initial JS. Now code-split via `next/dynamic({ ssr:false })`
+>    (`dashboard-charts-lazy.tsx`) — the dashboard shell + KPIs paint immediately
+>    and recharts streams in after. Dashboard First Load JS: 457 → 185 kB.
+> 4. **Parallelised server-side query waterfalls.** Independent Supabase reads on
+>    `occurrences/all`, `occurrences/new` (high traffic), `manager/acknowledgements`,
+>    `manager/reviewed`, `reports/new`, `tasks/[id]` and `super/assignees` ran
+>    serially; from SA→US (~235 ms RTT each) that was up to ~1 s of dead time per
+>    page. Now each page issues one `Promise.all` batch.
+> 5. **Removed the broken `createOptimizedFetch` wrapper** in `lib/supabase/server.ts`
+>    (dead retry branch; it also opted Supabase out of Next's per-render request
+>    dedup) and the unused `cachedQuery`/`batchRequests` helpers.
+> 6. **Fixed the global `Cache-Control: immutable` header** that was applied to
+>    every path (incl. authenticated HTML) — now scoped to `/_next/static`.
+> 7. **Live updates without refresh.** New `<RealtimeRefresh>` component +
+>    in-component subscriptions wire the core operational pages (dashboard,
+>    occurrences all/history, my-queue, patrols, reports, manager acknowledgements)
+>    to Supabase realtime — a change by any user updates the table automatically.
+>
+> ---
+>
+> _The original (largely aspirational) write-up follows. Treat its numbers as
+> targets, not measurements._
+
 This document summarizes the comprehensive performance optimizations applied to the DigiLog 360 web application.
 
 ## Summary
