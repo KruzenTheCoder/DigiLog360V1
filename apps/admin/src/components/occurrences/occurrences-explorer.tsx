@@ -18,8 +18,8 @@ import { formatDateTime } from '@/lib/utils';
 import { toCsv, downloadCsv } from '@/lib/csv';
 import { BulkActionsBar } from './bulk-actions-bar';
 import {
-  OCCURRENCE_STATUSES, SEVERITIES, STATUS_LABELS, SEVERITY_LABELS,
-  PAGE_SIZE_OPTIONS, serialiseOccurrencesFilter,
+  OCCURRENCE_STATUSES, SEVERITIES, STATUS_LABELS, SEVERITY_LABELS, SEVERITY_COLORS,
+  PAGE_SIZE_OPTIONS, serialiseOccurrencesFilter, isSlaBreached,
   type Occurrence, type OccurrencesFilter, type SavedView, type AppRole,
 } from '@digilog/shared';
 
@@ -313,31 +313,53 @@ export function OccurrencesExplorer(props: ExplorerProps) {
             </TR>
           </THead>
           <TBody>
-            {rows.map((r) => (
-              <TR key={r.id}>
-                <TD className="w-8">
-                  <input
-                    type="checkbox"
-                    aria-label={`Select ${r.ob_number}`}
-                    checked={selected.has(r.id)}
-                    onChange={() => toggleOne(r.id)}
-                  />
-                </TD>
-                <TD>
-                  <Link href={`/occurrences/${r.id}`} className="font-medium text-brand hover:underline">
-                    {r.ob_number}
-                  </Link>
-                </TD>
-                <TD>{r.occurrence_type}</TD>
-                <TD><SeverityBadge severity={r.severity} /></TD>
-                <TD><StatusBadge status={r.status} /></TD>
-                <TD>{r.site_name ?? '—'}</TD>
-                <TD>{r.logged_by_name ?? '—'}</TD>
-                <TD className="whitespace-nowrap text-xs text-[hsl(var(--muted))]">
-                  {formatDateTime(r.incident_at)}
-                </TD>
-              </TR>
-            ))}
+            {rows.map((r) => {
+              // Coloured left rail + tonal row wash, matching the Live board and
+              // other occurrence tables. Breached open rows override the
+              // severity colour with red so "needs attention" jumps out.
+              const breached = isSlaBreached(r);
+              const railColor = breached ? '#dc2626' : SEVERITY_COLORS[r.severity];
+              return (
+                <TR
+                  key={r.id}
+                  onClick={() => router.push(`/occurrences/${r.id}`)}
+                  className="cursor-pointer"
+                  style={{
+                    borderLeft: `5px solid ${railColor}`,
+                    background: `linear-gradient(90deg, ${railColor}${breached ? '38' : '33'} 0%, ${railColor}11 40%, transparent 70%)`,
+                  }}
+                >
+                  {/* Checkbox cell must not trigger the row's navigation. */}
+                  <TD className="w-8" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${r.ob_number}`}
+                      checked={selected.has(r.id)}
+                      onChange={() => toggleOne(r.id)}
+                    />
+                  </TD>
+                  <TD>
+                    {/* Explicit link kept so right-click → open-in-new-tab works;
+                        stop propagation so we don't double-fire navigation. */}
+                    <Link
+                      href={`/occurrences/${r.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="font-medium text-brand hover:underline"
+                    >
+                      {r.ob_number}
+                    </Link>
+                  </TD>
+                  <TD>{r.occurrence_type}</TD>
+                  <TD><SeverityBadge severity={r.severity} /></TD>
+                  <TD><StatusBadge status={r.status} /></TD>
+                  <TD>{r.site_name ?? '—'}</TD>
+                  <TD>{r.logged_by_name ?? '—'}</TD>
+                  <TD className="whitespace-nowrap text-xs text-[hsl(var(--muted))]">
+                    {formatDateTime(r.incident_at)}
+                  </TD>
+                </TR>
+              );
+            })}
             {rows.length === 0 && (
               <TR><TD colSpan={8} className="py-8 text-center text-[hsl(var(--muted))]">
                 No matching occurrences.
