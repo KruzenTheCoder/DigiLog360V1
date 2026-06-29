@@ -131,7 +131,11 @@ export function AppShell({
                     <Link
                       key={item.href}
                       href={item.href}
-                      prefetch={item.href.startsWith('/tasks') ? false : undefined}
+                      // Full prefetch (data included) so sidebar navigation is
+                      // instant — the always-visible sidebar is a small, fixed
+                      // set of links, so prefetching them is cheap. Tasks stays
+                      // skeleton-only (realtime + heavier).
+                      prefetch={item.href.startsWith('/tasks') ? false : true}
                       onClick={() => setOpen(false)}
                       className={cn(
                         'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',

@@ -16,11 +16,28 @@ import {
  * routes that gate behind capabilities.
  */
 
-/** Cached signed-in user (one network round-trip to Supabase Auth per render). */
+/**
+ * Cached signed-in user — read from the session cookie, NO network round-trip.
+ *
+ * Why `getSession()` and not `getUser()` here: the middleware
+ * (`lib/supabase/middleware.ts`) already calls `auth.getUser()` on every
+ * request, which cryptographically validates the JWT with the auth server and
+ * refreshes it if it's about to expire, writing fresh cookies for this request.
+ * By the time a page renders, the cookie is therefore already validated — so
+ * calling `getUser()` again here just repeats that ~235 ms US round-trip on
+ * every single page load (the main thing users saw as "skeleton for a while").
+ * `getSession()` reads the already-validated cookie locally instead.
+ *
+ * Security is preserved on two layers regardless: (1) the middleware validates
+ * every request before it reaches a page, and (2) Postgres RLS re-validates the
+ * JWT signature on every query, so a tampered token can never read data. We
+ * also still fetch the profile fresh below, so `is_active` / role changes are
+ * reflected immediately (no auth caching).
+ */
 const getCachedUser = cache(async () => {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  return data.user;
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user ?? null;
 });
 
 /** Cached profile fetch — selects only the columns the AppShell + auth helpers use. */
