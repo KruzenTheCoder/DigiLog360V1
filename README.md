@@ -35,6 +35,7 @@ npm run db:types
 npx supabase functions deploy `
   pin-login pin-set `
   admin-create-org admin-create-user admin-update-user `
+  admin-delete-org admin-delete-user `
   admin-api-token admin-role-capability `
   send-email webhook-deliver `
   patrol-watcher sla-monitor `
@@ -141,7 +142,9 @@ Examples of valid combinations:
 
 ### Capability matrix (super-user editable)
 
-47 built-in capability keys cover every feature the platform exposes. The
+Several dozen built-in capability keys (the registry grows as features land —
+e.g. `patrols.scan`, `occurrences.log_management_report`, `audit.view`, the
+mobile tab/duty keys) cover every feature the platform exposes. The
 super user opens **Super User → Permissions**, picks an organisation, and
 toggles a `role × capability` grid. The change takes effect immediately.
 
@@ -241,6 +244,7 @@ nav surfaces they can actually open.
                    │   ┌─ shifts  shift_handovers               │
                    │   ┌─ visitors  keys  key_handovers         │
                    │   ┌─ manager_acknowledgements              │
+                   │   ┌─ tasks  task_updates                   │
                    │   ┌─ saved_views  notifications            │
                    │   ┌─ audit_log  pin_attempts               │
                    │   ┌─ org_sla_overrides  org_occurrence_types │
@@ -261,6 +265,7 @@ nav surfaces they can actually open.
         │ (Next.js 15)     │  │  pin-login pin-set       │  │  (Expo / RN)   │
         │                  │  │  admin-create-org/user   │  │                │
         │  super_user      │  │  admin-update-user       │  │  guard         │
+        │                  │  │  admin-delete-org/user   │  │                │
         │  admin           │  │  admin-api-token         │  │  supervisor    │
         │  manager         │  │  admin-role-capability   │  │                │
         │  control_room    │  │  send-email              │  │  PIN-only      │
@@ -294,7 +299,8 @@ NewDigiLog/
 │   │   │   │   ├── history/    Closed + completed patrols
 │   │   │   │   └── [id]/       Detail: report, comments, assignment, updates
 │   │   │   ├── my-queue/       Assigned to me
-│   │   │   ├── manager/        Acknowledgement queue + reviewed logs
+│   │   │   ├── tasks/          Task board + task detail ([id])
+│   │   │   ├── manager/        Acknowledgement queue + reviewed logs + staff reports
 │   │   │   ├── patrols/        + schedules subroute
 │   │   │   ├── checkpoints/    QR/NFC/GPS checkpoint CRUD
 │   │   │   ├── team/           Team status
@@ -317,8 +323,12 @@ NewDigiLog/
 │   │   │   │   ├── api-tokens/ Personal access tokens
 │   │   │   │   └── audit/      Immutable action trail
 │   │   │   └── super/
-│   │   │       ├── organizations/ Cross-org tenant CRUD
-│   │   │       ├── users/      Cross-org user list
+│   │   │       ├── organizations/ Cross-org tenant CRUD (create + delete)
+│   │   │       ├── users/      Cross-org user list (org picker + delete)
+│   │   │       ├── assignees/  Assignment allow-list
+│   │   │       ├── branding/   Per-org parent-company logo toggle
+│   │   │       ├── form-builder/ Log-occurrence form section toggles
+│   │   │       ├── mobile-layout/ Mobile tab bar + home cards per role
 │   │   │       ├── health/     Platform health
 │   │   │       └── permissions/ Role × capability matrix editor
 │   │   ├── src/components/     UI primitives, page bodies
@@ -357,17 +367,24 @@ NewDigiLog/
 │                               schemas, sla, filters, capabilities, i18n
 │
 ├── supabase/
-│   ├── migrations/             14 incremental migrations (see §6)
-│   ├── functions/              12 edge functions (see §10)
+│   ├── migrations/             45 incremental migrations (see §6)
+│   ├── functions/              15 edge functions (see §10)
 │   ├── _deploy_all.sql         Single-file bundle for SQL editor paste
 │   ├── seed.sql                Demo sites + sample patrol route
 │   ├── schedule_sla_monitor.sql Sample pg_cron schedule for the SLA monitor
 │   └── config.toml
 │
-├── scripts/
-│   ├── seed-accounts.mjs       Bootstrap demo super user + org + roles
+├── scripts/                    Node maintenance scripts (run with --env-file=.env)
+│   ├── seed-accounts.mjs       Bootstrap super user + org + the full role line-up
 │   ├── seed-new.mjs            Import legacy AspNetUsers
-│   └── import-occurrences.mjs  Bulk import historical CSV
+│   ├── import-occurrences.mjs  Bulk import historical occurrences (CSV)
+│   ├── import-legacy-csv.mjs   Import a legacy CSV export
+│   ├── import-legacy-azure.mjs Import directly from a legacy Azure SQL BACPAC
+│   ├── backfill-audit.mjs      Reconstruct the audit log from historical records
+│   │                           (real timestamps, tagged backfilled, dry-run default)
+│   ├── fix-ob-sequence.mjs     Repair the OB-number sequence after a bulk import
+│   ├── build-mobile-icon.mjs   Generate the mobile app icon set
+│   └── verify-db-state.mjs / check-state.mjs / probe-rls-funcs.mjs  Diagnostics
 │
 ├── .github/workflows/ci.yml    Typecheck + build on PR
 ├── LICENSE                     Proprietary, governed by SA law
@@ -409,6 +426,32 @@ the bundled `_deploy_all.sql` can be re-run safely.
 | 20 | `20260603000012_voice_and_ocr.sql` | Private `occurrence-voice-notes` storage bucket |
 | 21 | `20260603000013_multi_role_profiles.sql` | `profiles.roles app_role[]`, sync trigger, array-based RLS helpers |
 | 22 | `20260603000014_capability_registry.sql` | `capabilities`, `role_capabilities`, `my_capabilities` view, `has_capability(text)` SQL helper |
+| 23 | `20260603000015_tasks.sql` | `tasks`, `task_updates` to-do tracker (assignment, realtime publication, audit triggers) |
+| 24 | `20260605000001_rename_org_to_pmi.sql` | Renames the seeded demo org to **PMI** (name + slug) |
+| 25 | `20260605000002_incident_taxonomy.sql` | Incident category taxonomy seed |
+| 26 | `20260605000003_org_types_taxonomy.sql` | Per-org occurrence-type taxonomy |
+| 27 | `20260605000004_org_categories_subcategories.sql` | Category → subcategory hierarchy for occurrence types |
+| 28 | `20260605000005_auto_generated_reports.sql` | Auto-create an `occurrence_reports` shell on occurrence logging |
+| 29 | `20260605000006_bulk_acknowledgement_group.sql` | `bulk_id` on `manager_acknowledgements` for one-click bulk sign-off |
+| 30 | `20260605000007_multi_site_assignment.sql` | `profiles.site_ids[]` — assign a user to multiple sites |
+| 31 | `20260610000001_add_patrols_scan_capability.sql` | Adds the `patrols.scan` capability key |
+| 32 | `20260625000001_management_report_capability.sql` | Adds the `occurrences.log_management_report` capability |
+| 33 | `20260626000001_org_show_netstream_logo.sql` | `organizations.show_netstream_logo` + `netstream_logo_url` |
+| 34 | `20260626000002_ob_seq_selfheal.sql` | OB-number sequence self-heal guard |
+| 35 | `20260626000003_job_title_and_operational_fields.sql` | `profiles.job_title` + operational profile fields |
+| 36 | `20260626000004_branding_storage.sql` | `org-branding` public storage bucket + policies |
+| 37 | `20260626000005_assignable_flag.sql` | `profiles.is_assignable` — assignment allow-list |
+| 38 | `20260626000006_log_form_config.sql` | `organizations.log_form_config` — form-builder section toggles |
+| 39 | `20260626000007_mobile_container_capabilities.sql` | Mobile home-container capability keys |
+| 40 | `20260626000007_occurrence_custom_fields.sql` | Per-org custom fields on occurrences |
+| 41 | `20260626000008_perf_composite_indexes.sql` | Composite indexes matching the apps' hot query paths |
+| 42 | `20260626000009_audit_log_capability_rls.sql` | `audit.view` capability + audit_log RLS tightening |
+| 43 | `20260626000009_mobile_duty_capability.sql` | Mobile on/off-duty capability |
+| 44 | `20260626000010_mobile_tab_capabilities.sql` | Per-role mobile tab-bar capability keys |
+| 45 | `20260626000010_occurrence_reports_all_areas_secure.sql` | Occurrence-report RLS hardening across all areas |
+
+> Migrations are forward-only and idempotent; `supabase/_deploy_all.sql` bundles
+> them for a single SQL-editor paste.
 
 ### Entity relationship (core)
 
@@ -565,6 +608,8 @@ Scheduled by `pg_cron` every 5 minutes. For each affected site:
 | `admin-create-user` | Create auth user + profile with roles[], optional PIN, optional employee# | admin OR super_user |
 | `admin-update-user` | Mutate profile fields + roles + PIN. Org admins can't reassign org | admin OR super_user |
 | `admin-create-org` | Super-user-only tenant provisioning with optional first-admin bootstrap | super_user |
+| `admin-delete-org` | Super-user-only tenant teardown — cascade-deletes all org data and removes the org's auth accounts (no orphans). Refuses to delete the caller's own org | super_user |
+| `admin-delete-user` | Delete a user (auth account + cascaded profile). super_user any; admin within own org (not super users, not self) | admin OR super_user |
 | `admin-api-token` | Mint / revoke org-scoped API tokens (SHA-256 stored hash, plaintext shown once) | admin OR super_user |
 | `admin-role-capability` | grant/revoke/bulk on `role_capabilities`, add/remove custom capability keys | super_user |
 | `send-email` | Resend wrapper; falls back to console log if `RESEND_API_KEY` unset | Internal key OR admin |
@@ -587,7 +632,14 @@ These tables stream change events over the `supabase_realtime` publication:
 
 `occurrences`, `occurrence_updates`, `occurrence_reports`, `patrols`,
 `checkpoint_scans`, `organizations`, `manager_acknowledgements`,
-`occurrence_comments`, `notifications`.
+`occurrence_comments`, `notifications`, `tasks`, `task_updates`.
+
+On the admin web, any server-rendered table can be made live by dropping in the
+reusable `<RealtimeRefresh tables={[…]} />` component: it subscribes to the
+listed tables and debounce-refreshes the page on any change (pausing while the
+tab is hidden). Client-cached pages (Reports, My Queue) subscribe directly and
+revalidate. This is what keeps the operational tables current without a manual
+refresh.
 
 Used by:
 
@@ -664,7 +716,15 @@ print route renders a polished page styled for A4 with auto-print on load.
 ### Manager
 
 - **Acknowledgements** — queue of un-acknowledged occurrences; modal lets the manager pick a decision (Acknowledge / Escalate / Reject) + notes; writes to `manager_acknowledgements`, mirrors status onto occurrence, drops a timeline update.
-- **Reviewed Logs** — historical decisions.
+- **Reviewed Logs** — historical decisions (bulk sign-offs collapse into one entry).
+- **Staff Reports** — per-role / per-person activity roll-up with CSV export.
+
+### Tasks
+
+Lightweight to-do tracker (`tasks` + `task_updates`). Create a task, optionally
+link it to an occurrence (OB), assign it to a user, and track status through an
+update thread. Realtime: assignees get a toast + the board self-updates. The
+detail page lives at `/tasks/[id]`.
 
 ### Field Operations
 
@@ -679,21 +739,25 @@ print route renders a polished page styled for A4 with auto-print on load.
 
 ### Administration
 
-- **Users** — table with role chips, multi-role checkbox dialog (rank-clamped), employee number, PIN reset, CSV export
-- **Sites** — CRUD per org
+- **Users** — table with role chips, multi-role checkbox dialog (rank-clamped), **multi-site assignment** (`site_ids[]`), job title, employee number, PIN reset, **delete** (not self; org admins can't delete super users), CSV export
+- **Sites** — CRUD per org. The super-user view adds an **Organisation column** and an org picker so a site can be assigned to any tenant
 - **Organisation** — branding, contact, plan (read-only for org admins)
 - **SLA Matrix** — per-severity override form, reset-to-default per row
-- **Occurrence Types** — register/disable custom types, default severity
+- **Occurrence Types** — register/disable custom types with a category → subcategory taxonomy, default severity, and optional per-type custom fields
 - **My Preferences** — per-user push/email/assignment/breach toggles
 - **Security (2FA)** — Supabase Auth TOTP enrollment with QR
 - **Webhooks** — register URL + events + secret; signed `X-DigiLog-Signature: hmac-sha256` deliveries; last_status badge
 - **API Tokens** — mint + revoke; shown plaintext once; SHA-256 hashed at rest; scopes list
-- **Audit Log** — color-coded action chips, actor name + role, target table#id, IP
+- **Audit Log** — color-coded action chips, actor name + role, target table#id, IP. Historical activity from before live logging (or from a legacy import) can be reconstructed from each record's real timestamp via `scripts/backfill-audit.mjs`; reconstructed rows are tagged `metadata.backfilled = true` so they stay distinguishable from live-captured entries and are reversible in one delete
 
 ### Super User
 
-- **Organisations** — table with per-tenant counts; new-org dialog with optional first-admin bootstrap
-- **All Users** — cross-org user list with per-org strip
+- **Organisations** — per-tenant counts; create (with optional first-admin bootstrap) and **delete** (type-to-confirm; cascades all org data and removes the org's auth accounts; can't delete the org you belong to)
+- **All Users (cross-org)** — every user across every tenant. Create a user **into a chosen organisation** (org picker; the assignable sites filter to that org), edit, reset PIN, and **delete**. Org membership is set explicitly per user — it is *not* derived from the site
+- **Assignment allow-list** — choose which profiles appear in the "Assign to" dropdown when logging an occurrence
+- **Branding** — toggle the parent-company (Netstream) logo per organisation
+- **Form Builder** — toggle which sections appear on the Log-Occurrence form per org
+- **Mobile Layout** — control the mobile tab bar and home cards shown per role
 - **Platform Health** — aggregate KPIs and recent activity across all tenants
 - **Permissions** — role × capability matrix editor (the entire point of the capability layer)
 
@@ -704,6 +768,11 @@ Self-service page anyone can open: roles held with primary chip, live capability
 ---
 
 ## 13. Mobile App — Surfaces & Workflows
+
+The mobile **tab bar and home cards are configurable per role** by the super
+user via **Super User → Mobile Layout** (backed by mobile-tab / mobile-duty /
+mobile-container capability keys), so each org can tailor what guards and
+supervisors see without a rebuild.
 
 ### Authentication — PIN only
 
@@ -950,6 +1019,19 @@ The features that distinguish DigiLog 360 from a demo:
 - ✅ GitHub Actions CI (typecheck + admin build)
 - ✅ Sentry opt-in error monitoring
 
+### Performance & scale
+
+The web console is tuned for South-African users hitting an EU-hosted Supabase
+project (see [`PERFORMANCE_OPTIMIZATIONS.md`](PERFORMANCE_OPTIMIZATIONS.md) for
+measured before/after numbers):
+
+- **Lean bundles** — Next.js default code-splitting (no catch-all vendor chunk) plus a tree-shakeable icon registry (`apps/admin/src/lib/icons.tsx`) hold shared First-Load JS at ~104 kB (down from ~426 kB). recharts, leaflet and tesseract.js are route-scoped / lazy-loaded.
+- **Parallel data fetching** — independent Supabase reads on heavy server pages run as one `Promise.all` batch instead of a serial SA→EU round-trip waterfall.
+- **One auth round-trip per navigation** — the middleware validates the JWT once per request; server components then read the already-validated session (no second network `getUser`). RLS still re-checks every query, so security is unchanged.
+- **Instant navigation** — the menu and sidebar fully prefetch destinations (data included), and the App-Router client cache (`staleTimes`) keeps revisits instant.
+- **Live, not polled** — `<RealtimeRefresh>` keeps operational tables current via Supabase realtime; no manual refresh.
+- **DB indexes** — composite indexes (`20260626000008_perf_composite_indexes.sql`) match the apps' hot query paths.
+
 ---
 
 ## 20. Deployment & Operations
@@ -976,6 +1058,7 @@ npm run db:types
 npx supabase functions deploy `
   pin-login pin-set `
   admin-create-org admin-create-user admin-update-user `
+  admin-delete-org admin-delete-user `
   admin-api-token admin-role-capability `
   send-email webhook-deliver `
   patrol-watcher sla-monitor `
