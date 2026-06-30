@@ -211,7 +211,7 @@ export default function AuditLogPage() {
       />
 
       {/* Filters */}
-      <Card className="mb-4 p-4">
+      <GradientSection title="Filters" icon="SlidersHorizontal" tone="slate" className="mb-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <Label className="flex items-center gap-2">
@@ -298,7 +298,7 @@ export default function AuditLogPage() {
             </Button>
           </div>
         </div>
-      </Card>
+      </GradientSection>
 
       <GradientSection title="Audit Trail" subtitle="Immutable record of sensitive actions" icon="ScrollText" tone="slate">
         <Table>

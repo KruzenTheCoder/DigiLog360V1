@@ -3,6 +3,7 @@ import { ArrowLeft, Radio, Footprints } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/page-header';
 import { HistoryOccurrences, type HistoryRow } from '@/components/occurrences/history-occurrences';
 import { CompletedPatrols } from '@/components/occurrences/completed-patrols';
 import { RealtimeRefresh } from '@/components/realtime/realtime-refresh';
@@ -43,26 +44,25 @@ export default async function HistoryPage() {
   return (
     <>
       <RealtimeRefresh tables={['occurrences', 'patrols', 'checkpoint_scans']} />
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">History — Closed Occurrences &amp; Completed Patrols</h1>
-          <p className="mt-1 text-sm text-[hsl(var(--muted))]">Resolved occurrences and completed patrols.</p>
-        </div>
-        <div className="flex gap-2">
-          {/* Jump anchor — instantly scrolls to the Completed Patrols section
-              further down the page so users don't have to scroll past every
-              closed occurrence first. */}
-          <a href="#completed-patrols">
-            <Button variant="secondary"><Footprints className="h-4 w-4" /> Jump to Patrols ({pat.length})</Button>
-          </a>
-          <Link href="/occurrences">
-            <Button variant="secondary"><Radio className="h-4 w-4" /> View Live Occurrences</Button>
-          </Link>
-          <Link href="/menu">
-            <Button variant="secondary"><ArrowLeft className="h-4 w-4" /> Back to Menu</Button>
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="History — Closed Occurrences & Completed Patrols"
+        description="Resolved occurrences and completed patrols."
+        action={
+          <div className="flex flex-wrap gap-2">
+            {/* Jump anchor — scrolls to the Completed Patrols section further
+                down so users don't have to scroll past every closed occurrence. */}
+            <a href="#completed-patrols">
+              <Button variant="secondary"><Footprints className="h-4 w-4" /> Jump to Patrols ({pat.length})</Button>
+            </a>
+            <Link href="/occurrences">
+              <Button variant="secondary"><Radio className="h-4 w-4" /> View Live Occurrences</Button>
+            </Link>
+            <Link href="/menu">
+              <Button variant="secondary"><ArrowLeft className="h-4 w-4" /> Back to Menu</Button>
+            </Link>
+          </div>
+        }
+      />
 
       <HistoryOccurrences rows={occ} />
 

@@ -7,7 +7,6 @@ import {
   Search, Download, ChevronLeft, ChevronRight, X, Bookmark,
   BookmarkPlus, Trash2, Loader2, Pin, Calendar,
 } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import { GradientSection } from '@/components/ui/gradient-section';
 import { Input, Select, Label } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -154,7 +153,7 @@ export function OccurrencesExplorer(props: ExplorerProps) {
       )}
 
       {/* ---------------- filter bar ---------------- */}
-      <Card className="mb-4 p-4">
+      <GradientSection title="Filters" icon="SlidersHorizontal" tone="slate" className="mb-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
           <div className="relative xl:col-span-2">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted))]" />
@@ -252,7 +251,7 @@ export function OccurrencesExplorer(props: ExplorerProps) {
             <BookmarkPlus className="h-4 w-4" /> Save view
           </Button>
         </div>
-      </Card>
+      </GradientSection>
 
       {/* ---------------- results count + actions ---------------- */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">

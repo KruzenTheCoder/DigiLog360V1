@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
 import { PageHeader } from '@/components/page-header';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { GradientSection } from '@/components/ui/gradient-section';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
 import { ImageGallery } from '@/components/occurrences/image-gallery';
 import { OccurrenceActions } from '@/components/occurrences/occurrence-actions';
@@ -60,8 +60,11 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
   // (critical = red, high = orange, medium = amber, low = blue): a top accent
   // "lip" + tinted card header, so the severity reads at a glance.
   const sevColor = SEVERITY_COLORS[o.severity];
-  const accentStripStyle = { background: `linear-gradient(90deg, ${sevColor}, ${sevColor}88)` };
-  const tintedHeaderStyle = { background: `${sevColor}14`, borderBottom: `1px solid ${sevColor}33` };
+  // Map the occurrence severity onto a GradientSection tone so every container
+  // header still reads the severity at a glance (and matches the Log Occurrence
+  // page's gradient-header + left-lip container styling).
+  const sevTone: 'red' | 'amber' | 'sky' =
+    o.severity === 'critical' ? 'red' : o.severity === 'low' ? 'sky' : 'amber';
 
   return (
     <>
@@ -89,36 +92,28 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
 
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
-          <Card className="overflow-hidden p-0">
-            {/* status accent strip */}
-            <div className="h-1.5 w-full" style={accentStripStyle} />
-            <CardHeader style={tintedHeaderStyle}>
-              <div className="flex items-center justify-between">
-                <CardTitle>Details</CardTitle>
-                <div className="flex gap-1"><SeverityBadge severity={o.severity} /><StatusBadge status={o.status} /></div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-5">
-              <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <Field label="Site" value={o.site_name} />
-                <Field label="Logged By" value={o.logged_by_name} />
-                <Field label="Incident" value={formatDateTime(o.incident_at)} />
-                <Field label="Logged" value={formatDateTime(o.created_at)} />
-                <Field label="SLA Due" value={formatDateTime(o.sla_due_at)} />
-                <Field label="Closed" value={formatDateTime(o.closed_at)} />
-              </dl>
-              <div className="mt-4">
-                <dt className="text-xs uppercase tracking-wide text-[hsl(var(--muted))]">Description</dt>
-                <dd className="mt-1 whitespace-pre-wrap text-sm">{o.description}</dd>
-              </div>
-            </CardContent>
-          </Card>
+          <GradientSection
+            title="Details"
+            icon="ClipboardList"
+            tone={sevTone}
+            actions={<div className="flex gap-1"><SeverityBadge severity={o.severity} /><StatusBadge status={o.status} /></div>}
+          >
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <Field label="Site" value={o.site_name} />
+              <Field label="Logged By" value={o.logged_by_name} />
+              <Field label="Incident" value={formatDateTime(o.incident_at)} />
+              <Field label="Logged" value={formatDateTime(o.created_at)} />
+              <Field label="SLA Due" value={formatDateTime(o.sla_due_at)} />
+              <Field label="Closed" value={formatDateTime(o.closed_at)} />
+            </dl>
+            <div className="mt-4">
+              <dt className="text-xs uppercase tracking-wide text-[hsl(var(--muted))]">Description</dt>
+              <dd className="mt-1 whitespace-pre-wrap text-sm">{o.description}</dd>
+            </div>
+          </GradientSection>
 
           {rep && (
-            <Card className="overflow-hidden p-0">
-              <div className="h-1.5 w-full" style={accentStripStyle} />
-              <CardHeader style={tintedHeaderStyle}><CardTitle>Occurrence Report</CardTitle></CardHeader>
-              <CardContent className="pt-5">
+            <GradientSection title="Occurrence Report" icon="FileText" tone={sevTone}>
                 <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   <Field label="Occurrence Type" value={rep.occurrence_type} />
                   <Field label="All Areas Secure" value={rep.all_areas_secure === null ? '—' : rep.all_areas_secure ? 'Yes' : 'No'} />
@@ -140,15 +135,12 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
                 </div>
                 {rep.immediate_actions && <div className="mt-3"><dt className="text-xs uppercase tracking-wide text-[hsl(var(--muted))]">Immediate Actions</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{rep.immediate_actions}</dd></div>}
                 {rep.next_steps && <div className="mt-3"><dt className="text-xs uppercase tracking-wide text-[hsl(var(--muted))]">Next Steps</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{rep.next_steps}</dd></div>}
-              </CardContent>
-            </Card>
+            </GradientSection>
           )}
 
-          <Card className="overflow-hidden p-0">
-            <div className="h-1.5 w-full" style={accentStripStyle} />
-            <CardHeader style={tintedHeaderStyle}><CardTitle>Photo Evidence</CardTitle></CardHeader>
-            <CardContent className="pt-5"><ImageGallery images={imgs} /></CardContent>
-          </Card>
+          <GradientSection title="Photo Evidence" icon="Images" tone={sevTone}>
+            <ImageGallery images={imgs} />
+          </GradientSection>
         </div>
 
         <div className="space-y-5">
@@ -161,10 +153,7 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
             assignables={assignables}
           />
 
-        <Card className="h-fit overflow-hidden p-0">
-          <div className="h-1.5 w-full" style={accentStripStyle} />
-          <CardHeader style={tintedHeaderStyle}><CardTitle>Update Timeline</CardTitle></CardHeader>
-          <CardContent className="pt-5">
+        <GradientSection title="Update Timeline" icon="History" tone={sevTone} className="h-fit">
             {upd.length === 0 ? (
               <p className="text-sm text-[hsl(var(--muted))]">No updates recorded yet.</p>
             ) : (
@@ -182,8 +171,7 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
                 ))}
               </ol>
             )}
-          </CardContent>
-        </Card>
+        </GradientSection>
 
         <CommentsThread
           occurrenceId={o.id}

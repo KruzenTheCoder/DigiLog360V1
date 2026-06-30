@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, Printer, Search, RotateCcw, FilePlus } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Select, Label } from '@/components/ui/input';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
@@ -50,7 +49,7 @@ export function ReportsTable({ reports }: { reports: OccurrenceReport[] }) {
   return (
     <>
       {/* Top filter bar — search + filter chips + create CTA */}
-      <Card className="mb-4 p-4">
+      <GradientSection title="Filters" icon="SlidersHorizontal" tone="slate" className="mb-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
             <Label className="text-xs">Search</Label>
@@ -93,7 +92,7 @@ export function ReportsTable({ reports }: { reports: OccurrenceReport[] }) {
             </Link>
           </div>
         </div>
-      </Card>
+      </GradientSection>
 
       {/* Results table — clickable rows + severity-tinted left rail */}
       <GradientSection title="Occurrence Reports" subtitle="View, filter or export to PDF" icon="FileText" tone="brand">

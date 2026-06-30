@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
+import { GradientSection } from '@/components/ui/gradient-section';
 import { Button } from '@/components/ui/button';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
 import { UpdateOccurrenceDialog } from './update-dialog';
@@ -119,7 +120,7 @@ export function LiveBoard({ initial, profile }: { initial: LiveOccurrence[]; pro
       </div>
 
       {/* Filter bar */}
-      <Card className="mb-5 p-4">
+      <GradientSection title="Filters" icon="SlidersHorizontal" tone="slate" className="mb-5">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           <FilterSelect label="Severity" value={severity} onChange={setSeverity}
             options={SEVERITIES.map((s) => ({ value: s, label: SEVERITY_LABELS[s] }))} />
@@ -137,7 +138,7 @@ export function LiveBoard({ initial, profile }: { initial: LiveOccurrence[]; pro
             </Button>
           </div>
         </div>
-      </Card>
+      </GradientSection>
 
       {/* Active occurrences table */}
       <Card className="overflow-hidden p-0">

@@ -88,38 +88,45 @@ export function TasksBoard({
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          {SCOPES.map((s) => (
-            <button
-              key={s.key}
-              onClick={() => setScope(s.key)}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium ${scope === s.key ? 'bg-brand text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'}`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Text search across title / description / assignee / OB. */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted))]" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search title, assignee, OB…"
-              className="w-56 pl-9"
-            />
+      <GradientSection
+        title="Filters"
+        icon="SlidersHorizontal"
+        tone="slate"
+        className="mb-4"
+        actions={<Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> New task</Button>}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            {SCOPES.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setScope(s.key)}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium ${scope === s.key ? 'bg-brand text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'}`}
+              >
+                {s.label}
+              </button>
+            ))}
           </div>
-          <Filter className="h-4 w-4 text-[hsl(var(--muted))]" />
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'open_only' | 'all')}>
-            <option value="open_only">Open (default)</option>
-            {TASK_STATUSES.map((s) => <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>)}
-            <option value="all">All</option>
-          </Select>
-          <Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> New task</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Text search across title / description / assignee / OB. */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted))]" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search title, assignee, OB…"
+                className="w-56 pl-9"
+              />
+            </div>
+            <Filter className="h-4 w-4 text-[hsl(var(--muted))]" />
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'open_only' | 'all')}>
+              <option value="open_only">Open (default)</option>
+              {TASK_STATUSES.map((s) => <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>)}
+              <option value="all">All</option>
+            </Select>
+          </div>
         </div>
-      </div>
+      </GradientSection>
 
       {overdue.length > 0 && (
         <Card className="mb-4 border-red-300 bg-red-50/50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">

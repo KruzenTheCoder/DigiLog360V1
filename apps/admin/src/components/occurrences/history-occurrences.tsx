@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RotateCcw } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import { GradientSection } from '@/components/ui/gradient-section';
 import { Button } from '@/components/ui/button';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { usePagedRows, Pager } from '@/components/ui/pager';
 import { SEVERITIES, SEVERITY_COLORS, SEVERITY_LABELS, type OccurrenceStatus, type SeverityLevel } from '@digilog/shared';
 
@@ -69,8 +69,7 @@ export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
 
   return (
     <>
-      <Card className="mb-5 p-4">
-        <p className="mb-3 text-sm font-semibold">Filter Closed Occurrences</p>
+      <GradientSection title="Filter Closed Occurrences" icon="SlidersHorizontal" tone="slate" className="mb-5">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           <div>
             <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted))]">Logged date</label>
@@ -90,7 +89,7 @@ export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
             </Button>
           </div>
         </div>
-      </Card>
+      </GradientSection>
 
       <GradientSection
         title="Closed / Resolved Occurrences"
@@ -98,34 +97,33 @@ export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
         tone="slate"
         actions={<span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold">{filtered.length.toLocaleString()}</span>}
       >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-sm">
-            <thead>
-              <tr className="bg-brand-gradient text-left text-[11px] font-semibold uppercase tracking-wide text-white">
-                <th className="px-4 py-2.5">OB No.</th>
-                <th className="px-4 py-2.5">Logged Date</th>
-                <th className="px-4 py-2.5">Closed Date</th>
-                <th className="px-4 py-2.5">Type</th>
-                <th className="px-4 py-2.5">Severity</th>
-                <th className="px-4 py-2.5">Guard / Site</th>
-                <th className="px-4 py-2.5">Status</th>
-                <th className="px-4 py-2.5">Description</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[hsl(var(--border))]">
-              {pg.pageRows.map((r) => {
-                const railColor = SEVERITY_COLORS[r.severity];
-                return (
-                <tr
+        <Table className="min-w-[980px]">
+          <THead>
+            <TR>
+              <TH>OB No.</TH>
+              <TH>Logged Date</TH>
+              <TH>Closed Date</TH>
+              <TH>Type</TH>
+              <TH>Severity</TH>
+              <TH>Guard / Site</TH>
+              <TH>Status</TH>
+              <TH>Description</TH>
+            </TR>
+          </THead>
+          <TBody>
+            {pg.pageRows.map((r) => {
+              const railColor = SEVERITY_COLORS[r.severity];
+              return (
+                <TR
                   key={r.id}
                   onClick={() => router.push(`/occurrences/${r.id}`)}
-                  className="cursor-pointer transition hover:brightness-[0.99]"
+                  className="cursor-pointer"
                   style={{
                     borderLeft: `5px solid ${railColor}`,
                     background: `linear-gradient(90deg, ${railColor}33 0%, ${railColor}14 100%)`,
                   }}
                 >
-                  <td className="whitespace-nowrap px-4 py-3">
+                  <TD className="whitespace-nowrap">
                     <Link
                       href={`/occurrences/${r.id}`}
                       onClick={(e) => e.stopPropagation()}
@@ -133,32 +131,31 @@ export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
                     >
                       {r.ob_number ?? '—'}
                     </Link>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-xs text-[hsl(var(--muted))]">{fmt(r.incident_at)}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-xs text-[hsl(var(--muted))]">{fmt(r.closed_at)}</td>
-                  <td className="whitespace-nowrap px-4 py-3">{r.occurrence_type}</td>
-                  <td className="px-4 py-3"><SeverityBadge severity={r.severity} /></td>
-                  <td className="px-4 py-3 text-xs">
+                  </TD>
+                  <TD className="whitespace-nowrap text-xs text-[hsl(var(--muted))]">{fmt(r.incident_at)}</TD>
+                  <TD className="whitespace-nowrap text-xs text-[hsl(var(--muted))]">{fmt(r.closed_at)}</TD>
+                  <TD className="whitespace-nowrap">{r.occurrence_type}</TD>
+                  <TD><SeverityBadge severity={r.severity} /></TD>
+                  <TD className="text-xs">
                     <span className="text-[hsl(var(--foreground))]">{r.logged_by_name ?? '—'}</span>
                     <span className="text-[hsl(var(--muted))]"> / {r.site_name ?? '—'}</span>
-                  </td>
-                  <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
-                  <td className="max-w-[320px] truncate px-4 py-3 text-[hsl(var(--muted))]" title={r.description ?? ''}>
+                  </TD>
+                  <TD><StatusBadge status={r.status} /></TD>
+                  <TD className="max-w-[320px] truncate text-[hsl(var(--muted))]" title={r.description ?? ''}>
                     {r.description ?? '—'}
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               );
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-[hsl(var(--muted))]">
-                    {rows.length === 0 ? 'No closed occurrences.' : 'No occurrences match the current filters.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            })}
+            {filtered.length === 0 && (
+              <TR>
+                <TD colSpan={8} className="py-10 text-center text-[hsl(var(--muted))]">
+                  {rows.length === 0 ? 'No closed occurrences.' : 'No occurrences match the current filters.'}
+                </TD>
+              </TR>
+            )}
+          </TBody>
+        </Table>
         <Pager {...pg} />
       </GradientSection>
     </>
