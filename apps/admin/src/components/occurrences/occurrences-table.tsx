@@ -106,7 +106,7 @@ export function OccurrencesTable({ rows }: { rows: Occurrence[] }) {
                 // fight the rest of the page. Hover layer still applies on top.
                 style={{
                   borderLeft: `5px solid ${railColor}`,
-                  background: `linear-gradient(90deg, ${railColor}${breached ? '38' : '33'} 0%, ${railColor}11 40%, transparent 70%)`,
+                  background: `linear-gradient(90deg, ${railColor}${breached ? '40' : '33'} 0%, ${railColor}${breached ? '1f' : '14'} 100%)`,
                 }}
               >
                 <TD>

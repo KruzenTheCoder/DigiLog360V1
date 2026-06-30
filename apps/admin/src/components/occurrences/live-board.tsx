@@ -189,7 +189,7 @@ export function LiveBoard({ initial, profile }: { initial: LiveOccurrence[]; pro
                       borderLeft: `5px solid ${railColor}`,
                       // Tonal wash in the row colour — stronger for breached/due
                       // so they read instantly even on white backgrounds.
-                      background: `linear-gradient(90deg, ${railColor}${(o.is_sla_breached || o.is_sla_update_due) ? '38' : '2a'} 0%, ${railColor}12 45%, transparent 78%)`,
+                      background: `linear-gradient(90deg, ${railColor}${(o.is_sla_breached || o.is_sla_update_due) ? '40' : '33'} 0%, ${railColor}${(o.is_sla_breached || o.is_sla_update_due) ? '1f' : '14'} 100%)`,
                     }}
                   >
                     <td className="whitespace-nowrap px-4 py-3">

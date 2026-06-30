@@ -63,7 +63,7 @@ export function MyQueueClient({ userId }: { userId: string }) {
                 className="cursor-pointer"
                 style={{
                   borderLeft: `5px solid ${railColor}`,
-                  background: `linear-gradient(90deg, ${railColor}${breached ? '38' : '2a'} 0%, ${railColor}11 40%, transparent 72%)`,
+                  background: `linear-gradient(90deg, ${railColor}${breached ? '40' : '33'} 0%, ${railColor}${breached ? '1f' : '14'} 100%)`,
                 }}
               >
                 <TD><Link href={`/occurrences/${r.id}`} onClick={(e) => e.stopPropagation()} className="font-medium text-brand hover:underline">{r.ob_number}</Link></TD>

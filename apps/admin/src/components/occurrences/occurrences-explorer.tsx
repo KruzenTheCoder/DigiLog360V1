@@ -326,7 +326,7 @@ export function OccurrencesExplorer(props: ExplorerProps) {
                   className="cursor-pointer"
                   style={{
                     borderLeft: `5px solid ${railColor}`,
-                    background: `linear-gradient(90deg, ${railColor}${breached ? '38' : '33'} 0%, ${railColor}11 40%, transparent 70%)`,
+                    background: `linear-gradient(90deg, ${railColor}${breached ? '40' : '33'} 0%, ${railColor}${breached ? '1f' : '14'} 100%)`,
                   }}
                 >
                   {/* Checkbox cell must not trigger the row's navigation. */}

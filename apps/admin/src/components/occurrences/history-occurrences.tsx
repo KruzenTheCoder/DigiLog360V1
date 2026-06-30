@@ -112,7 +112,7 @@ export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
                   className="cursor-pointer transition hover:brightness-[0.99]"
                   style={{
                     borderLeft: `5px solid ${railColor}`,
-                    background: `linear-gradient(90deg, ${railColor}2a 0%, ${railColor}11 40%, transparent 72%)`,
+                    background: `linear-gradient(90deg, ${railColor}33 0%, ${railColor}14 100%)`,
                   }}
                 >
                   <td className="whitespace-nowrap px-4 py-3">

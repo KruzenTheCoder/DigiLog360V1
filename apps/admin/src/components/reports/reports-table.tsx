@@ -103,7 +103,7 @@ export function ReportsTable({ reports }: { reports: OccurrenceReport[] }) {
                   className="cursor-pointer"
                   style={{
                     borderLeft: `5px solid ${sevColor}`,
-                    background: `linear-gradient(90deg, ${sevColor}33 0%, ${sevColor}11 40%, transparent 70%)`,
+                    background: `linear-gradient(90deg, ${sevColor}33 0%, ${sevColor}14 100%)`,
                   }}
                 >
                   <TD>
