@@ -11,6 +11,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Input, Select, Textarea, Label } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { usePagedRows, Pager } from '@/components/ui/pager';
 import { formatDateTime } from '@/lib/utils';
 import {
   TASK_STATUSES, TASK_STATUS_LABELS, TASK_STATUS_COLORS,
@@ -78,6 +79,12 @@ export function TasksBoard({
   const now = Date.now();
   const overdue = filtered.filter((t) => t.due_at && new Date(t.due_at).getTime() < now && t.status !== 'done' && t.status !== 'cancelled');
 
+  const pg = usePagedRows(filtered, 50);
+  useEffect(() => {
+    pg.setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, q, scope]);
+
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -131,12 +138,22 @@ export function TasksBoard({
             </TR>
           </THead>
           <TBody>
-            {filtered.map((t) => {
+            {pg.pageRows.map((t) => {
               const isOverdue = t.due_at && new Date(t.due_at).getTime() < now && t.status !== 'done' && t.status !== 'cancelled';
+              // Priority-coloured rail; overdue rows override to red so they jump out.
+              const railColor = isOverdue ? '#dc2626' : TASK_PRIORITY_COLORS[t.priority];
               return (
-                <TR key={t.id}>
+                <TR
+                  key={t.id}
+                  onClick={() => router.push(`/tasks/${t.id}`)}
+                  className="cursor-pointer"
+                  style={{
+                    borderLeft: `5px solid ${railColor}`,
+                    background: `linear-gradient(90deg, ${railColor}${isOverdue ? '40' : '33'} 0%, ${railColor}${isOverdue ? '1f' : '14'} 100%)`,
+                  }}
+                >
                   <TD>
-                    <Link href={`/tasks/${t.id}`} prefetch={false} className="font-medium text-brand hover:underline">
+                    <Link href={`/tasks/${t.id}`} prefetch={false} onClick={(e) => e.stopPropagation()} className="font-medium text-brand hover:underline">
                       {t.title}
                     </Link>
                     {t.description && <p className="line-clamp-1 text-xs text-[hsl(var(--muted))]">{t.description}</p>}
@@ -149,7 +166,7 @@ export function TasksBoard({
                   </TD>
                   <TD>
                     {t.ob_number ? (
-                      <Link href={`/occurrences/${t.occurrence_id}`} className="text-xs text-brand hover:underline">
+                      <Link href={`/occurrences/${t.occurrence_id}`} onClick={(e) => e.stopPropagation()} className="text-xs text-brand hover:underline">
                         {t.ob_number}
                       </Link>
                     ) : '—'}
@@ -165,6 +182,7 @@ export function TasksBoard({
             )}
           </TBody>
         </Table>
+        <Pager {...pg} />
       </Card>
 
       <NewTaskDialog

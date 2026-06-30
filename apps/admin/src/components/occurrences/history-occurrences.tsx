@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RotateCcw } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
+import { usePagedRows, Pager } from '@/components/ui/pager';
 import { SEVERITIES, SEVERITY_COLORS, SEVERITY_LABELS, type OccurrenceStatus, type SeverityLevel } from '@digilog/shared';
 
 export interface HistoryRow {
@@ -59,6 +60,12 @@ export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
   const anyFilter = !!date || guard !== 'all' || site !== 'all' || type !== 'all' || severity !== 'all';
   const reset = () => { setDate(''); setGuard('all'); setSite('all'); setType('all'); setSeverity('all'); };
 
+  const pg = usePagedRows(filtered, 50);
+  useEffect(() => {
+    pg.setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, guard, site, type, severity]);
+
   return (
     <>
       <Card className="mb-5 p-4">
@@ -103,7 +110,7 @@ export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-[hsl(var(--border))]">
-              {filtered.map((r) => {
+              {pg.pageRows.map((r) => {
                 const railColor = SEVERITY_COLORS[r.severity];
                 return (
                 <tr
@@ -148,6 +155,9 @@ export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="px-4 pb-3">
+          <Pager {...pg} />
         </div>
       </Card>
     </>

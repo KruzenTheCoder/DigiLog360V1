@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, Printer, Search, RotateCcw, FilePlus } from 'lucide-react';
@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Select, Label } from '@/components/ui/input';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { usePagedRows, Pager } from '@/components/ui/pager';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
 import { formatDateTime } from '@/lib/utils';
 import {
@@ -38,6 +39,12 @@ export function ReportsTable({ reports }: { reports: OccurrenceReport[] }) {
 
   const anyFilter = !!q || !!severity || !!status || !!date;
   const reset = () => { setQ(''); setSeverity(''); setStatus(''); setDate(''); };
+
+  const pg = usePagedRows(filtered, 50);
+  useEffect(() => {
+    pg.setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, severity, status, date]);
 
   return (
     <>
@@ -94,7 +101,7 @@ export function ReportsTable({ reports }: { reports: OccurrenceReport[] }) {
             <TR><TH>OB #</TH><TH>Type</TH><TH>Severity</TH><TH>Status</TH><TH>Created By</TH><TH>Created</TH><TH /></TR>
           </THead>
           <TBody>
-            {filtered.map((r) => {
+            {pg.pageRows.map((r) => {
               const sevColor = r.severity ? SEVERITY_COLORS[r.severity] : '#94a3b8';
               return (
                 <TR
@@ -140,6 +147,9 @@ export function ReportsTable({ reports }: { reports: OccurrenceReport[] }) {
             )}
           </TBody>
         </Table>
+        <div className="p-3">
+          <Pager {...pg} />
+        </div>
       </Card>
     </>
   );

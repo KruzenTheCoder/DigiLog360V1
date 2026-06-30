@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useCachedQuery } from '@/lib/use-cached-query';
 import { Card } from '@/components/ui/card';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { usePagedRows, Pager } from '@/components/ui/pager';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
 import { formatDateTime } from '@/lib/utils';
 import { SEVERITY_COLORS, isSlaBreached, type Occurrence } from '@digilog/shared';
@@ -41,10 +42,12 @@ export function MyQueueClient({ userId }: { userId: string }) {
     return () => { sb.removeChannel(channel); };
   }, [userId, refresh]);
 
+  const rows = data ?? [];
+  const pg = usePagedRows(rows, 50);
+
   if (loading && !data) {
     return <div className="h-96 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-slate-800/60" />;
   }
-  const rows = data ?? [];
 
   return (
     <Card className="overflow-hidden p-0">
@@ -53,7 +56,7 @@ export function MyQueueClient({ userId }: { userId: string }) {
           <TH>OB #</TH><TH>Type</TH><TH>Severity</TH><TH>Status</TH><TH>Site</TH><TH>Incident</TH>
         </TR></THead>
         <TBody>
-          {rows.map((r) => {
+          {pg.pageRows.map((r) => {
             const breached = isSlaBreached(r);
             const railColor = breached ? '#dc2626' : SEVERITY_COLORS[r.severity];
             return (
@@ -82,6 +85,9 @@ export function MyQueueClient({ userId }: { userId: string }) {
           )}
         </TBody>
       </Table>
+      <div className="p-3">
+        <Pager {...pg} />
+      </div>
     </Card>
   );
 }

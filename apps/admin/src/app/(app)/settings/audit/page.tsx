@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { usePagedRows, Pager } from '@/components/ui/pager';
 import { ROLE_LABELS, type AppRole } from '@digilog/shared';
 import { formatDateTime } from '@/lib/utils';
 
@@ -99,7 +100,9 @@ export default function AuditLogPage() {
       while (true) {
         const { data, error } = await (supabase as any)
           .from('audit_log')
-          .select('*')
+          // Lean column set — the heavy `metadata` jsonb isn't shown in the
+          // table, and skipping it keeps the (potentially 10k+ row) payload small.
+          .select('id, created_at, action, actor_id, actor_name, actor_role, summary, target_table, target_id, ip_address')
           .order('created_at', { ascending: false })
           .range(from, from + AUDIT_BATCH_SIZE - 1);
 
@@ -155,6 +158,15 @@ export default function AuditLogPage() {
       return true;
     });
   }, [rows, search, actionFilter, actorFilter, dateFrom, dateTo]);
+
+  // Paginate the filtered set so the DOM only ever holds one page (renders fast
+  // even with 10k+ rows loaded).
+  const pg = usePagedRows(filteredRows, 50);
+  // Jump back to page 1 whenever a filter changes.
+  useEffect(() => {
+    pg.setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, actionFilter, actorFilter, dateFrom, dateTo]);
 
   // Clear all filters
   function clearFilters() {
@@ -305,8 +317,16 @@ export default function AuditLogPage() {
                 Loading audit log…
               </TD></TR>
             )}
-            {filteredRows.map((r) => (
-              <TR key={r.id}>
+            {pg.pageRows.map((r) => {
+              const c = colorFor(r.action);
+              return (
+              <TR
+                key={r.id}
+                style={{
+                  borderLeft: `5px solid ${c}`,
+                  background: `linear-gradient(90deg, ${c}33 0%, ${c}14 100%)`,
+                }}
+              >
                 <TD className="whitespace-nowrap text-xs text-muted-foreground">
                   {formatDateTime(r.created_at)}
                 </TD>
@@ -327,7 +347,8 @@ export default function AuditLogPage() {
                 </TD>
                 <TD className="font-mono text-xs">{r.ip_address ?? '—'}</TD>
               </TR>
-            ))}
+              );
+            })}
             {!loading && filteredRows.length === 0 && (
               <TR><TD colSpan={6} className="py-8 text-center text-muted-foreground">
                 No audit events recorded.
@@ -335,6 +356,7 @@ export default function AuditLogPage() {
             )}
           </TBody>
         </Table>
+        <Pager {...pg} />
       </Card>
     </>
   );
