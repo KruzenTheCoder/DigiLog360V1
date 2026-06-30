@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { ArrowLeft, Radio, Footprints } from 'lucide-react';
+import { ArrowLeft, Radio } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/page-header';
-import { HistoryOccurrences, type HistoryRow } from '@/components/occurrences/history-occurrences';
-import { CompletedPatrols } from '@/components/occurrences/completed-patrols';
+import { type HistoryRow } from '@/components/occurrences/history-occurrences';
+import { HistoryTabs } from '@/components/occurrences/history-tabs';
 import { RealtimeRefresh } from '@/components/realtime/realtime-refresh';
 import type { PatrolDetailed } from '@digilog/shared';
 
@@ -49,11 +49,6 @@ export default async function HistoryPage() {
         description="Resolved occurrences and completed patrols."
         action={
           <div className="flex flex-wrap gap-2">
-            {/* Jump anchor — scrolls to the Completed Patrols section further
-                down so users don't have to scroll past every closed occurrence. */}
-            <a href="#completed-patrols">
-              <Button variant="secondary"><Footprints className="h-4 w-4" /> Jump to Patrols ({pat.length})</Button>
-            </a>
             <Link href="/occurrences">
               <Button variant="secondary"><Radio className="h-4 w-4" /> View Live Occurrences</Button>
             </Link>
@@ -64,11 +59,7 @@ export default async function HistoryPage() {
         }
       />
 
-      <HistoryOccurrences rows={occ} />
-
-      <div className="mt-5">
-        <CompletedPatrols patrols={pat} />
-      </div>
+      <HistoryTabs occ={occ} pat={pat} />
     </>
   );
 }

@@ -8,9 +8,12 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-brand-gradient text-white shadow-sm hover:opacity-90',
-        secondary: 'border bg-[hsl(var(--surface))] hover:bg-slate-50 dark:hover:bg-slate-800',
+        // Explicit text colour so the button stays legible even inside a
+        // coloured/`text-white` parent (e.g. the PageHeader banner) — without it
+        // the button inherits white text on a white surface and disappears.
+        secondary: 'border bg-[hsl(var(--surface))] text-[hsl(var(--foreground))] hover:bg-slate-50 dark:hover:bg-slate-800',
         destructive: 'bg-red-600 text-white hover:bg-red-700',
-        ghost: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+        ghost: 'text-[hsl(var(--foreground))] hover:bg-slate-100 dark:hover:bg-slate-800',
         outline: 'border border-brand text-brand hover:bg-brand/10',
       },
       size: {
