@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RotateCcw } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { GradientSection } from '@/components/ui/gradient-section';
 import { Button } from '@/components/ui/button';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
 import { usePagedRows, Pager } from '@/components/ui/pager';
@@ -91,10 +92,12 @@ export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
         </div>
       </Card>
 
-      <Card className="overflow-hidden p-0">
-        <div className="px-4 py-3 text-sm font-semibold">
-          Closed / Resolved Occurrences <span className="text-[hsl(var(--muted))]">({filtered.length})</span>
-        </div>
+      <GradientSection
+        title="Closed / Resolved Occurrences"
+        icon="Archive"
+        tone="slate"
+        actions={<span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold">{filtered.length.toLocaleString()}</span>}
+      >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-sm">
             <thead>
@@ -156,10 +159,8 @@ export function HistoryOccurrences({ rows }: { rows: HistoryRow[] }) {
             </tbody>
           </table>
         </div>
-        <div className="px-4 pb-3">
-          <Pager {...pg} />
-        </div>
-      </Card>
+        <Pager {...pg} />
+      </GradientSection>
     </>
   );
 }

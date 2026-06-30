@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useCachedQuery } from '@/lib/use-cached-query';
-import { Card } from '@/components/ui/card';
+import { GradientSection } from '@/components/ui/gradient-section';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { usePagedRows, Pager } from '@/components/ui/pager';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
@@ -50,7 +50,7 @@ export function MyQueueClient({ userId }: { userId: string }) {
   }
 
   return (
-    <Card className="overflow-hidden p-0">
+    <GradientSection title="Assigned to Me" subtitle="Open occurrences assigned to you" icon="Inbox" tone="sky">
       <Table>
         <THead><TR>
           <TH>OB #</TH><TH>Type</TH><TH>Severity</TH><TH>Status</TH><TH>Site</TH><TH>Incident</TH>
@@ -85,9 +85,7 @@ export function MyQueueClient({ userId }: { userId: string }) {
           )}
         </TBody>
       </Table>
-      <div className="p-3">
-        <Pager {...pg} />
-      </div>
-    </Card>
+      <Pager {...pg} />
+    </GradientSection>
   );
 }

@@ -6,6 +6,7 @@ import { Download, Search, Calendar, User, Filter, RotateCcw, X } from 'lucide-r
 import { createClient } from '@/lib/supabase/client';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { GradientSection } from '@/components/ui/gradient-section';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
@@ -299,7 +300,7 @@ export default function AuditLogPage() {
         </div>
       </Card>
 
-      <Card className="p-4">
+      <GradientSection title="Audit Trail" subtitle="Immutable record of sensitive actions" icon="ScrollText" tone="slate">
         <Table>
           <THead>
             <TR>
@@ -357,7 +358,7 @@ export default function AuditLogPage() {
           </TBody>
         </Table>
         <Pager {...pg} />
-      </Card>
+      </GradientSection>
     </>
   );
 }

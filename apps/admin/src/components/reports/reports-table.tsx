@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Select, Label } from '@/components/ui/input';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { GradientSection } from '@/components/ui/gradient-section';
 import { usePagedRows, Pager } from '@/components/ui/pager';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
 import { formatDateTime } from '@/lib/utils';
@@ -95,7 +96,7 @@ export function ReportsTable({ reports }: { reports: OccurrenceReport[] }) {
       </Card>
 
       {/* Results table — clickable rows + severity-tinted left rail */}
-      <Card className="overflow-hidden p-0">
+      <GradientSection title="Occurrence Reports" subtitle="View, filter or export to PDF" icon="FileText" tone="brand">
         <Table>
           <THead>
             <TR><TH>OB #</TH><TH>Type</TH><TH>Severity</TH><TH>Status</TH><TH>Created By</TH><TH>Created</TH><TH /></TR>
@@ -147,10 +148,8 @@ export function ReportsTable({ reports }: { reports: OccurrenceReport[] }) {
             )}
           </TBody>
         </Table>
-        <div className="p-3">
-          <Pager {...pg} />
-        </div>
-      </Card>
+        <Pager {...pg} />
+      </GradientSection>
     </>
   );
 }

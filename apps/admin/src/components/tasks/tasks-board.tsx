@@ -11,6 +11,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Input, Select, Textarea, Label } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { GradientSection } from '@/components/ui/gradient-section';
 import { usePagedRows, Pager } from '@/components/ui/pager';
 import { formatDateTime } from '@/lib/utils';
 import {
@@ -129,7 +130,7 @@ export function TasksBoard({
         </Card>
       )}
 
-      <Card className="p-4">
+      <GradientSection title="Tasks" subtitle="Assignments and to-dos across the team" icon="CheckSquare" tone="violet">
         <Table>
           <THead>
             <TR>
@@ -183,7 +184,7 @@ export function TasksBoard({
           </TBody>
         </Table>
         <Pager {...pg} />
-      </Card>
+      </GradientSection>
 
       <NewTaskDialog
         open={addOpen}

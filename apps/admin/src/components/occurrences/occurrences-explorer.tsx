@@ -8,6 +8,7 @@ import {
   BookmarkPlus, Trash2, Loader2, Pin, Calendar,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { GradientSection } from '@/components/ui/gradient-section';
 import { Input, Select, Label } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -296,7 +297,7 @@ export function OccurrencesExplorer(props: ExplorerProps) {
       </div>
 
       {/* ---------------- table ---------------- */}
-      <Card className="p-4">
+      <GradientSection title="Occurrence Book" subtitle="Search, filter and export the full log" icon="ClipboardList" tone="brand">
         <Table>
           <THead>
             <TR>
@@ -367,7 +368,7 @@ export function OccurrencesExplorer(props: ExplorerProps) {
             )}
           </TBody>
         </Table>
-      </Card>
+      </GradientSection>
 
       {/* ---------------- pagination ---------------- */}
       <div className="mt-4 flex items-center justify-between gap-3">
