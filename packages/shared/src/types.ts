@@ -36,6 +36,10 @@ export type Profile = Omit<WithOrg<T['profiles']['Row']>, 'role'> & {
   pin_hash: string | null;
   pin_set_at: string | null;
   last_pin_login_at: string | null;
+  /** Per-user override: shows the "Management Reports" option on the Log
+   *  Occurrence form even if the user's role lacks the capability. Managed at
+   *  /super/management-reports. */
+  can_log_management_report: boolean;
 };
 export type Occurrence = WithOrg<T['occurrences']['Row']>;
 export type OccurrenceInsert = T['occurrences']['Insert'] & { org_id?: string };

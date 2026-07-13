@@ -53,6 +53,7 @@ const DESCRIPTIONS: Record<string, string> = {
   '/super/branding': 'Toggle the parent-company logo per organisation.',
   '/super/mobile-layout': 'Control the mobile bottom bar and home cards per role.',
   '/super/assignees': 'Choose who appears in the Assign-to dropdown.',
+  '/super/management-reports': 'Choose who can log Management Reports.',
   '/super/form-builder': 'Toggle which sections show on the Log Occurrence form.',
 };
 

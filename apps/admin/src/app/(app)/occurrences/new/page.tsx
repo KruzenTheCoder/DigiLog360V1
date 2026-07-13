@@ -98,7 +98,12 @@ export default async function NewOccurrencePage() {
         reporters={reporters}
         assignees={assignees}
         canAssign={can(caps, 'occurrences.assign')}
-        canLogManagementReport={can(caps, 'occurrences.log_management_report')}
+        canLogManagementReport={
+          can(caps, 'occurrences.log_management_report') ||
+          // Per-user override — super-user can grant the dropdown to specific
+          // people at /super/management-reports without touching their role.
+          profile.can_log_management_report === true
+        }
         formConfig={formConfig}
       />
     </>
