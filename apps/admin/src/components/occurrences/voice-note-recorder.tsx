@@ -48,6 +48,12 @@ export function VoiceNoteRecorder({
   async function start() {
     setError(null);
     if (clips.length >= MAX_CLIPS) { setError(`Up to ${MAX_CLIPS} voice notes.`); return; }
+    // getUserMedia only exists in a secure context (HTTPS or localhost). On a
+    // plain-HTTP page navigator.mediaDevices is undefined — tell the user why.
+    if (typeof window !== 'undefined' && window.isSecureContext === false) {
+      setError('Recording needs a secure connection (https://). Open the console over HTTPS to record.');
+      return;
+    }
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setError('Recording is not supported in this browser.');
       return;
@@ -79,8 +85,17 @@ export function VoiceNoteRecorder({
       setRecording(true);
       setElapsed(0);
       timerRef.current = setInterval(() => setElapsed(Date.now() - startedAtRef.current), 250);
-    } catch {
-      setError('Microphone permission denied.');
+    } catch (e) {
+      const name = e instanceof Error ? e.name : '';
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        setError('Microphone blocked. Allow mic access for this site in your browser, then try again.');
+      } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        setError('No microphone found on this device.');
+      } else if (name === 'NotReadableError') {
+        setError('Microphone is in use by another app. Close it and try again.');
+      } else {
+        setError('Could not start recording.');
+      }
     }
   }
 

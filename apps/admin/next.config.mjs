@@ -18,6 +18,11 @@ const csp = [
   `img-src 'self' data: blob: https://${supabaseHost} https://*.supabase.co https://*.tile.openstreetmap.org https://unpkg.com`,
   // XHR + websocket to Supabase.
   `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://*.supabase.co wss://*.supabase.co`,
+  // Audio playback: local blob: previews (freshly recorded voice notes) and
+  // Supabase Storage signed URLs (attached voice-note clips). Without an
+  // explicit media-src, <audio> falls back to default-src 'self' and both are
+  // blocked.
+  `media-src 'self' blob: https://${supabaseHost} https://*.supabase.co`,
   `frame-ancestors 'none'`,
   `base-uri 'self'`,
   `form-action 'self'`,
@@ -140,8 +145,10 @@ const nextConfig = {
           // HSTS — only honoured over HTTPS. 2 years, include subdomains.
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
           { key: 'X-DNS-Prefetch-Control', value: 'on' },
-          // No browser features the console doesn't need.
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
+          // Allow the microphone for our OWN origin only (voice notes on the Log
+          // Occurrence form). Camera/geolocation stay disabled — the web console
+          // doesn't use them (photos + GPS are mobile-only).
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=(), interest-cohort=()' },
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
         ],
       },
