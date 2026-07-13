@@ -82,7 +82,7 @@ export default async function ManagementReportsPage() {
     <>
       <PageHeader
         title="Management Reports Access"
-        description='Pick which users see the "Management Reports" option when logging an occurrence. This is a per-user override on top of role permissions — toggle anyone on to grant them the dropdown individually.'
+        description='Pick which users see the "Management Reports" option when logging an occurrence. This toggle is the single control — turning a user off hides the option for them, turning it on shows it. New users start off.'
       />
 
       {schemaMissing && (

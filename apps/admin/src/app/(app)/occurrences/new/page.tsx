@@ -98,12 +98,12 @@ export default async function NewOccurrencePage() {
         reporters={reporters}
         assignees={assignees}
         canAssign={can(caps, 'occurrences.assign')}
-        canLogManagementReport={
-          can(caps, 'occurrences.log_management_report') ||
-          // Per-user override — super-user can grant the dropdown to specific
-          // people at /super/management-reports without touching their role.
-          profile.can_log_management_report === true
-        }
+        // The "Management Reports" option is controlled solely by the per-user
+        // flag managed at /super/management-reports — turning it off there
+        // reliably hides the option (a role capability can't silently re-grant
+        // it). Existing holders were seeded on by migration
+        // 20260713000002 so nobody lost access on rollout.
+        canLogManagementReport={profile.can_log_management_report === true}
         formConfig={formConfig}
       />
     </>
