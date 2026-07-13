@@ -402,6 +402,8 @@ export const SLA_CONFIG: Record<SeverityLevel, { resolveHours: number; updateInt
 };
 
 export const STORAGE_BUCKET = 'occurrence-images';
+/** Private bucket holding occurrence voice-note audio clips. */
+export const VOICE_NOTES_BUCKET = 'occurrence-voice-notes';
 
 export const CHECKPOINT_QR_PREFIX = 'DIGILOG-CP:';
 export function encodeCheckpointQr(token: string): string {

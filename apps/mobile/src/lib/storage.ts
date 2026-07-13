@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { STORAGE_BUCKET } from '@digilog/shared';
+import { STORAGE_BUCKET, VOICE_NOTES_BUCKET } from '@digilog/shared';
 
 // Minimal base64 → Uint8Array (avoids extra deps; RN has global atob via polyfill on newer RN,
 // but we implement directly to be safe).
@@ -33,6 +33,20 @@ export async function uploadOccurrenceImage(
   const { error } = await supabase.storage
     .from(STORAGE_BUCKET)
     .upload(path, bytes, { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}`, upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+/** Upload a base64 audio clip to the occurrence-voice-notes bucket; returns the
+ *  storage path. Mirrors uploadOccurrenceImage — same <OB>/<uuid> path shape. */
+export async function uploadVoiceNote(
+  base64: string, obNumber: string, ext = 'm4a',
+): Promise<string> {
+  const path = `${obNumber}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const bytes = base64ToBytes(base64);
+  const { error } = await supabase.storage
+    .from(VOICE_NOTES_BUCKET)
+    .upload(path, bytes, { contentType: 'audio/m4a', upsert: false });
   if (error) throw error;
   return path;
 }

@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header';
 import { GradientSection } from '@/components/ui/gradient-section';
 import { SeverityBadge, StatusBadge } from '@/components/ui/badge';
 import { ImageGallery } from '@/components/occurrences/image-gallery';
+import { VoiceNoteGallery } from '@/components/occurrences/voice-note-gallery';
 import { OccurrenceActions } from '@/components/occurrences/occurrence-actions';
 import { AssignmentCard } from '@/components/occurrences/assignment-card';
 import { CommentsThread } from '@/components/occurrences/comments-thread';
@@ -12,7 +13,7 @@ import { formatDateTime } from '@/lib/utils';
 import {
   STATUS_LABELS, SEVERITY_COLORS, SEVERITY_LABELS,
   type Occurrence, type OccurrenceUpdate, type OccurrenceReport, type OccurrenceImage,
-  type OccurrenceComment, type AppRole,
+  type OccurrenceComment, type OccurrenceVoiceNote, type AppRole,
 } from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
@@ -35,10 +36,15 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
   if (!occ) notFound();
   const o = occ as Occurrence;
 
-  const [{ data: updates }, { data: report }, { data: images }, commentsRes, assignablesRes] = await Promise.all([
+  const [{ data: updates }, { data: report }, { data: images }, voiceRes, commentsRes, assignablesRes] = await Promise.all([
     supabase.from('occurrence_updates').select('*').eq('occurrence_id', o.id).order('created_at', { ascending: false }),
     supabase.from('occurrence_reports').select('*').eq('occurrence_id', o.id).maybeSingle(),
     supabase.from('occurrence_images').select('*').eq('occurrence_id', o.id).order('captured_at', { ascending: false }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('occurrence_voice_notes').select('*').eq('occurrence_id', o.id).order('created_at', { ascending: true }).then(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (r: any) => r, () => ({ data: [] }),
+    ),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any).from('occurrence_comments').select('*').eq('occurrence_id', o.id).order('created_at', { ascending: true }).then(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,6 +59,7 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
   const upd = (updates ?? []) as OccurrenceUpdate[];
   const rep = report as OccurrenceReport | null;
   const imgs = (images ?? []) as OccurrenceImage[];
+  const voiceNotes = (voiceRes?.data ?? []) as OccurrenceVoiceNote[];
   const comments = (commentsRes?.data ?? []) as OccurrenceComment[];
   const assignables = (assignablesRes.data ?? []) as { id: string; full_name: string | null; email: string | null; role: AppRole }[];
 
@@ -140,6 +147,10 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
 
           <GradientSection title="Photo Evidence" icon="Images" tone={sevTone}>
             <ImageGallery images={imgs} />
+          </GradientSection>
+
+          <GradientSection title="Voice Notes" icon="Mic" tone={sevTone}>
+            <VoiceNoteGallery notes={voiceNotes} />
           </GradientSection>
         </div>
 

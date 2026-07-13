@@ -18,5 +18,25 @@ declare module 'expo-av' {
       stopAndUnloadAsync(): Promise<void>;
       getURI(): string | null;
     }
+    export interface PlaybackStatus {
+      isLoaded: boolean;
+      isPlaying?: boolean;
+      didJustFinish?: boolean;
+      positionMillis?: number;
+      durationMillis?: number;
+    }
+    export class Sound {
+      static createAsync(
+        source: { uri: string },
+        initialStatus?: unknown,
+        onPlaybackStatusUpdate?: (status: PlaybackStatus) => void,
+      ): Promise<{ sound: Sound }>;
+      playAsync(): Promise<void>;
+      pauseAsync(): Promise<void>;
+      stopAsync(): Promise<void>;
+      replayAsync(): Promise<void>;
+      unloadAsync(): Promise<void>;
+      setOnPlaybackStatusUpdate(cb: (status: PlaybackStatus) => void): void;
+    }
   }
 }

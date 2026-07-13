@@ -6,7 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase } from './supabase';
-import { uploadOccurrenceImage } from './storage';
+import { uploadOccurrenceImage, uploadVoiceNote } from './storage';
 
 const KEY = 'digilog.offline_queue.v1';
 
@@ -30,6 +30,9 @@ export interface QueuedOccurrence {
   };
   /** Base64 image payloads to attach after the row is created. */
   photos: { base64: string }[];
+  /** Base64 audio payloads (voice notes) to attach after the row is created.
+   *  Optional so queue items written by older builds still parse. */
+  voiceNotes?: { base64: string; durationMs: number | null }[];
   /** Retry counter — we stop after this many to avoid infinite loops. */
   attempts: number;
   /** Most recent error message — populated on each failed retry, so the user
@@ -141,6 +144,23 @@ export async function flushQueue(): Promise<{
           });
         } catch {
           // a single failed photo doesn't fail the whole occurrence; we move on.
+        }
+      }
+
+      for (const vn of item.voiceNotes ?? []) {
+        try {
+          const path = await uploadVoiceNote(vn.base64, occ!.ob_number ?? `OB${occ!.id}`);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any).from('occurrence_voice_notes').insert({
+            occurrence_id: occ!.id,
+            ob_number: occ!.ob_number,
+            storage_path: path,
+            duration_ms: vn.durationMs,
+            recorded_by: item.occurrence.logged_by,
+            recorded_by_name: item.occurrence.logged_by_name,
+          });
+        } catch {
+          // a single failed voice note doesn't fail the whole occurrence.
         }
       }
       flushed += 1;

@@ -7,6 +7,7 @@ import {
   Info, Loader2, MapPin, RotateCcw, Send, ShieldAlert, UserPlus,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { VoiceNoteRecorder, type VoiceClip } from '@/components/occurrences/voice-note-recorder';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea, Select, Label } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +16,7 @@ import { OcrDropzone } from './ocr-dropzone';
 import {
   SEVERITIES, SEVERITY_LABELS, SEVERITY_COLORS, SLA_CONFIG, ROLE_LABELS,
   mergeIncidentCategories, mergeIncidentSubcategories, mergeIncidentTypes,
-  isSectionEnabled, isCustomSectionEnabled,
+  isSectionEnabled, isCustomSectionEnabled, VOICE_NOTES_BUCKET,
   type Profile, type Site, type SeverityLevel, type AppRole,
   type OrgIncidentType, type OrgIncidentCategory, type OrgIncidentSubcategory,
   type LogFormConfig, type CustomSection, type CustomField,
@@ -63,6 +64,7 @@ export function LogIncidentForm({
   const [type, setType] = useState('');
   const [severity, setSeverity] = useState<SeverityLevel>('medium');
   const [description, setDescription] = useState('');
+  const [voiceClips, setVoiceClips] = useState<VoiceClip[]>([]);
   // Live "now" — ticks every second. Used both as the visible running clock
   // (so users see the system recording the time as it happens) and as the
   // value stamped onto the record at submit. Admins can manually back-date
@@ -139,6 +141,7 @@ export function LogIncidentForm({
     setStatusIndicator(''); setCctvAvailable(null); setCctvTimes('');
     setEmergencyServices([]);
     setCustomValues({});
+    setVoiceClips((prev) => { prev.forEach((c) => URL.revokeObjectURL(c.url)); return []; });
     if (options?.clearMessages ?? true) {
       setOk(null); setError(null);
     }
@@ -239,6 +242,24 @@ export function LogIncidentForm({
       setSaving(false);
       setError(insErr.message);
       return;
+    }
+
+    // Upload any voice notes and attach them to the occurrence. A failed clip
+    // never blocks the log — mirrors the mobile photo/voice behaviour.
+    if (voiceClips.length > 0 && data?.id) {
+      const ob = data.ob_number ?? `OB${data.id}`;
+      await Promise.allSettled(voiceClips.map(async (clip) => {
+        const path = `${ob}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${clip.ext}`;
+        const { error: upErr } = await supabase.storage
+          .from(VOICE_NOTES_BUCKET)
+          .upload(path, clip.blob, { contentType: clip.blob.type || 'audio/webm', upsert: false });
+        if (upErr) throw upErr;
+        await (supabase as any).from('occurrence_voice_notes').insert({
+          occurrence_id: data.id, ob_number: data.ob_number, storage_path: path,
+          duration_ms: clip.durationMs,
+          recorded_by: profile.id, recorded_by_name: reportedBy || profile.full_name || profile.email,
+        });
+      }));
     }
 
     // Create a task if assigned to someone
@@ -429,6 +450,10 @@ export function LogIncidentForm({
                 <OcrDropzone onText={(text) => setDescription((d) => d ? `${d}\n\n${text}` : text)} />
               </div>
             )}
+            <div className="mt-4">
+              <Label>Voice notes (optional)</Label>
+              <VoiceNoteRecorder clips={voiceClips} onChange={setVoiceClips} />
+            </div>
           </div>
         </GradientSection>
 

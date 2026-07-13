@@ -42,6 +42,18 @@ export type OccurrenceInsert = T['occurrences']['Insert'] & { org_id?: string };
 export type OccurrenceUpdate = WithOrg<T['occurrence_updates']['Row']>;
 export type OccurrenceReport = WithOrg<T['occurrence_reports']['Row']>;
 export type OccurrenceImage = WithOrg<T['occurrence_images']['Row']>;
+/** A playable audio clip attached to an occurrence (bucket: occurrence-voice-notes).
+ *  Manual type until database.types.ts is regenerated for the new table. */
+export interface OccurrenceVoiceNote {
+  id: number;
+  occurrence_id: number;
+  ob_number: string | null;
+  storage_path: string;
+  duration_ms: number | null;
+  recorded_by: string | null;
+  recorded_by_name: string | null;
+  created_at: string;
+}
 export type PatrolRoute = WithOrg<T['patrol_routes']['Row']>;
 export type Checkpoint = WithOrg<T['checkpoints']['Row']>;
 export type RouteCheckpoint = WithOrg<T['route_checkpoints']['Row']>;

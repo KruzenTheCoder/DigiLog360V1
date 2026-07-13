@@ -9,16 +9,21 @@
 // On submit: success toast + navigate to the new occurrence detail.
 // On network failure: gracefully fall back to the offline queue.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { uploadOccurrenceImage } from '@/lib/storage';
+import { uploadOccurrenceImage, uploadVoiceNote } from '@/lib/storage';
+import {
+  startRecording, stopRecording, formatDuration,
+  type ActiveRecording, type CapturedClip,
+} from '@/lib/audio-capture';
 import { enqueueOccurrence, isOnline, flushQueue, pendingCount, clearQueue, inspectQueue } from '@/lib/offline-queue';
 import { Button, Field } from '@/components/ui';
 import { useToast, SectionTitle, Sheet, haptic } from '@/components/primitives';
@@ -51,6 +56,9 @@ export default function NewOccurrence() {
   const [severity, setSeverity] = useState<SeverityLevel>('medium');
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
+  const [voiceNotes, setVoiceNotes] = useState<CapturedClip[]>([]);
+  const [recording, setRecording] = useState<ActiveRecording | null>(null);
+  const [recElapsed, setRecElapsed] = useState(0);
   const [saving, setSaving] = useState(false);
   const [pending, setPending] = useState(0);
 
@@ -141,11 +149,52 @@ export default function NewOccurrence() {
   }
 
   // ----------------------------------------------------------------------
+  // Voice notes — record natively via expo-av, attach like a photo.
+  // ----------------------------------------------------------------------
+  // Tick the elapsed timer while recording.
+  useEffect(() => {
+    if (!recording) return;
+    const iv = setInterval(() => setRecElapsed(Date.now() - recording.startedAt), 250);
+    return () => clearInterval(iv);
+  }, [recording]);
+
+  async function toggleRecord() {
+    if (recording) {
+      // Stop + attach.
+      try {
+        const active = recording;
+        setRecording(null);
+        setRecElapsed(0);
+        const clip = await stopRecording(active);
+        // Ignore accidental sub-second taps.
+        if (clip.durationMs >= 700) {
+          setVoiceNotes((v) => [...v, clip].slice(0, 5));
+        }
+      } catch (e) {
+        toast.show(e instanceof Error ? e.message : 'Recording failed', 'error');
+      }
+      return;
+    }
+    if (voiceNotes.length >= 5) { toast.show('Up to 5 voice notes', 'error'); return; }
+    const active = await startRecording();
+    if (!active) {
+      Alert.alert('Microphone permission needed', 'Enable microphone access in Settings to record voice notes.');
+      return;
+    }
+    setRecElapsed(0);
+    setRecording(active);
+  }
+
+  function removeVoiceNote(idx: number) {
+    setVoiceNotes((arr) => arr.filter((_, i) => i !== idx));
+  }
+
+  // ----------------------------------------------------------------------
   // Submit
   // ----------------------------------------------------------------------
   function resetForm() {
     setCategory(''); setSubcategory(''); setOccurrenceType('');
-    setDescription(''); setPhotos([]); setSeverity('medium');
+    setDescription(''); setPhotos([]); setVoiceNotes([]); setSeverity('medium');
   }
 
   async function submit() {
@@ -174,7 +223,9 @@ export default function NewOccurrence() {
 
     if (!online) {
       await enqueueOccurrence({
-        occurrence, photos: photos.map((p) => ({ base64: p.base64 })),
+        occurrence,
+        photos: photos.map((p) => ({ base64: p.base64 })),
+        voiceNotes: voiceNotes.map((v) => ({ base64: v.base64, durationMs: v.durationMs })),
       });
       const left = await pendingCount();
       setPending(left);
@@ -202,6 +253,19 @@ export default function NewOccurrence() {
         }));
       }
 
+      // Upload voice notes the same way — a failed clip never blocks the log.
+      if (voiceNotes.length > 0) {
+        await Promise.allSettled(voiceNotes.map(async (vn) => {
+          const path = await uploadVoiceNote(vn.base64, occ.ob_number ?? `OB${occ.id}`);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any).from('occurrence_voice_notes').insert({
+            occurrence_id: occ.id, ob_number: occ.ob_number, storage_path: path,
+            duration_ms: vn.durationMs,
+            recorded_by: profile.id, recorded_by_name: profile.full_name ?? profile.email,
+          });
+        }));
+      }
+
       setSaving(false);
       resetForm();
       haptic('success');
@@ -215,7 +279,9 @@ export default function NewOccurrence() {
     } catch (e) {
       // Network died mid-request → queue for retry.
       await enqueueOccurrence({
-        occurrence, photos: photos.map((p) => ({ base64: p.base64 })),
+        occurrence,
+        photos: photos.map((p) => ({ base64: p.base64 })),
+        voiceNotes: voiceNotes.map((v) => ({ base64: v.base64, durationMs: v.durationMs })),
       });
       const left = await pendingCount();
       setPending(left);
@@ -368,6 +434,39 @@ export default function NewOccurrence() {
           )}
         </View>
 
+        <SectionTitle right={
+          voiceNotes.length > 0 ? (
+            <Text style={{ color: theme.textMuted, fontSize: 12 }}>{voiceNotes.length}/5</Text>
+          ) : undefined
+        }>Voice notes (optional)</SectionTitle>
+
+        {voiceNotes.map((v, i) => (
+          <View key={v.uri} style={styles.vnRow}>
+            <VoiceNotePreview uri={v.uri} />
+            <Text style={styles.vnDuration}>{formatDuration(v.durationMs)}</Text>
+            <TouchableOpacity onPress={() => removeVoiceNote(i)} hitSlop={8} style={styles.vnRemove}>
+              <Ionicons name="trash-outline" size={18} color={theme.danger} />
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        {voiceNotes.length < 5 && (
+          <TouchableOpacity
+            style={[styles.recordBtn, recording && styles.recordBtnActive]}
+            onPress={toggleRecord}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={recording ? 'stop' : 'mic'}
+              size={20}
+              color={recording ? '#fff' : theme.brand}
+            />
+            <Text style={[styles.recordLabel, recording && { color: '#fff' }]}>
+              {recording ? `Recording… ${formatDuration(recElapsed)} · tap to stop` : 'Record voice note'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <View style={{ height: spacing.xl }} />
         <Button
           title="Log Occurrence"
@@ -505,6 +604,45 @@ function Chip({ label, active, color, onPress }: {
   );
 }
 
+// ---------------------------------------------------------------------------
+// VoiceNotePreview — play/stop a just-recorded local clip before submitting.
+// ---------------------------------------------------------------------------
+function VoiceNotePreview({ uri }: { uri: string }) {
+  const [playing, setPlaying] = useState(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  useEffect(() => {
+    return () => { soundRef.current?.unloadAsync().catch(() => {}); };
+  }, []);
+
+  async function toggle() {
+    try {
+      if (playing) {
+        await soundRef.current?.stopAsync();
+        setPlaying(false);
+        return;
+      }
+      if (!soundRef.current) {
+        const { sound } = await Audio.Sound.createAsync({ uri }, undefined, (status) => {
+          if (status.isLoaded && status.didJustFinish) setPlaying(false);
+        });
+        soundRef.current = sound;
+      }
+      await soundRef.current.replayAsync();
+      setPlaying(true);
+    } catch {
+      setPlaying(false);
+    }
+  }
+
+  return (
+    <TouchableOpacity onPress={toggle} style={styles.vnPlay} activeOpacity={0.7}>
+      <Ionicons name={playing ? 'stop' : 'play'} size={18} color={theme.brand} />
+      <Text style={styles.vnPlayLabel}>{playing ? 'Playing…' : 'Play'}</Text>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   queueBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -556,4 +694,24 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   addPhotoLabel: { color: theme.textMuted, fontSize: 10, fontWeight: '600' },
+
+  vnRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1,
+    borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10,
+    marginBottom: spacing.sm,
+  },
+  vnPlay: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
+  vnPlayLabel: { color: theme.brand, fontSize: 14, fontWeight: '600' },
+  vnDuration: { color: theme.textMuted, fontSize: 12, fontVariant: ['tabular-nums'] },
+  vnRemove: { padding: 4 },
+
+  recordBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderWidth: 1, borderColor: theme.brand, borderStyle: 'dashed',
+    borderRadius: radius.md, paddingVertical: 14,
+    backgroundColor: theme.surface,
+  },
+  recordBtnActive: { backgroundColor: theme.danger, borderColor: theme.danger, borderStyle: 'solid' },
+  recordLabel: { color: theme.brand, fontSize: 14, fontWeight: '700' },
 });

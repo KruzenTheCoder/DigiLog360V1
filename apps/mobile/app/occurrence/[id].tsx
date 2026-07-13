@@ -4,22 +4,24 @@
 // Reviewers (supervisor / manager / control_room / admin / super_user) get
 // a sticky "Update status" action + a comment thread.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
+import { formatDuration } from '@/lib/audio-capture';
 import { Badge, Button, Field } from '@/components/ui';
 import { Sheet, useToast, SectionTitle, Skeleton } from '@/components/primitives';
 import { theme, spacing, radius, type } from '@/lib/theme';
 import {
   SEVERITY_COLORS, SEVERITY_LABELS, STATUS_COLORS, STATUS_LABELS, STORAGE_BUCKET,
-  OCCURRENCE_STATUSES,
+  VOICE_NOTES_BUCKET, OCCURRENCE_STATUSES,
   hasAnyRole,
-  type Occurrence, type OccurrenceUpdate, type OccurrenceImage,
+  type Occurrence, type OccurrenceUpdate, type OccurrenceImage, type OccurrenceVoiceNote,
   type OccurrenceStatus,
 } from '@digilog/shared';
 
@@ -41,6 +43,7 @@ export default function OccurrenceDetail() {
   const [updates, setUpdates] = useState<OccurrenceUpdate[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [voiceNotes, setVoiceNotes] = useState<{ url: string; durationMs: number | null }[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -56,7 +59,7 @@ export default function OccurrenceDetail() {
   const load = useCallback(async () => {
     setLoading(true);
     const occId = Number(id);
-    const [oRes, uRes, iRes, cRes] = await Promise.all([
+    const [oRes, uRes, iRes, cRes, vRes] = await Promise.all([
       supabase.from('occurrences').select('*').eq('id', occId).maybeSingle(),
       supabase.from('occurrence_updates').select('*').eq('occurrence_id', occId)
         .order('created_at', { ascending: false }),
@@ -65,6 +68,10 @@ export default function OccurrenceDetail() {
       (supabase as any).from('occurrence_comments').select('id, author_id, author_name, body, created_at')
         .eq('occurrence_id', occId).order('created_at', { ascending: true })
         .then((r: { data: Comment[] | null }) => r, () => ({ data: [] })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any).from('occurrence_voice_notes').select('*')
+        .eq('occurrence_id', occId).order('created_at', { ascending: true })
+        .then((r: { data: OccurrenceVoiceNote[] | null }) => r, () => ({ data: [] })),
     ]);
     setOcc(oRes.data as Occurrence | null);
     setUpdates((uRes.data ?? []) as OccurrenceUpdate[]);
@@ -76,6 +83,17 @@ export default function OccurrenceDetail() {
       setImageUrls((signed ?? []).map((s) => s.signedUrl).filter(Boolean) as string[]);
     } else {
       setImageUrls([]);
+    }
+
+    const vns = ((vRes as { data: OccurrenceVoiceNote[] | null })?.data ?? []) as OccurrenceVoiceNote[];
+    if (vns.length) {
+      const { data: signed } = await supabase.storage
+        .from(VOICE_NOTES_BUCKET).createSignedUrls(vns.map((v) => v.storage_path), 3600);
+      setVoiceNotes((signed ?? [])
+        .map((s, i) => ({ url: s.signedUrl as string, durationMs: vns[i]?.duration_ms ?? null }))
+        .filter((v) => v.url));
+    } else {
+      setVoiceNotes([]);
     }
     setLoading(false);
   }, [id]);
@@ -150,6 +168,15 @@ export default function OccurrenceDetail() {
                     <Image key={i} source={{ uri: u }} style={styles.photo} />
                   ))}
                 </ScrollView>
+              </>
+            )}
+
+            {voiceNotes.length > 0 && (
+              <>
+                <SectionTitle right={<Text style={[type.muted, { fontSize: 11 }]}>{voiceNotes.length}</Text>}>Voice notes</SectionTitle>
+                {voiceNotes.map((v, i) => (
+                  <VoiceNotePlayer key={i} url={v.url} durationMs={v.durationMs} index={i + 1} />
+                ))}
               </>
             )}
 
@@ -237,6 +264,50 @@ export default function OccurrenceDetail() {
 
       <toast.ToastView />
     </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// VoiceNotePlayer — play/stop a stored clip from its signed URL.
+// ---------------------------------------------------------------------------
+function VoiceNotePlayer({ url, durationMs, index }: { url: string; durationMs: number | null; index: number }) {
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  useEffect(() => {
+    return () => { soundRef.current?.unloadAsync().catch(() => {}); };
+  }, []);
+
+  async function toggle() {
+    try {
+      if (playing) {
+        await soundRef.current?.stopAsync();
+        setPlaying(false);
+        return;
+      }
+      if (!soundRef.current) {
+        setLoading(true);
+        const { sound } = await Audio.Sound.createAsync({ uri: url }, undefined, (status) => {
+          if (status.isLoaded && status.didJustFinish) setPlaying(false);
+        });
+        soundRef.current = sound;
+        setLoading(false);
+      }
+      await soundRef.current.replayAsync();
+      setPlaying(true);
+    } catch {
+      setLoading(false);
+      setPlaying(false);
+    }
+  }
+
+  return (
+    <TouchableOpacity onPress={toggle} style={styles.vnPlayer} activeOpacity={0.7}>
+      <Ionicons name={playing ? 'stop-circle' : 'play-circle'} size={30} color={theme.brand} />
+      <Text style={styles.vnPlayerLabel}>Voice note {index}</Text>
+      <Text style={styles.vnPlayerDuration}>{loading ? 'Loading…' : formatDuration(durationMs)}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -389,6 +460,15 @@ const styles = StyleSheet.create({
   detailValue: { color: theme.text, fontSize: 13, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
 
   photo: { width: 130, height: 130, borderRadius: radius.md, marginRight: 10 },
+
+  vnPlayer: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1,
+    borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10,
+    marginBottom: spacing.sm,
+  },
+  vnPlayerLabel: { color: theme.text, fontSize: 14, fontWeight: '600', flex: 1 },
+  vnPlayerDuration: { color: theme.textMuted, fontSize: 12, fontVariant: ['tabular-nums'] },
 
   comment: {
     backgroundColor: theme.surfaceAlt, borderRadius: radius.md,
