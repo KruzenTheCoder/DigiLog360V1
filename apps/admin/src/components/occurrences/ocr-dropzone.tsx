@@ -6,7 +6,7 @@
 //
 // Lazy-loads tesseract.js only when the user actually drops a file, so the
 // bundle stays small for everyone who never uses OCR.
-import { useState, type DragEvent } from 'react';
+import { useRef, useState, type DragEvent } from 'react';
 import { Loader2, Upload, FileText } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ export function OcrDropzone({ onText }: Props) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   async function process(file: File) {
     setBusy(true); setError(null); setProgress(0);
@@ -59,13 +60,19 @@ export function OcrDropzone({ onText }: Props) {
           <p className="text-xs text-[hsl(var(--muted))]">
             We'll extract the text right in your browser — no upload.
           </p>
-          <label className="cursor-pointer">
-            <input
-              type="file" accept="image/*" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) process(f); }}
-            />
-            <Button variant="secondary"><Upload className="h-4 w-4" /> Pick image</Button>
-          </label>
+          <input
+            ref={inputRef}
+            type="file" accept="image/*" className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) process(f);
+              // Reset so picking the SAME file again still fires onChange.
+              e.target.value = '';
+            }}
+          />
+          <Button type="button" variant="secondary" onClick={() => inputRef.current?.click()}>
+            <Upload className="h-4 w-4" /> Pick image
+          </Button>
         </>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
