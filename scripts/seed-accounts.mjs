@@ -126,10 +126,10 @@ const SITE_BY_EMAIL = {
   'supervisor@netstreamissupport.com': 'Cape Town',
   'controlroom@netstreamissupport.com': 'Cape Town',
   'udeen.control@pmi.com':             'HQ Central',
-  'cellier.combrink@digilog360.co.za': 'HQ Central',
-  'tshikovhi.mpho@digilog360.co.za':   'HQ Central',
-  'jj.barnard@digilog360.co.za':       'HQ Central',
-  'willem.smith@digilog360.co.za':     'HQ Central',
+  'cellier.combrink@pmi.com': 'HQ Central',
+  'tshikovhi.mpho@pmi.com':   'HQ Central',
+  'jj.barnard@pmi.com':       'HQ Central',
+  'willem.smith@pmi.com':     'HQ Central',
   'casper.control@pmi.com':            'HQ Central',
 };
 
@@ -167,11 +167,11 @@ const RAW_USERS = [
   // ─── Admin ─────────────────────────────────────────────────────────────
   { name: 'Administrator',              email: 'admin@site.com',                              secret: 'AdmiAdmi123!', role: 'Admin' },
 
-  // ─── Manager (web; @digilog360.co.za + Control Room Managers below) ────
-  { name: 'Cellier Combrink',           email: 'cellier.combrink@digilog360.co.za',           secret: 'CellMana123!', role: 'Manager' },
-  { name: 'Tshikovhi Mpho',             email: 'tshikovhi.mpho@digilog360.co.za',             secret: 'TshiMana123!', role: 'Manager' },
-  { name: 'JJ Barnard',                 email: 'jj.barnard@digilog360.co.za',                 secret: 'JjBaMana123!', role: 'Manager' },
-  { name: 'Willem Smith',               email: 'willem.smith@digilog360.co.za',               secret: 'WillMana123!', role: 'Manager' },
+  // ─── Manager (web; PMI manager logins + Control Room Managers below) ─────
+  { name: 'Cellier Combrink',           email: 'cellier.combrink@pmi.com',                    secret: 'CellMana123!', role: 'Manager' },
+  { name: 'Tshikovhi Mpho',             email: 'tshikovhi.mpho@pmi.com',                      secret: 'TshiMana123!', role: 'Manager' },
+  { name: 'JJ Barnard',                 email: 'jj.barnard@pmi.com',                          secret: 'JjBaMana123!', role: 'Manager' },
+  { name: 'Willem Smith',               email: 'willem.smith@pmi.com',                        secret: 'WillMana123!', role: 'Manager' },
 
   // ─── Control Room (single role) ────────────────────────────────────────
   { name: 'Sherwin (Control)',          email: 'sherwin.control@pmi.com',                     secret: 'SherCont123!', role: 'Control Room' },

@@ -330,11 +330,40 @@ export interface OrgIncidentType {
 }
 
 /**
+ * Options for the taxonomy merge helpers.
+ *
+ * `customized`: the org has "forked" the built-in taxonomy into its own rows
+ * (organizations.taxonomy_customized). When set, the pickers read ONLY the
+ * org's active rows — the built-in list is ignored, because it has already been
+ * materialised into those rows and may have been renamed/reordered/disabled
+ * since. Un-set (the default) keeps the original "built-in + custom" merge.
+ */
+export interface TaxonomyMergeOptions {
+  customized?: boolean;
+}
+
+/** Active org rows sorted by sort_order then name — the forked-org list. */
+function sortedActive<T extends { is_active: boolean; sort_order: number; name: string }>(rows: T[]): T[] {
+  return rows
+    .filter((r) => r.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+}
+
+/**
  * Built-in categories + active org-custom categories. Built-ins first
  * (declaration order), org-custom alphabetised after, de-duplicated by
  * lower-case name so an org can't shadow a built-in.
+ *
+ * When `options.customized` is set, the built-in list is skipped and the org's
+ * own active rows are the complete list (see TaxonomyMergeOptions).
  */
-export function mergeIncidentCategories(orgCategories: OrgIncidentCategory[]): string[] {
+export function mergeIncidentCategories(
+  orgCategories: OrgIncidentCategory[],
+  options?: TaxonomyMergeOptions,
+): string[] {
+  if (options?.customized) {
+    return sortedActive(orgCategories as (OrgIncidentCategory & { name: string })[]).map((c) => c.name);
+  }
   const builtin = [...INCIDENT_CATEGORIES] as string[];
   const lowerBuiltin = new Set(builtin.map((c) => c.toLowerCase()));
   const custom = orgCategories
@@ -351,9 +380,15 @@ export function mergeIncidentCategories(orgCategories: OrgIncidentCategory[]): s
 export function mergeIncidentSubcategories(
   category: string | null | undefined,
   orgSubcategories: OrgIncidentSubcategory[],
+  options?: TaxonomyMergeOptions,
 ): string[] {
-  const builtin = getSubcategories(category);
   if (!category) return [];
+  if (options?.customized) {
+    return sortedActive(
+      orgSubcategories.filter((s) => s.category.toLowerCase() === category.toLowerCase()),
+    ).map((s) => s.name);
+  }
+  const builtin = getSubcategories(category);
   const lowerBuiltin = new Set(builtin.map((s) => s.toLowerCase()));
   const custom = orgSubcategories
     .filter(
@@ -377,9 +412,19 @@ export function mergeIncidentTypes(
   category: string | null | undefined,
   subcategory: string | null | undefined,
   orgTypes: OrgIncidentType[],
+  options?: TaxonomyMergeOptions,
 ): string[] {
+  if (!category || !subcategory) return options?.customized ? [] : getIncidentTypes(category, subcategory);
+  if (options?.customized) {
+    return sortedActive(
+      orgTypes.filter(
+        (t) =>
+          (t.category ?? '').toLowerCase() === category.toLowerCase() &&
+          (t.subcategory ?? '').toLowerCase() === subcategory.toLowerCase(),
+      ) as (OrgIncidentType & { name: string })[],
+    ).map((t) => t.name);
+  }
   const builtin = getIncidentTypes(category, subcategory);
-  if (!category || !subcategory) return builtin;
   const lowerBuiltin = new Set(builtin.map((t) => t.toLowerCase()));
   const custom = orgTypes
     .filter((t) =>
@@ -391,6 +436,24 @@ export function mergeIncidentTypes(
     .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
     .map((t) => t.name);
   return [...builtin, ...custom];
+}
+
+/**
+ * The built-in taxonomy flattened to a { category, subcategory, name } list in
+ * declaration order — the payload passed to the `fork_org_taxonomy` RPC so the
+ * DB materialises exactly the shipped defaults (single source of truth here).
+ */
+export function flattenBuiltinTaxonomy(): { category: string; subcategory: string; name: string }[] {
+  const out: { category: string; subcategory: string; name: string }[] = [];
+  for (const category of INCIDENT_CATEGORIES) {
+    const subs = INCIDENT_TAXONOMY[category] as Record<string, readonly string[]>;
+    for (const subcategory of Object.keys(subs)) {
+      for (const name of subs[subcategory] ?? []) {
+        out.push({ category, subcategory, name });
+      }
+    }
+  }
+  return out;
 }
 
 /** SLA rules per severity — mirrors the database functions. */

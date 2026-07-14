@@ -10,7 +10,7 @@ import { SlaComplianceReport } from '@/components/dashboard/sla-compliance';
 import { RealtimeRefresh } from '@/components/realtime/realtime-refresh';
 import {
   isSlaBreached, isSlaUpdateDue, SEVERITIES, SEVERITY_LABELS,
-  OCCURRENCE_STATUSES, STATUS_LABELS, STATUS_COLORS,
+  OCCURRENCE_STATUSES, STATUS_LABELS, STATUS_COLORS, TERMINAL_STATUSES,
 } from '@digilog/shared';
 import type { Occurrence } from '@digilog/shared';
 
@@ -87,11 +87,18 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   const last60 = new Date(now.getTime() - 60 * 864e5);
   const occ30 = occ.filter((o) => new Date(o.incident_at) >= last30);
   const total30 = occ30.length;
-  const open = occ30.filter((o) => o.status === 'open').length;
-  const resolved = occ30.filter((o) => o.status === 'resolved' || o.status === 'closed').length;
+  const isTerminal = (o: DashboardOcc) => (TERMINAL_STATUSES as readonly string[]).includes(o.status);
+  // "Open / Live" = every non-terminal occurrence (open, acknowledged, in_progress,
+  // on_patrol), not just the literal 'open' status — so Open/Live + Resolved = Total.
+  const open = occ30.filter((o) => !isTerminal(o)).length;
+  const resolved = occ30.filter(isTerminal).length;
   const resolutionRate = total30 ? Math.round((resolved / total30) * 100) : 0;
+  // Currently-actionable SLA state (age-independent) — drives the alert banner.
   const breached = occ.filter((o) => isSlaBreached(o, now)).length;
   const updateDue = occ.filter((o) => isSlaUpdateDue(o, now) && !isSlaBreached(o, now)).length;
+  // 30-day breach count for the quick-counter row, so all four cards share the
+  // same 30-day window (the banner keeps the age-independent `breached`).
+  const breached30 = occ30.filter((o) => isSlaBreached(o, now)).length;
 
   // Previous 30-day window (days 31–60) for the trend delta on the hero card.
   const prevTotal = occ.filter((o) => {
@@ -100,7 +107,8 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   }).length;
   const trendPct = prevTotal ? Math.round(((total30 - prevTotal) / prevTotal) * 1000) / 10 : null;
 
-  // Average time-to-close (hours) over occurrences closed in the last 30 days.
+  // Average time-to-close (hours) over occurrences that OCCURRED in the last 30
+  // days and have since been closed (occ30 is scoped by incident_at).
   const closed30 = occ30.filter((o) => o.closed_at);
   const avgResolutionHrs = closed30.length
     ? Math.round(
@@ -263,7 +271,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           tone="blue"
           icon="ShieldAlert"
           label="Highest Risk"
-          sublabel="Category"
+          sublabel="Incident Type"
           value={typeBreakdown[0]?.name ?? '—'}
           footer={`${typeBreakdown[0]?.count ?? 0} incidents logged`}
         />
@@ -282,7 +290,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
         {[
           { label: 'Open / Live', value: open, accent: 'bg-amber-400' },
           { label: 'Resolved / Closed', value: resolved, accent: 'bg-emerald-400' },
-          { label: 'SLA Breached', value: breached, accent: 'bg-red-400' },
+          { label: 'SLA Breached', value: breached30, accent: 'bg-red-400' },
           { label: 'Resolution Rate', value: `${resolutionRate}%`, accent: 'bg-brand' },
         ].map((c) => (
           <Card key={c.label} className="flex items-stretch overflow-hidden p-0">
@@ -327,7 +335,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
 
       {/* Category breakdown + high-frequency incidents */}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <GradientSection title="Incident Breakdown by Category" icon="PieChart" tone="brand">
+        <GradientSection title="Incident Breakdown by Type" icon="PieChart" tone="brand">
           <CategoryDonut data={typeBreakdown} />
         </GradientSection>
         <GradientSection title="High-Frequency Incidents" icon="Flame" tone="red">

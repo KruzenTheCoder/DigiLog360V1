@@ -93,6 +93,9 @@ export function LogIncidentForm({
   const [orgTypes, setOrgTypes] = useState<OrgIncidentType[]>([]);
   const [orgCategories, setOrgCategories] = useState<OrgIncidentCategory[]>([]);
   const [orgSubcategories, setOrgSubcategories] = useState<OrgIncidentSubcategory[]>([]);
+  // When the org has "forked" the taxonomy, the pickers read ONLY the org rows
+  // (renamed/disabled/reordered), never the built-in defaults.
+  const [taxonomyCustomized, setTaxonomyCustomized] = useState(false);
 
   // Tick the running clock every second so the displayed "incident time" is
   // always the real now-time. Stops re-rendering the whole tree by isolating
@@ -113,19 +116,22 @@ export function LogIncidentForm({
       .then(({ data }: { data: OrgIncidentCategory[] | null }) => setOrgCategories(data ?? []));
     sb.from('org_incident_subcategories').select('category, name, is_active, sort_order')
       .then(({ data }: { data: OrgIncidentSubcategory[] | null }) => setOrgSubcategories(data ?? []));
+    sb.from('organizations').select('taxonomy_customized').maybeSingle()
+      .then(({ data }: { data: { taxonomy_customized: boolean } | null }) => setTaxonomyCustomized(Boolean(data?.taxonomy_customized)));
   }, []);
 
-  const categoryOptions = mergeIncidentCategories(orgCategories);
+  const merge = useMemo(() => ({ customized: taxonomyCustomized }), [taxonomyCustomized]);
+  const categoryOptions = mergeIncidentCategories(orgCategories, merge);
   const subcategoryOptions = useMemo(() => {
-    const base = mergeIncidentSubcategories(category, orgSubcategories);
+    const base = mergeIncidentSubcategories(category, orgSubcategories, merge);
     if (!showManagementReport || !category) return base;
     if (base.some((s) => s.toLowerCase() === MGMT_REPORT_SUBCATEGORY.toLowerCase())) return base;
     return [...base, MGMT_REPORT_SUBCATEGORY];
-  }, [category, orgSubcategories, showManagementReport]);
+  }, [category, orgSubcategories, showManagementReport, merge]);
   const typeOptions = useMemo(() => {
     if (subcategory === MGMT_REPORT_SUBCATEGORY) return [MGMT_REPORT_TYPE];
-    return mergeIncidentTypes(category, subcategory, orgTypes);
-  }, [category, subcategory, orgTypes]);
+    return mergeIncidentTypes(category, subcategory, orgTypes, merge);
+  }, [category, subcategory, orgTypes, merge]);
   const isMgmtReport = subcategory === MGMT_REPORT_SUBCATEGORY;
 
   function onCategoryChange(c: string) { setCategory(c); setSubcategory(''); setType(''); }

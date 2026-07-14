@@ -44,6 +44,8 @@ export default function NewOccurrence() {
   const [orgTypes, setOrgTypes] = useState<OrgIncidentType[]>([]);
   const [orgCategories, setOrgCategories] = useState<OrgIncidentCategory[]>([]);
   const [orgSubcategories, setOrgSubcategories] = useState<OrgIncidentSubcategory[]>([]);
+  // Org "forked" its taxonomy → pickers use ONLY the org rows (renamed/disabled).
+  const [taxonomyCustomized, setTaxonomyCustomized] = useState(false);
 
   // 3-level cascading classification.
   const [category, setCategory] = useState('');
@@ -64,9 +66,10 @@ export default function NewOccurrence() {
 
   // Cascaded option lists — built-in taxonomy + active org-custom at every
   // level. Recompute whenever the upstream selection changes.
-  const categoryOptions = mergeIncidentCategories(orgCategories);
-  const subcategoryOptions = mergeIncidentSubcategories(category, orgSubcategories);
-  const typeOptions = mergeIncidentTypes(category, subcategory, orgTypes);
+  const mergeOpts = { customized: taxonomyCustomized };
+  const categoryOptions = mergeIncidentCategories(orgCategories, mergeOpts);
+  const subcategoryOptions = mergeIncidentSubcategories(category, orgSubcategories, mergeOpts);
+  const typeOptions = mergeIncidentTypes(category, subcategory, orgTypes, mergeOpts);
 
   useFocusEffect(useCallback(() => {
     setSaving(false);
@@ -92,6 +95,9 @@ export default function NewOccurrence() {
       .catch(() => {});
     sb.from('org_incident_subcategories').select('category, name, is_active, sort_order')
       .then(({ data }: { data: OrgIncidentSubcategory[] | null }) => setOrgSubcategories(data ?? []))
+      .catch(() => {});
+    sb.from('organizations').select('taxonomy_customized').maybeSingle()
+      .then(({ data }: { data: { taxonomy_customized: boolean } | null }) => setTaxonomyCustomized(Boolean(data?.taxonomy_customized)))
       .catch(() => {});
   }, [profile]);
 
