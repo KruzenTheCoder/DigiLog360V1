@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { requireProfile, loadMyCapabilities } from '@/lib/auth';
 import { visibleSections } from '@/components/layout/nav-config';
 import { RoleMenu, type RoleMenuData } from '@/components/menu/role-menu';
@@ -20,9 +19,11 @@ const ROLE_MENU_TITLE: Record<string, string> = {
 };
 
 export default async function MenuPage() {
+  // Only the (already-cached) profile + capabilities are needed to build the
+  // menu — zero extra DB round-trips. The KPI strip + site info are fetched
+  // client-side so the cards paint instantly instead of waiting on 5 counts.
   const profile = await requireProfile();
   const caps = await loadMyCapabilities();
-  const supabase = await createClient();
 
   // One menu per role the user holds, so multi-role users (e.g. Control Room +
   // Manager) get a pill switcher. The role filter differentiates the tabs;
@@ -58,27 +59,5 @@ export default async function MenuPage() {
     });
   }
 
-  let siteName: string | null = null;
-  if (profile.site_id && profile.role !== 'admin' && profile.role !== 'super_user') {
-    const { data } = await supabase.from('sites').select('name').eq('id', profile.site_id).maybeSingle();
-    siteName = data?.name ?? null;
-  }
-
-  // KPI strip — RLS scopes these counts to the caller's organisation.
-  const base = () => supabase.from('occurrences').select('id', { count: 'exact', head: true });
-  const [{ count: total }, { count: open }, { count: closed }, { count: critical }] = await Promise.all([
-    base(),
-    base().not('status', 'in', '(resolved,closed)'),
-    base().in('status', ['resolved', 'closed']),
-    base().eq('severity', 'critical').not('status', 'in', '(resolved,closed)'),
-  ]);
-
-  const kpis = [
-    { label: 'Total Occurrences', value: total ?? 0, accent: 'bg-brand' },
-    { label: 'Open / Live', value: open ?? 0, accent: 'bg-amber-400' },
-    { label: 'Closed / Resolved', value: closed ?? 0, accent: 'bg-emerald-400' },
-    { label: 'Critical', value: critical ?? 0, accent: 'bg-red-500' },
-  ];
-
-  return <RoleMenu roleMenus={roleMenus} kpis={kpis} siteName={siteName} />;
+  return <RoleMenu roleMenus={roleMenus} userId={profile.id} />;
 }

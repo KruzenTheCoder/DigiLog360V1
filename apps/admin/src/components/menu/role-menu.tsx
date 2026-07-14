@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Info, MapPin } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { MenuGrid } from './menu-grid';
+import { MenuKpis } from './menu-kpis';
 import { ROLE_COLORS, ROLE_LABELS, type AppRole } from '@digilog/shared';
 import type { NavSection } from '@/components/layout/nav-config';
 
@@ -11,7 +12,6 @@ export interface RoleMenuData {
   title: string;
   sections: NavSection[];
 }
-interface Kpi { label: string; value: number; accent: string }
 
 /**
  * The landing hub.
@@ -25,11 +25,10 @@ interface Kpi { label: string; value: number; accent: string }
  * showing an empty-state hint if everything was absorbed above.
  */
 export function RoleMenu({
-  roleMenus, kpis, siteName,
+  roleMenus, userId,
 }: {
   roleMenus: RoleMenuData[];
-  kpis: Kpi[];
-  siteName: string | null;
+  userId: string;
 }) {
   const [active, setActive] = useState<AppRole>(roleMenus[0]?.role);
   const current = roleMenus.find((m) => m.role === active) ?? roleMenus[0];
@@ -67,27 +66,11 @@ export function RoleMenu({
             <h1 className="text-2xl font-bold tracking-tight">{current.title}</h1>
             <p className="mt-1 text-sm text-white/85">Select a dashboard or action to proceed.</p>
           </div>
-          {siteName && (
-            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium backdrop-blur-sm">
-              <MapPin className="h-4 w-4" />
-              {siteName}
-            </span>
-          )}
         </div>
       </div>
 
-      {/* KPI strip */}
-      <div className="mb-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {kpis.map((k) => (
-          <div key={k.label} className="flex items-stretch overflow-hidden rounded-xl border bg-[hsl(var(--surface))] shadow-sm">
-            <span className={`w-1.5 shrink-0 ${k.accent}`} />
-            <div className="px-4 py-3">
-              <p className="text-2xl font-extrabold leading-tight">{k.value}</p>
-              <p className="text-xs text-[hsl(var(--muted))]">{k.label}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* KPI strip — fetched client-side so it never blocks the menu paint */}
+      <MenuKpis userId={userId} />
 
       {current.sections.length > 0 ? (
         <MenuGrid sections={current.sections} />
