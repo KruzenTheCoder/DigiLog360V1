@@ -59,5 +59,20 @@ export default async function MenuPage() {
     });
   }
 
-  return <RoleMenu roleMenus={roleMenus} userId={profile.id} />;
+  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
+  const ownSites = Array.from(new Set([
+    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
+    ...(profile.site_id ? [profile.site_id] : []),
+  ]));
+  const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
+
+  return (
+    <RoleMenu
+      roleMenus={roleMenus}
+      userId={profile.id}
+      orgId={profile.org_id}
+      siteIds={ownSites}
+      isUnscoped={isUnscopedRole}
+    />
+  );
 }

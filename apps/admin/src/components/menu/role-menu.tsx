@@ -25,10 +25,13 @@ export interface RoleMenuData {
  * showing an empty-state hint if everything was absorbed above.
  */
 export function RoleMenu({
-  roleMenus, userId,
+  roleMenus, userId, orgId, siteIds, isUnscoped,
 }: {
   roleMenus: RoleMenuData[];
   userId: string;
+  orgId: string;
+  siteIds: string[];
+  isUnscoped: boolean;
 }) {
   const [active, setActive] = useState<AppRole>(roleMenus[0]?.role);
   const current = roleMenus.find((m) => m.role === active) ?? roleMenus[0];
@@ -70,7 +73,7 @@ export function RoleMenu({
       </div>
 
       {/* KPI strip — fetched client-side so it never blocks the menu paint */}
-      <MenuKpis userId={userId} />
+      <MenuKpis userId={userId} orgId={orgId} siteIds={siteIds} isUnscoped={isUnscoped} />
 
       {current.sections.length > 0 ? (
         <MenuGrid sections={current.sections} />
