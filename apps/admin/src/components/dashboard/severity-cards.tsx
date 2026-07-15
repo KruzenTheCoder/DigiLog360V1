@@ -11,16 +11,25 @@ const META: Record<SeverityLevel, { icon: string; ring: string; bg: string; fg: 
 };
 
 /** Four big tonal tiles showing the count of incidents at each severity. */
-export function SeverityCards({ counts }: { counts: Record<SeverityLevel, number> }) {
+export function SeverityCards({
+  counts, hrefFor,
+}: {
+  counts: Record<SeverityLevel, number>;
+  /** Optional: makes each tile link to that severity's occurrence list. */
+  hrefFor?: (key: SeverityLevel) => string;
+}) {
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       {SEVERITIES.map((key) => {
         const m = META[key];
         const C = getIcon(m.icon, 'Circle');
+        const href = hrefFor?.(key);
+        const Wrapper = href ? 'a' : 'div';
         return (
-          <div
+          <Wrapper
             key={key}
-            className={`flex flex-col items-center rounded-2xl ${m.bg} p-5 text-center ring-1 ${m.ring}`}
+            {...(href ? { href } : {})}
+            className={`flex flex-col items-center rounded-2xl ${m.bg} p-5 text-center ring-1 ${m.ring} ${href ? 'transition hover:-translate-y-0.5 hover:shadow-md' : ''}`}
           >
             <div className={`mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-white/70 ${m.fg} dark:bg-white/10`}>
               <C className="h-6 w-6" />
@@ -29,7 +38,7 @@ export function SeverityCards({ counts }: { counts: Record<SeverityLevel, number
             <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
               {SEVERITY_LABELS[key]}
             </p>
-          </div>
+          </Wrapper>
         );
       })}
     </div>

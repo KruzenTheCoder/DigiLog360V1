@@ -12,7 +12,7 @@ import { SlaComplianceReport } from '@/components/dashboard/sla-compliance';
 import { RolePerformanceTable, type RolePerfRow } from '@/components/manager/role-performance';
 import { StaffReports } from '@/components/manager/staff-reports';
 import {
-  APP_ROLES, SEVERITIES, SEVERITY_LABELS, isSlaBreached, isSlaUpdateDue,
+  APP_ROLES, SEVERITIES, SEVERITY_LABELS, isSlaBreached, isSlaUpdateDue, TERMINAL_STATUSES,
   type AppRole, type SeverityLevel,
 } from '@digilog/shared';
 
@@ -152,7 +152,10 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
 
   // ----------------------------- alerts strip --------------------------------
 
-  const openCount = occ.filter((o) => o.status === 'open').length;
+  // "Open" = every non-terminal occurrence (open/acknowledged/in_progress/on_patrol),
+  // matching the dashboard so open + resolved = total.
+  const isTerminal = (s: string) => (TERMINAL_STATUSES as readonly string[]).includes(s);
+  const openCount = occ.filter((o) => !isTerminal(o.status)).length;
   // isSlaBreached / isSlaUpdateDue expect the strict OccurrenceStatus enum
   // type from shared; runtime values are equivalent so cast through unknown.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -162,8 +165,8 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
 
   // ----------------------------- hero KPIs -----------------------------------
 
-  const total30 = occ.length;
-  const resolved = occ.filter((o) => o.status === 'resolved' || o.status === 'closed').length;
+  const totalInPeriod = occ.length;
+  const resolved = occ.filter((o) => isTerminal(o.status)).length;
   const closedWithTime = occ.filter((o) => o.closed_at);
   const avgResHrs = closedWithTime.length
     ? Math.round(
@@ -243,12 +246,11 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
   const slaTotal = slaScoped.length;
   const slaBreaches = slaScoped.filter(breachedEver);
   const slaWithin = slaTotal - slaBreaches.length;
-  const complianceRate = slaTotal ? Math.round((slaWithin / slaTotal) * 100) : 100;
+  // Precise floats — the SlaComplianceReport formats them to 2 dp at display.
+  const complianceRate = slaTotal ? (slaWithin / slaTotal) * 100 : 100;
   const avgOverageHrs = slaBreaches.length
-    ? Math.round(
-        (slaBreaches.reduce((s, o) => s + (slaEnd(o) - new Date(o.sla_due_at as string).getTime()), 0)
-          / slaBreaches.length) / 36e5 * 10,
-      ) / 10
+    ? (slaBreaches.reduce((s, o) => s + (slaEnd(o) - new Date(o.sla_due_at as string).getTime()), 0)
+        / slaBreaches.length) / 36e5
     : 0;
   const slaBySeverity = SEVERITIES.map((sev) => {
     const rows = slaScoped.filter((o) => o.severity === sev);
@@ -256,7 +258,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
     return {
       key: sev, label: SEVERITY_LABELS[sev],
       total: rows.length, breached: br,
-      compliance: rows.length ? Math.round(((rows.length - br) / rows.length) * 100) : 100,
+      compliance: rows.length ? ((rows.length - br) / rows.length) * 100 : 100,
     };
   }).filter((s) => s.total > 0);
   const slaSiteMap = new Map<string, { total: number; breached: number }>();
@@ -269,7 +271,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
   const slaBySite = [...slaSiteMap.entries()]
     .map(([name, v]) => ({
       name, total: v.total, breached: v.breached,
-      compliance: v.total ? Math.round(((v.total - v.breached) / v.total) * 100) : 100,
+      compliance: v.total ? ((v.total - v.breached) / v.total) * 100 : 100,
     }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 6);
@@ -434,14 +436,14 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
           icon="TriangleAlert"
           label="Total Incidents"
           sublabel={`Last ${days} days`}
-          value={total30}
+          value={totalInPeriod}
           footer={<span>{resolved} resolved · {openCount} open</span>}
         />
         <HeroKpi
           tone="blue"
           icon="ShieldAlert"
           label="Highest Risk"
-          sublabel="Category"
+          sublabel="Incident Type"
           value={highestRisk.name}
           footer={`${highestRisk.count} incidents logged`}
         />
@@ -471,7 +473,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
 
       {/* Category breakdown + high-frequency incidents */}
       <div className="mb-5 grid gap-4 lg:grid-cols-2">
-        <GradientSection title="Incident Breakdown by Category" icon="PieChart" tone="brand">
+        <GradientSection title="Incident Breakdown by Type" icon="PieChart" tone="brand">
           <CategoryDonut data={typeBreakdown.slice(0, 7)} />
         </GradientSection>
         <GradientSection title="High-Frequency Incidents" icon="Flame" tone="red">
@@ -482,7 +484,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
               const top = typeBreakdown.slice(0, 7);
               const maxCount = top[0]?.count || 1;
               return top.map((t, i) => {
-                const pct = total30 ? Math.round((t.count / total30) * 100) : 0;
+                const pct = totalInPeriod ? Math.round((t.count / totalInPeriod) * 100) : 0;
                 const barWidth = Math.max(Math.round((t.count / maxCount) * 100), 8);
                 const color = BAR_PALETTE[i % BAR_PALETTE.length];
                 return (
@@ -529,7 +531,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
           <div className="space-y-3">
             {topSites.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
             {topSites.slice(0, 8).map((s) => {
-              const pct = total30 ? Math.round((s.count / total30) * 100) : 0;
+              const pct = totalInPeriod ? Math.round((s.count / totalInPeriod) * 100) : 0;
               return (
                 <div key={s.name}>
                   <div className="mb-1 flex justify-between text-sm">

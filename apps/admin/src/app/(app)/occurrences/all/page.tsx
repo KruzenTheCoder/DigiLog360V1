@@ -56,6 +56,10 @@ export default async function AllOccurrencesPage({ searchParams }: PageProps) {
     );
   }
   if (filter.status) q = q.eq('status', filter.status);
+  // Coarse bucket used by dashboard KPI drill-ins (matches the KPI's own
+  // non-terminal / terminal split so the list count equals the card).
+  if (filter.status_group === 'live') q = q.not('status', 'in', '(resolved,closed)');
+  if (filter.status_group === 'done') q = q.in('status', ['resolved', 'closed']);
   if (filter.severity) q = q.eq('severity', filter.severity);
   if (filter.site_id) q = q.eq('site_id', filter.site_id);
   if (filter.site_name) q = q.eq('site_name', filter.site_name);

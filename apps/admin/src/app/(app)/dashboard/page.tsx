@@ -10,7 +10,7 @@ import { SlaComplianceReport } from '@/components/dashboard/sla-compliance';
 import { RealtimeRefresh } from '@/components/realtime/realtime-refresh';
 import {
   isSlaBreached, isSlaUpdateDue, SEVERITIES, SEVERITY_LABELS,
-  OCCURRENCE_STATUSES, STATUS_LABELS, STATUS_COLORS,
+  OCCURRENCE_STATUSES, STATUS_LABELS, STATUS_COLORS, TERMINAL_STATUSES,
 } from '@digilog/shared';
 import type { Occurrence } from '@digilog/shared';
 
@@ -81,26 +81,47 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   ]);
   const activeSite = siteParam ? (allSites ?? []).find((s) => s.id === siteParam) : null;
 
+  // Every KPI links into the All Occurrences list, pre-filtered to match what
+  // the number represents. The current site scope (if any) is carried through
+  // so the drill-in stays within the site the user is viewing.
+  const drill = (extra: Record<string, string | undefined>) => {
+    const sp = new URLSearchParams();
+    if (siteParam) sp.set('site_id', siteParam);
+    for (const [k, v] of Object.entries(extra)) if (v) sp.set(k, v);
+    const qs = sp.toString();
+    return `/occurrences/all${qs ? `?${qs}` : ''}`;
+  };
+
   const occ = (data ?? []) as DashboardOcc[];
   const now = new Date();
   const last30 = new Date(now.getTime() - 30 * 864e5);
   const last60 = new Date(now.getTime() - 60 * 864e5);
   const occ30 = occ.filter((o) => new Date(o.incident_at) >= last30);
   const total30 = occ30.length;
-  const open = occ30.filter((o) => o.status === 'open').length;
-  const resolved = occ30.filter((o) => o.status === 'resolved' || o.status === 'closed').length;
-  const resolutionRate = total30 ? Math.round((resolved / total30) * 100) : 0;
+  const isTerminal = (o: DashboardOcc) => (TERMINAL_STATUSES as readonly string[]).includes(o.status);
+  // "Open / Live" = every non-terminal occurrence (open, acknowledged, in_progress,
+  // on_patrol), not just the literal 'open' status — so Open/Live + Resolved = Total.
+  const open = occ30.filter((o) => !isTerminal(o)).length;
+  const resolved = occ30.filter(isTerminal).length;
+  // Percentages are kept as precise floats and only formatted (to 2 dp) at the
+  // point of display — no rounding-up that hides the real figure.
+  const resolutionRate = total30 ? (resolved / total30) * 100 : 0;
+  // Currently-actionable SLA state (age-independent) — drives the alert banner.
   const breached = occ.filter((o) => isSlaBreached(o, now)).length;
   const updateDue = occ.filter((o) => isSlaUpdateDue(o, now) && !isSlaBreached(o, now)).length;
+  // 30-day breach count for the quick-counter row, so all four cards share the
+  // same 30-day window (the banner keeps the age-independent `breached`).
+  const breached30 = occ30.filter((o) => isSlaBreached(o, now)).length;
 
   // Previous 30-day window (days 31–60) for the trend delta on the hero card.
   const prevTotal = occ.filter((o) => {
     const d = new Date(o.incident_at);
     return d >= last60 && d < last30;
   }).length;
-  const trendPct = prevTotal ? Math.round(((total30 - prevTotal) / prevTotal) * 1000) / 10 : null;
+  const trendPct = prevTotal ? ((total30 - prevTotal) / prevTotal) * 100 : null;
 
-  // Average time-to-close (hours) over occurrences closed in the last 30 days.
+  // Average time-to-close (hours) over occurrences that OCCURRED in the last 30
+  // days and have since been closed (occ30 is scoped by incident_at).
   const closed30 = occ30.filter((o) => o.closed_at);
   const avgResolutionHrs = closed30.length
     ? Math.round(
@@ -151,12 +172,10 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   const slaBreaches = slaScoped.filter(breachedEver);
   const slaBreachCount = slaBreaches.length;
   const slaWithin = slaTotal - slaBreachCount;
-  const complianceRate = slaTotal ? Math.round((slaWithin / slaTotal) * 100) : 100;
+  const complianceRate = slaTotal ? (slaWithin / slaTotal) * 100 : 100;
   const avgOverageHrs = slaBreachCount
-    ? Math.round(
-        (slaBreaches.reduce((sum, o) => sum + (slaEnd(o) - new Date(o.sla_due_at as string).getTime()), 0)
-          / slaBreachCount) / 36e5 * 10,
-      ) / 10
+    ? (slaBreaches.reduce((sum, o) => sum + (slaEnd(o) - new Date(o.sla_due_at as string).getTime()), 0)
+        / slaBreachCount) / 36e5
     : 0;
 
   const slaBySeverity = SEVERITIES.map((sev) => {
@@ -164,7 +183,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
     const br = rows.filter(breachedEver).length;
     return {
       key: sev, label: SEVERITY_LABELS[sev], total: rows.length, breached: br,
-      compliance: rows.length ? Math.round(((rows.length - br) / rows.length) * 100) : 100,
+      compliance: rows.length ? ((rows.length - br) / rows.length) * 100 : 100,
     };
   }).filter((s) => s.total > 0);
 
@@ -178,7 +197,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   const slaBySite = [...slaSiteMap.entries()]
     .map(([name, v]) => ({
       name, total: v.total, breached: v.breached,
-      compliance: v.total ? Math.round(((v.total - v.breached) / v.total) * 100) : 100,
+      compliance: v.total ? ((v.total - v.breached) / v.total) * 100 : 100,
     }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 6);
@@ -251,20 +270,22 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           label="Total Incidents"
           sublabel="Last 30 days"
           value={total30}
+          href={drill({})}
           footer={
             trendPct === null
               ? <span>No prior period</span>
               : trendPct === 0
                 ? <span>No change vs previous period</span>
-                : <span>{trendPct < 0 ? '↓' : '↑'} {Math.abs(trendPct)}% vs previous period</span>
+                : <span>{trendPct < 0 ? '↓' : '↑'} {Math.abs(trendPct).toFixed(2)}% vs previous period</span>
           }
         />
         <HeroKpi
           tone="blue"
           icon="ShieldAlert"
           label="Highest Risk"
-          sublabel="Category"
+          sublabel="Incident Type"
           value={typeBreakdown[0]?.name ?? '—'}
+          href={typeBreakdown[0] ? drill({ type: typeBreakdown[0].name }) : undefined}
           footer={`${typeBreakdown[0]?.count ?? 0} incidents logged`}
         />
         <HeroKpi
@@ -273,25 +294,28 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           label="Avg Resolution"
           sublabel="Time to close"
           value={`${avgResolutionHrs} Hrs`}
+          href={drill({ status_group: 'done' })}
           footer={avgResolutionHrs <= 4 ? '✓ Within 4h target' : '⚠ Over 4h target'}
         />
       </div>
 
-      {/* Quick operational counters */}
+      {/* Quick operational counters — each drills into the matching list */}
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { label: 'Open / Live', value: open, accent: 'bg-amber-400' },
-          { label: 'Resolved / Closed', value: resolved, accent: 'bg-emerald-400' },
-          { label: 'SLA Breached', value: breached, accent: 'bg-red-400' },
-          { label: 'Resolution Rate', value: `${resolutionRate}%`, accent: 'bg-brand' },
+          { label: 'Open / Live', value: open, accent: 'bg-amber-400', href: drill({ status_group: 'live' }) },
+          { label: 'Resolved / Closed', value: resolved, accent: 'bg-emerald-400', href: drill({ status_group: 'done' }) },
+          { label: 'SLA Breached', value: breached30, accent: 'bg-red-400', href: drill({ status_group: 'live', sort: 'sla_due_at', dir: 'asc' }) },
+          { label: 'Resolution Rate', value: `${resolutionRate.toFixed(2)}%`, accent: 'bg-brand', href: drill({ status_group: 'done' }) },
         ].map((c) => (
-          <Card key={c.label} className="flex items-stretch overflow-hidden p-0">
-            <span className={`w-1.5 shrink-0 ${c.accent}`} />
-            <div className="px-4 py-3">
-              <p className="text-2xl font-extrabold leading-tight">{c.value}</p>
-              <p className="text-xs text-[hsl(var(--muted))]">{c.label}</p>
-            </div>
-          </Card>
+          <a key={c.label} href={c.href} className="group">
+            <Card className="flex items-stretch overflow-hidden p-0 transition group-hover:-translate-y-0.5 group-hover:shadow-md">
+              <span className={`w-1.5 shrink-0 ${c.accent}`} />
+              <div className="px-4 py-3">
+                <p className="text-2xl font-extrabold leading-tight">{c.value}</p>
+                <p className="text-xs text-[hsl(var(--muted))]">{c.label}</p>
+              </div>
+            </Card>
+          </a>
         ))}
       </div>
 
@@ -310,14 +334,14 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
             </div>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
               {statusCounts.map((s) => {
-                const pct = total30 ? Math.round((s.count / total30) * 100) : 0;
+                const pct = total30 ? (s.count / total30) * 100 : 0;
                 return (
-                  <span key={s.key} className="flex items-center gap-1.5 text-xs">
+                  <a key={s.key} href={drill({ status: s.key })} className="flex items-center gap-1.5 text-xs hover:underline">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
                     {s.label}
                     <span className="font-semibold text-[hsl(var(--foreground))]">{s.count}</span>
-                    <span className="text-[hsl(var(--muted))]">({pct}%)</span>
-                  </span>
+                    <span className="text-[hsl(var(--muted))]">({pct.toFixed(2)}%)</span>
+                  </a>
                 );
               })}
             </div>
@@ -327,7 +351,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
 
       {/* Category breakdown + high-frequency incidents */}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <GradientSection title="Incident Breakdown by Category" icon="PieChart" tone="brand">
+        <GradientSection title="Incident Breakdown by Type" icon="PieChart" tone="brand">
           <CategoryDonut data={typeBreakdown} />
         </GradientSection>
         <GradientSection title="High-Frequency Incidents" icon="Flame" tone="red">
@@ -339,11 +363,11 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
               // sliver when many types each hold a small % of the total.
               const maxCount = typeBreakdown[0]?.count || 1;
               return typeBreakdown.map((t, i) => {
-                const pct = total30 ? Math.round((t.count / total30) * 100) : 0;
+                const pct = total30 ? (t.count / total30) * 100 : 0;
                 const barWidth = Math.max(Math.round((t.count / maxCount) * 100), 8);
                 const color = BAR_PALETTE[i % BAR_PALETTE.length];
                 return (
-                  <div key={t.name} className="flex items-center gap-3">
+                  <a key={t.name} href={drill({ type: t.name })} className="flex items-center gap-3 rounded-lg p-1 -m-1 transition hover:bg-slate-50 dark:hover:bg-slate-800/40">
                     {/* Rank badge */}
                     <span
                       className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm"
@@ -355,7 +379,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
                       <div className="mb-1 flex items-center justify-between gap-2 text-sm">
                         <span className="truncate font-medium">{t.name}</span>
                         <span className="shrink-0 text-xs text-[hsl(var(--muted))]">
-                          <span className="font-semibold text-[hsl(var(--foreground))]">{t.count}</span> · {pct}%
+                          <span className="font-semibold text-[hsl(var(--foreground))]">{t.count}</span> · {pct.toFixed(2)}%
                         </span>
                       </div>
                       <div className="h-4 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
@@ -366,14 +390,14 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
                             backgroundColor: color,
                           }}
                         >
-                          {barWidth >= 22 ? `${pct}%` : ''}
+                          {barWidth >= 22 ? `${pct.toFixed(2)}%` : ''}
                         </div>
                       </div>
                       <div className="mt-1 text-right text-[10px] font-medium text-[hsl(var(--muted))]">
-                        {pct}% of total incidents
+                        {pct.toFixed(2)}% of total incidents
                       </div>
                     </div>
-                  </div>
+                  </a>
                 );
               });
             })()}
@@ -387,17 +411,17 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           <div className="space-y-3">
             {topSites.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
             {topSites.map((s) => {
-              const pct = total30 ? Math.round((s.count / total30) * 100) : 0;
+              const pct = total30 ? (s.count / total30) * 100 : 0;
               return (
-                <div key={s.name}>
+                <a key={s.name} href={drill({ site_name: s.name === 'Unassigned' ? undefined : s.name })} className="block rounded-md p-1 -m-1 transition hover:bg-slate-50 dark:hover:bg-slate-800/40">
                   <div className="mb-1 flex justify-between text-sm">
                     <span>{s.name}</span>
-                    <span className="text-[hsl(var(--muted))]">{s.count} ({pct}%)</span>
+                    <span className="text-[hsl(var(--muted))]">{s.count} ({pct.toFixed(2)}%)</span>
                   </div>
                   <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                     <div className="h-full rounded-full bg-brand-gradient" style={{ width: `${pct}%` }} />
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>
@@ -410,7 +434,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
       {/* Severity distribution */}
       <div className="mt-5">
         <GradientSection title="Severity Distribution" icon="Layers" tone="amber">
-          <SeverityCards counts={severityCounts} />
+          <SeverityCards counts={severityCounts} hrefFor={(key) => drill({ severity: key })} />
         </GradientSection>
       </div>
 
@@ -425,6 +449,9 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
             avgOverageHrs={avgOverageHrs}
             bySeverity={slaBySeverity}
             bySite={slaBySite}
+            hrefForSeverity={(key) => drill({ severity: key })}
+            hrefForSite={(name) => drill({ site_name: name === 'Unassigned' ? undefined : name })}
+            hrefBreached={drill({ status_group: 'live', sort: 'sla_due_at', dir: 'asc' })}
           />
         </GradientSection>
       </div>

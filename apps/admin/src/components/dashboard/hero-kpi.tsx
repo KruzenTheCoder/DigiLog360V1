@@ -16,7 +16,7 @@ const TONES: Record<HeroTone, string> = {
  * trend / target line.
  */
 export function HeroKpi({
-  tone, icon, label, sublabel, value, footer,
+  tone, icon, label, sublabel, value, footer, href,
 }: {
   tone: HeroTone;
   icon: string;
@@ -24,13 +24,18 @@ export function HeroKpi({
   sublabel?: string;
   value: string | number;
   footer?: React.ReactNode;
+  /** When set, the whole tile becomes a link to this occurrence-list view. */
+  href?: string;
 }) {
   const C = getIcon(icon, 'Activity');
+  const Wrapper = href ? 'a' : 'div';
 
   return (
-    <div
+    <Wrapper
+      {...(href ? { href } : {})}
       className={cn(
         'relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-lg',
+        href && 'block transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/60',
         TONES[tone],
       )}
     >
@@ -53,6 +58,6 @@ export function HeroKpi({
           {footer}
         </div>
       )}
-    </div>
+    </Wrapper>
   );
 }
