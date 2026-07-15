@@ -34,7 +34,8 @@ export function ReportsClient({
       let allowedIds: number[] | null = null;
       if (scoped) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: occs } = await (sb as any).from('occurrences').select('id').in('site_id', ownSites);
+        const { data: occs } = await (sb as any).from('occurrences')
+          .select('id').in('site_id', ownSites);
         allowedIds = (occs ?? []).map((o: { id: number }) => o.id);
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

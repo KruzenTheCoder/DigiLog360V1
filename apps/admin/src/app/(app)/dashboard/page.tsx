@@ -59,25 +59,33 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   // first; sequencing them serially added a full round-trip on every page
   // load. Also: select only the columns the dashboard aggregates over —
   // pulling `select('*')` was returning ~25 KB per row × thousands of rows.
-  let occQ = supabase
-    .from('occurrences')
-    .select('id, status, severity, occurrence_type, site_name, site_id, incident_at, sla_due_at, last_sla_update_at, sla_hours, closed_at')
-    .gte('incident_at', sixMonthsAgo.toISOString())
-    .order('incident_at', { ascending: false });
-
-  // Constrain to the user's site scope FIRST, then narrow further if they
-  // picked a single site from the filter chips.
-  if (!isUnscopedRole && ownSites.length > 0) occQ = occQ.in('site_id', ownSites);
-  if (siteParam) occQ = occQ.eq('site_id', siteParam);
-
   // Visible sites in the chip row mirror the user's scope — admin/super_user
   // see every site in the org; everyone else sees only their assigned sites.
   let sitesQ = supabase.from('sites').select('id, name').order('name');
   if (!isUnscopedRole && ownSites.length > 0) sitesQ = sitesQ.in('id', ownSites);
 
-  const [{ data: allSites }, { data }] = await Promise.all([
+  const fetchDashboardOccurrences = async () => {
+    let base = supabase
+      .from('occurrences')
+      .select('id, status, severity, occurrence_type, site_name, site_id, incident_at, sla_due_at, last_sla_update_at, sla_hours, closed_at')
+      .gte('incident_at', sixMonthsAgo.toISOString())
+      .order('incident_at', { ascending: false });
+
+    // If they picked a specific site from the chips, just use that.
+    if (siteParam) {
+      return (await base.eq('site_id', siteParam)).data ?? [];
+    }
+
+    if (!isUnscopedRole && ownSites.length > 0) {
+      base = base.in('site_id', ownSites);
+    }
+
+    return (await base).data ?? [];
+  };
+
+  const [{ data: allSites }, data] = await Promise.all([
     sitesQ,
-    occQ,
+    fetchDashboardOccurrences(),
   ]);
   const activeSite = siteParam ? (allSites ?? []).find((s) => s.id === siteParam) : null;
 

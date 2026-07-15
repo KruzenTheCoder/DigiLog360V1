@@ -44,13 +44,28 @@ export function LiveBoard({ initial, profile }: { initial: LiveOccurrence[]; pro
   const [site, setSite] = useState('all');
   const [type, setType] = useState('all');
 
+  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
+  const ownSites = useMemo(() => Array.from(new Set([
+    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
+    ...(profile.site_id ? [profile.site_id] : []),
+  ])), [profSiteIds, profile.site_id]);
+  const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
+
   const refresh = useCallback(async () => {
     const supabase = createClient();
-    const { data } = await supabase.from('occurrences_live')
-      .select(SELECT)
-      .order('incident_at', { ascending: false });
-    if (data) setItems(data as unknown as LiveRow[]);
-  }, []);
+    const base = () => supabase.from('occurrences_live').select(SELECT).order('incident_at', { ascending: false });
+    
+    if (!isUnscopedRole && ownSites.length > 0) {
+      // Fetch concurrently to prevent Postgres from running a sequential scan timeout
+      const results = await Promise.all(ownSites.map(sid => base().eq('site_id', sid)));
+      const merged = results.flatMap(r => r.data ?? []);
+      merged.sort((a, b) => new Date((b as any).incident_at).getTime() - new Date((a as any).incident_at).getTime());
+      setItems(merged as unknown as LiveRow[]);
+    } else {
+      const { data } = await base();
+      if (data) setItems(data as unknown as LiveRow[]);
+    }
+  }, [isUnscopedRole, ownSites]);
 
   useEffect(() => {
     const supabase = createClient();

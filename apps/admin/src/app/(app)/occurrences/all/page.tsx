@@ -36,47 +36,53 @@ export default async function AllOccurrencesPage({ searchParams }: PageProps) {
   const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
 
   // ---------- build the query ----------
-  let q = supabase
-    .from('occurrences')
-    .select('*', { count: 'exact' })
-    .order(sort, { ascending: dir === 'asc' });
+  const fetchAllOccurrences = async () => {
+    const base = () => {
+      let b = supabase
+        .from('occurrences')
+        .select('*', { count: 'exact' })
+        .order(sort, { ascending: dir === 'asc' });
 
-  if (!isUnscopedRole && ownSites.length > 0) q = q.in('site_id', ownSites);
+      if (filter.q) {
+        // Fuzzy match across ob_number / type / description (gin_trgm indices).
+        const needle = filter.q.replace(/[%_]/g, '\\$&');
+        b = b.or(
+          [
+            `ob_number.ilike.%${needle}%`,
+            `occurrence_type.ilike.%${needle}%`,
+            `description.ilike.%${needle}%`,
+            `logged_by_name.ilike.%${needle}%`,
+          ].join(','),
+        );
+      }
+      if (filter.status) b = b.eq('status', filter.status);
+      if (filter.status_group === 'live') b = b.not('status', 'in', '(resolved,closed)');
+      if (filter.status_group === 'done') b = b.in('status', ['resolved', 'closed']);
+      if (filter.severity) b = b.eq('severity', filter.severity);
+      if (filter.site_id) b = b.eq('site_id', filter.site_id);
+      if (filter.site_name) b = b.eq('site_name', filter.site_name);
+      if (filter.type) b = b.eq('occurrence_type', filter.type);
+      if (filter.logged_by) b = b.eq('logged_by', filter.logged_by);
+      if (filter.is_patrol === 'true') b = b.eq('is_patrol', true);
+      if (filter.is_patrol === 'false') b = b.eq('is_patrol', false);
+      if (filter.from) b = b.gte('incident_at', new Date(filter.from).toISOString());
+      if (filter.to) {
+        const end = new Date(filter.to);
+        end.setUTCHours(23, 59, 59, 999);
+        b = b.lte('incident_at', end.toISOString());
+      }
+      return b;
+    };
 
-  if (filter.q) {
-    // Fuzzy match across ob_number / type / description (gin_trgm indices).
-    const needle = filter.q.replace(/[%_]/g, '\\$&');
-    q = q.or(
-      [
-        `ob_number.ilike.%${needle}%`,
-        `occurrence_type.ilike.%${needle}%`,
-        `description.ilike.%${needle}%`,
-        `logged_by_name.ilike.%${needle}%`,
-      ].join(','),
-    );
-  }
-  if (filter.status) q = q.eq('status', filter.status);
-  // Coarse bucket used by dashboard KPI drill-ins (matches the KPI's own
-  // non-terminal / terminal split so the list count equals the card).
-  if (filter.status_group === 'live') q = q.not('status', 'in', '(resolved,closed)');
-  if (filter.status_group === 'done') q = q.in('status', ['resolved', 'closed']);
-  if (filter.severity) q = q.eq('severity', filter.severity);
-  if (filter.site_id) q = q.eq('site_id', filter.site_id);
-  if (filter.site_name) q = q.eq('site_name', filter.site_name);
-  if (filter.type) q = q.eq('occurrence_type', filter.type);
-  if (filter.logged_by) q = q.eq('logged_by', filter.logged_by);
-  if (filter.is_patrol === 'true') q = q.eq('is_patrol', true);
-  if (filter.is_patrol === 'false') q = q.eq('is_patrol', false);
-  if (filter.from) q = q.gte('incident_at', new Date(filter.from).toISOString());
-  if (filter.to) {
-    // "to" is inclusive — bump to the end of that day.
-    const end = new Date(filter.to);
-    end.setUTCHours(23, 59, 59, 999);
-    q = q.lte('incident_at', end.toISOString());
-  }
+    if (!isUnscopedRole && ownSites.length > 0) {
+      let q = base().in('site_id', ownSites);
+      const offset = (page - 1) * pageSize;
+      return await q.range(offset, offset + pageSize - 1);
+    }
 
-  const offset = (page - 1) * pageSize;
-  q = q.range(offset, offset + pageSize - 1);
+    const offset = (page - 1) * pageSize;
+    return await base().range(offset, offset + pageSize - 1);
+  };
 
   // ---------- saved views (graceful if migration not deployed yet) ----------
   // Wrapped so a missing table resolves to [] instead of rejecting the batch.
@@ -105,7 +111,7 @@ export default async function AllOccurrencesPage({ searchParams }: PageProps) {
     { data: typeRows },
     views,
   ] = await Promise.all([
-    q,
+    fetchAllOccurrences(),
     supabase.from('sites').select('id, name').order('name'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
