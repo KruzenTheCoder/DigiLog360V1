@@ -23,6 +23,25 @@ function complianceColor(pct: number) {
   return '#dc2626'; // red
 }
 
+// Summary tile — a plain box, or a link when `href` is supplied.
+function Tile({
+  value, label, valueClass, valueStyle, href,
+}: {
+  value: string | number; label: string;
+  valueClass?: string; valueStyle?: React.CSSProperties; href?: string;
+}) {
+  const Wrapper = href ? 'a' : 'div';
+  return (
+    <Wrapper
+      {...(href ? { href } : {})}
+      className={`block rounded-xl border p-4 text-center ${href ? 'transition hover:-translate-y-0.5 hover:shadow-md' : ''}`}
+    >
+      <p className={`text-3xl font-extrabold ${valueClass ?? ''}`} style={valueStyle}>{value}</p>
+      <p className="mt-0.5 text-xs text-[hsl(var(--muted))]">{label}</p>
+    </Wrapper>
+  );
+}
+
 function Bar({ pct, color }: { pct: number; color: string }) {
   return (
     <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
@@ -31,8 +50,13 @@ function Bar({ pct, color }: { pct: number; color: string }) {
   );
 }
 
+// Percentages are shown to 2 decimals (no rounding-up) so a 99.20% rate never
+// masquerades as a clean "99%".
+const pct2 = (n: number) => `${n.toFixed(2)}%`;
+
 export function SlaComplianceReport({
   complianceRate, within, breached, total, avgOverageHrs, bySeverity, bySite,
+  hrefForSeverity, hrefForSite, hrefBreached,
 }: {
   complianceRate: number;
   within: number;
@@ -41,6 +65,9 @@ export function SlaComplianceReport({
   avgOverageHrs: number;
   bySeverity: SevCompliance[];
   bySite: SiteCompliance[];
+  hrefForSeverity?: (key: SeverityLevel) => string;
+  hrefForSite?: (name: string) => string;
+  hrefBreached?: string;
 }) {
   const rateColor = complianceColor(complianceRate);
 
@@ -61,22 +88,10 @@ export function SlaComplianceReport({
           <div className="space-y-6">
             {/* Summary tiles */}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <div className="rounded-xl border p-4 text-center">
-                <p className="text-3xl font-extrabold" style={{ color: rateColor }}>{complianceRate}%</p>
-                <p className="mt-0.5 text-xs text-[hsl(var(--muted))]">Compliance rate</p>
-              </div>
-              <div className="rounded-xl border p-4 text-center">
-                <p className="text-3xl font-extrabold text-emerald-600">{within}</p>
-                <p className="mt-0.5 text-xs text-[hsl(var(--muted))]">Within SLA</p>
-              </div>
-              <div className="rounded-xl border p-4 text-center">
-                <p className="text-3xl font-extrabold text-red-600">{breached}</p>
-                <p className="mt-0.5 text-xs text-[hsl(var(--muted))]">Breached</p>
-              </div>
-              <div className="rounded-xl border p-4 text-center">
-                <p className="text-3xl font-extrabold">{avgOverageHrs}h</p>
-                <p className="mt-0.5 text-xs text-[hsl(var(--muted))]">Avg breach overage</p>
-              </div>
+              <Tile value={pct2(complianceRate)} valueStyle={{ color: rateColor }} label="Compliance rate" />
+              <Tile value={within} valueClass="text-emerald-600" label="Within SLA" />
+              <Tile value={breached} valueClass="text-red-600" label="Breached" href={hrefBreached} />
+              <Tile value={`${avgOverageHrs.toFixed(2)}h`} label="Avg breach overage" />
             </div>
 
             {/* Overall compliance bar */}
@@ -98,18 +113,22 @@ export function SlaComplianceReport({
                 </h3>
                 <div className="space-y-3">
                   {bySeverity.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data.</p>}
-                  {bySeverity.map((s) => (
-                    <div key={s.key}>
-                      <div className="mb-1 flex items-center justify-between text-sm">
-                        <span className="flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full" style={{ background: SEVERITY_COLORS[s.key] }} />
-                          {s.label}
-                        </span>
-                        <span className="text-[hsl(var(--muted))]">{s.compliance}% · {s.breached}/{s.total} breached</span>
-                      </div>
-                      <Bar pct={s.compliance} color={complianceColor(s.compliance)} />
-                    </div>
-                  ))}
+                  {bySeverity.map((s) => {
+                    const href = hrefForSeverity?.(s.key);
+                    const Row = href ? 'a' : 'div';
+                    return (
+                      <Row key={s.key} {...(href ? { href } : {})} className={href ? 'block rounded-md transition hover:bg-slate-50 dark:hover:bg-slate-800/40' : 'block'}>
+                        <div className="mb-1 flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ background: SEVERITY_COLORS[s.key] }} />
+                            {s.label}
+                          </span>
+                          <span className="text-[hsl(var(--muted))]">{s.compliance.toFixed(2)}% · {s.breached}/{s.total} breached</span>
+                        </div>
+                        <Bar pct={s.compliance} color={complianceColor(s.compliance)} />
+                      </Row>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -120,15 +139,19 @@ export function SlaComplianceReport({
                 </h3>
                 <div className="space-y-3">
                   {bySite.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data.</p>}
-                  {bySite.map((s) => (
-                    <div key={s.name}>
-                      <div className="mb-1 flex items-center justify-between text-sm">
-                        <span>{s.name}</span>
-                        <span className="text-[hsl(var(--muted))]">{s.compliance}% · {s.breached}/{s.total} breached</span>
-                      </div>
-                      <Bar pct={s.compliance} color={complianceColor(s.compliance)} />
-                    </div>
-                  ))}
+                  {bySite.map((s) => {
+                    const href = hrefForSite?.(s.name);
+                    const Row = href ? 'a' : 'div';
+                    return (
+                      <Row key={s.name} {...(href ? { href } : {})} className={href ? 'block rounded-md transition hover:bg-slate-50 dark:hover:bg-slate-800/40' : 'block'}>
+                        <div className="mb-1 flex items-center justify-between text-sm">
+                          <span>{s.name}</span>
+                          <span className="text-[hsl(var(--muted))]">{s.compliance.toFixed(2)}% · {s.breached}/{s.total} breached</span>
+                        </div>
+                        <Bar pct={s.compliance} color={complianceColor(s.compliance)} />
+                      </Row>
+                    );
+                  })}
                 </div>
               </div>
             </div>

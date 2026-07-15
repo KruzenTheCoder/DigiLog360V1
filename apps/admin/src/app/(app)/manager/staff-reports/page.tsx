@@ -246,12 +246,11 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
   const slaTotal = slaScoped.length;
   const slaBreaches = slaScoped.filter(breachedEver);
   const slaWithin = slaTotal - slaBreaches.length;
-  const complianceRate = slaTotal ? Math.round((slaWithin / slaTotal) * 100) : 100;
+  // Precise floats — the SlaComplianceReport formats them to 2 dp at display.
+  const complianceRate = slaTotal ? (slaWithin / slaTotal) * 100 : 100;
   const avgOverageHrs = slaBreaches.length
-    ? Math.round(
-        (slaBreaches.reduce((s, o) => s + (slaEnd(o) - new Date(o.sla_due_at as string).getTime()), 0)
-          / slaBreaches.length) / 36e5 * 10,
-      ) / 10
+    ? (slaBreaches.reduce((s, o) => s + (slaEnd(o) - new Date(o.sla_due_at as string).getTime()), 0)
+        / slaBreaches.length) / 36e5
     : 0;
   const slaBySeverity = SEVERITIES.map((sev) => {
     const rows = slaScoped.filter((o) => o.severity === sev);
@@ -259,7 +258,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
     return {
       key: sev, label: SEVERITY_LABELS[sev],
       total: rows.length, breached: br,
-      compliance: rows.length ? Math.round(((rows.length - br) / rows.length) * 100) : 100,
+      compliance: rows.length ? ((rows.length - br) / rows.length) * 100 : 100,
     };
   }).filter((s) => s.total > 0);
   const slaSiteMap = new Map<string, { total: number; breached: number }>();
@@ -272,7 +271,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
   const slaBySite = [...slaSiteMap.entries()]
     .map(([name, v]) => ({
       name, total: v.total, breached: v.breached,
-      compliance: v.total ? Math.round(((v.total - v.breached) / v.total) * 100) : 100,
+      compliance: v.total ? ((v.total - v.breached) / v.total) * 100 : 100,
     }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 6);

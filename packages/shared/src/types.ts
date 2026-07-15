@@ -96,6 +96,10 @@ export type ManagerDecision = 'acknowledged' | 'escalated' | 'rejected';
 export interface OccurrencesFilter {
   q?: string;
   status?: OccurrenceStatus | '';
+  // Coarse status bucket for KPI drill-ins: 'live' = every non-terminal status
+  // (open/acknowledged/in_progress/on_patrol), 'done' = resolved/closed. Lets a
+  // multi-status KPI (e.g. "Open / Live") link to a list whose count matches.
+  status_group?: '' | 'live' | 'done';
   severity?: SeverityLevel | '';
   site_id?: string;
   site_name?: string;
@@ -107,7 +111,7 @@ export interface OccurrencesFilter {
 }
 
 export const OCCURRENCE_FILTER_KEYS: (keyof OccurrencesFilter)[] = [
-  'q', 'status', 'severity', 'site_id', 'site_name', 'type',
+  'q', 'status', 'status_group', 'severity', 'site_id', 'site_name', 'type',
   'from', 'to', 'logged_by', 'is_patrol',
 ];
 
