@@ -1,4 +1,5 @@
 import { requireProfile, loadMyCapabilities } from '@/lib/auth';
+import { siteScope } from '@/lib/site-scope';
 import { createClient } from '@/lib/supabase/server';
 import { AppShell } from '@/components/layout/app-shell';
 
@@ -13,11 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const sb: any = supabase;
 
   // Union of the user's assigned sites (site_ids[] + legacy site_id).
-  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
-  const ownSiteIds = Array.from(new Set([
-    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
-    ...(profile.site_id ? [profile.site_id] : []),
-  ]));
+  const { ownSites: ownSiteIds, isUnscoped } = siteScope(profile);
 
   const [capsSet, sitesRows, orgRow] = await Promise.all([
     loadMyCapabilities(),
@@ -32,7 +29,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   //   • multiple assigned   → "Multi-site"
   //   • exactly one         → that site's name
   const siteList = (sitesRows.data ?? []) as Array<{ id: string; name: string }>;
-  const isUnscoped = profile.role === 'admin' || profile.role === 'super_user';
   const siteLabel = isUnscoped
     ? 'All sites'
     : siteList.length > 1

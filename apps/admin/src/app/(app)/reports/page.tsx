@@ -1,4 +1,5 @@
 import { requireProfile } from '@/lib/auth';
+import { siteScope } from '@/lib/site-scope';
 import { PageHeader } from '@/components/page-header';
 import { ReportsClient } from '@/components/reports/reports-client';
 
@@ -10,17 +11,12 @@ export default async function ReportsPage() {
   // this page renders instantly instead of waiting on a US round-trip.
   const profile = await requireProfile();
 
-  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
-  const ownSites = Array.from(new Set([
-    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
-    ...(profile.site_id ? [profile.site_id] : []),
-  ]));
-  const isUnscoped = profile.role === 'admin' || profile.role === 'super_user';
+  const { ownSites, isUnscoped } = siteScope(profile);
 
   return (
     <>
       <PageHeader title="Occurrence Reports" description="Detailed incident reports — view, filter or export to PDF." />
-      <ReportsClient ownSites={ownSites} isUnscoped={isUnscoped} />
+      <ReportsClient ownSites={ownSites} isUnscoped={isUnscoped} userId={profile.id} />
     </>
   );
 }

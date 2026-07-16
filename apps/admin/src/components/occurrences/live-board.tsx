@@ -7,6 +7,7 @@ import {
   AlertTriangle, RefreshCw, FileText, Bell, ScrollText, PencilLine, RotateCcw,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { siteScope } from '@/lib/site-scope';
 import { Card } from '@/components/ui/card';
 import { GradientSection } from '@/components/ui/gradient-section';
 import { Button } from '@/components/ui/button';
@@ -44,20 +45,22 @@ export function LiveBoard({ initial, profile }: { initial: LiveOccurrence[]; pro
   const [site, setSite] = useState('all');
   const [type, setType] = useState('all');
 
-  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
-  const ownSites = useMemo(() => Array.from(new Set([
-    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
-    ...(profile.site_id ? [profile.site_id] : []),
-  ])), [profSiteIds, profile.site_id]);
-  const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const scope = useMemo(() => siteScope(profile), [profile.id]);
 
   const refresh = useCallback(async () => {
     const supabase = createClient();
     const base = () => supabase.from('occurrences_live').select(SELECT).order('incident_at', { ascending: false });
-    
-    if (!isUnscopedRole && ownSites.length > 0) {
+
+    if (!scope.isUnscoped) {
+      if (scope.ownSites.length === 0) {
+        // Site-less scoped user — own rows only (unfiltered would time out).
+        const { data } = await base().eq('logged_by', profile.id);
+        setItems((data ?? []) as unknown as LiveRow[]);
+        return;
+      }
       // Fetch concurrently to prevent Postgres from running a sequential scan timeout
-      const results = await Promise.all(ownSites.map(sid => base().eq('site_id', sid)));
+      const results = await Promise.all(scope.ownSites.map(sid => base().eq('site_id', sid)));
       const merged = results.flatMap(r => r.data ?? []);
       merged.sort((a, b) => new Date((b as any).incident_at).getTime() - new Date((a as any).incident_at).getTime());
       setItems(merged as unknown as LiveRow[]);
@@ -65,7 +68,7 @@ export function LiveBoard({ initial, profile }: { initial: LiveOccurrence[]; pro
       const { data } = await base();
       if (data) setItems(data as unknown as LiveRow[]);
     }
-  }, [isUnscopedRole, ownSites]);
+  }, [scope, profile.id]);
 
   useEffect(() => {
     const supabase = createClient();

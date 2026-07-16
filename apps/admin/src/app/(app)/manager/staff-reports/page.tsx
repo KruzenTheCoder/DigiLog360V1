@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, isManager } from '@/lib/auth';
+import { siteScope } from '@/lib/site-scope';
 import { PageHeader } from '@/components/page-header';
 import { GradientSection } from '@/components/ui/gradient-section';
 import { HeroKpi } from '@/components/dashboard/hero-kpi';
@@ -102,15 +103,10 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const now = new Date();
 
-  // Site scope — admin / super_user see everything they have RLS for;
-  // everyone else is restricted to the sites they're assigned to.
-  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
-  const ownSites = Array.from(new Set([
-    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
-    ...(profile.site_id ? [profile.site_id] : []),
-  ]));
-  const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
-  const scopeSites = !isUnscopedRole && ownSites.length > 0 ? ownSites : null;
+  // Site scope — admin / super_user (any held role) see everything; everyone
+  // else is restricted to the sites they're assigned to.
+  const { ownSites, isUnscoped } = siteScope(profile);
+  const scopeSites = !isUnscoped && ownSites.length > 0 ? ownSites : null;
 
   // ----------------------------- core data -----------------------------------
 
@@ -124,6 +120,8 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
     .gte('incident_at', since)
     .order('incident_at', { ascending: false });
   if (scopeSites) occQ = occQ.in('site_id', scopeSites);
+  // Site-less scoped user → own rows only (unfiltered would time out on RLS).
+  else if (!isUnscoped) occQ = occQ.eq('logged_by', profile.id);
 
   const [
     { data: occRaw },

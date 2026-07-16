@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
+import { siteScope } from '@/lib/site-scope';
 import { PageHeader } from '@/components/page-header';
 import { OccurrencesExplorer } from '@/components/occurrences/occurrences-explorer';
 import { RealtimeRefresh } from '@/components/realtime/realtime-refresh';
@@ -25,15 +26,10 @@ export default async function AllOccurrencesPage({ searchParams }: PageProps) {
 
   const supabase = await createClient();
 
-  // Site scope — admin / super_user see every site; everyone else is
-  // restricted to the sites they're assigned to (profile.site_ids[] union
-  // legacy site_id column).
-  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
-  const ownSites = Array.from(new Set([
-    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
-    ...(profile.site_id ? [profile.site_id] : []),
-  ]));
-  const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
+  // Site scope — admin / super_user (any held role) see every site; everyone
+  // else is restricted to the sites they're assigned to (profile.site_ids[]
+  // union legacy site_id column).
+  const { ownSites, isUnscoped } = siteScope(profile);
 
   // ---------- build the query ----------
   const fetchAllOccurrences = async () => {
@@ -74,13 +70,15 @@ export default async function AllOccurrencesPage({ searchParams }: PageProps) {
       return b;
     };
 
-    if (!isUnscopedRole && ownSites.length > 0) {
-      let q = base().in('site_id', ownSites);
-      const offset = (page - 1) * pageSize;
+    const offset = (page - 1) * pageSize;
+    if (!isUnscoped) {
+      // Site-less scoped user → own rows only (unfiltered would time out).
+      const q = ownSites.length > 0
+        ? base().in('site_id', ownSites)
+        : base().eq('logged_by', profile.id);
       return await q.range(offset, offset + pageSize - 1);
     }
 
-    const offset = (page - 1) * pageSize;
     return await base().range(offset, offset + pageSize - 1);
   };
 
@@ -119,7 +117,15 @@ export default async function AllOccurrencesPage({ searchParams }: PageProps) {
       .in('role', ['admin', 'manager', 'control_room', 'supervisor'])
       .order('full_name'),
     // PostgREST has no DISTINCT — sample a window and unique client-side.
-    supabase.from('occurrences').select('occurrence_type').limit(2000),
+    // Scoped the same way as the main list: an unfiltered sample forces a
+    // full-table RLS scan for non-admins, which times out.
+    (() => {
+      let tq = supabase.from('occurrences').select('occurrence_type').limit(2000);
+      if (!isUnscoped) {
+        tq = ownSites.length > 0 ? tq.in('site_id', ownSites) : tq.eq('logged_by', profile.id);
+      }
+      return tq;
+    })(),
     savedViewsQuery,
   ]);
 

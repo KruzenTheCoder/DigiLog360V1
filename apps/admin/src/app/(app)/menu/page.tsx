@@ -1,4 +1,5 @@
 import { requireProfile, loadMyCapabilities } from '@/lib/auth';
+import { siteScope } from '@/lib/site-scope';
 import { visibleSections } from '@/components/layout/nav-config';
 import { RoleMenu, type RoleMenuData } from '@/components/menu/role-menu';
 import { profileRoles, roleRank, type AppRole } from '@digilog/shared';
@@ -59,12 +60,9 @@ export default async function MenuPage() {
     });
   }
 
-  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
-  const ownSites = Array.from(new Set([
-    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
-    ...(profile.site_id ? [profile.site_id] : []),
-  ]));
-  const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
+  // Shared scope rules — checks ALL held roles (roles[]), not just the
+  // primary, and unions site_ids[] with the legacy site_id column.
+  const { ownSites, isUnscoped: isUnscopedRole } = siteScope(profile);
 
   return (
     <RoleMenu

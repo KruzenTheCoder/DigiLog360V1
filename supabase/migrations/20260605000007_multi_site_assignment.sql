@@ -117,6 +117,8 @@ create policy keys_select on public.keys
     )
   );
 
+-- key_handovers has NO site_id column — a handover belongs to a site through
+-- its key (key_id → keys.site_id).
 drop policy if exists key_handovers_select on public.key_handovers;
 create policy key_handovers_select on public.key_handovers
   for select to authenticated using (
@@ -124,7 +126,10 @@ create policy key_handovers_select on public.key_handovers
     or (
       org_id = public.current_org_id() and (
         public.is_admin()
-        or site_id = any(public.current_site_ids())
+        or key_id in (
+          select k.id from public.keys k
+          where k.site_id = any(public.current_site_ids())
+        )
       )
     )
   );

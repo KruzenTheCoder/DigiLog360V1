@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
+import { siteScope } from '@/lib/site-scope';
 import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { GradientSection } from '@/components/ui/gradient-section';
@@ -45,15 +46,10 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-  // Site scope — admin / super_user see everything they have RLS for.
-  // Everyone else is restricted to the sites they're assigned to
+  // Site scope — admin / super_user (any held role) see everything; everyone
+  // else is restricted to the sites they're assigned to
   // (profile.site_ids[] union profile.site_id legacy column).
-  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
-  const ownSites = Array.from(new Set([
-    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
-    ...(profile.site_id ? [profile.site_id] : []),
-  ]));
-  const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
+  const { ownSites, isUnscoped } = siteScope(profile);
 
   // Run the two queries in parallel. The previous version waited on sites
   // first; sequencing them serially added a full round-trip on every page
@@ -62,7 +58,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   // Visible sites in the chip row mirror the user's scope — admin/super_user
   // see every site in the org; everyone else sees only their assigned sites.
   let sitesQ = supabase.from('sites').select('id, name').order('name');
-  if (!isUnscopedRole && ownSites.length > 0) sitesQ = sitesQ.in('id', ownSites);
+  if (!isUnscoped && ownSites.length > 0) sitesQ = sitesQ.in('id', ownSites);
 
   const fetchDashboardOccurrences = async () => {
     let base = supabase
@@ -71,13 +67,17 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
       .gte('incident_at', sixMonthsAgo.toISOString())
       .order('incident_at', { ascending: false });
 
-    // If they picked a specific site from the chips, just use that.
-    if (siteParam) {
+    // If they picked a specific site from the chips, honour it — but a scoped
+    // user can only pick within their own sites.
+    if (siteParam && (isUnscoped || ownSites.includes(siteParam))) {
       return (await base.eq('site_id', siteParam)).data ?? [];
     }
 
-    if (!isUnscopedRole && ownSites.length > 0) {
-      base = base.in('site_id', ownSites);
+    if (!isUnscoped) {
+      // Site-less scoped user → own rows only (unfiltered would time out).
+      base = ownSites.length > 0
+        ? base.in('site_id', ownSites)
+        : base.eq('logged_by', profile.id);
     }
 
     return (await base).data ?? [];
@@ -234,7 +234,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
       <RealtimeRefresh tables={['occurrences']} debounceMs={2000} />
       <PageHeader
         title="Control Room Performance Dashboard"
-        description={`Real-time analytics & key performance indicators — last 30 days${activeSite ? ` · ${activeSite.name}` : profile.role === 'admin' ? ' · all sites' : ''}`}
+        description={`Real-time analytics & key performance indicators — last 30 days${activeSite ? ` · ${activeSite.name}` : isUnscoped ? ' · all sites' : ''}`}
       />
 
       {(breached > 0 || updateDue > 0) && (

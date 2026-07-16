@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowLeft, Radio } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
+import { siteScope } from '@/lib/site-scope';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/page-header';
 import { type HistoryRow } from '@/components/occurrences/history-occurrences';
@@ -15,14 +16,9 @@ export default async function HistoryPage() {
   const profile = await requireProfile();
   const supabase = await createClient();
 
-  // Site scope — admin / super_user see every site; everyone else is
-  // restricted to the sites they're assigned to.
-  const profSiteIds = (profile as unknown as { site_ids?: string[] | null }).site_ids ?? [];
-  const ownSites = Array.from(new Set([
-    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
-    ...(profile.site_id ? [profile.site_id] : []),
-  ]));
-  const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
+  // Site scope — admin / super_user (any held role) see every site; everyone
+  // else is restricted to the sites they're assigned to.
+  const { ownSites, isUnscoped } = siteScope(profile);
 
   const fetchOccurrences = async () => {
     let occQ = supabase.from('occurrences')
@@ -31,10 +27,13 @@ export default async function HistoryPage() {
       .order('closed_at', { ascending: false })
       .limit(500);
 
-    if (!isUnscopedRole && ownSites.length > 0) {
-      occQ = occQ.in('site_id', ownSites);
+    if (!isUnscoped) {
+      // Site-less scoped user → own rows only (unfiltered would time out).
+      occQ = ownSites.length > 0
+        ? occQ.in('site_id', ownSites)
+        : occQ.eq('logged_by', profile.id);
     }
-    
+
     return (await occQ).data ?? [];
   };
 
@@ -44,8 +43,12 @@ export default async function HistoryPage() {
       .order('ended_at', { ascending: false })
       .limit(200);
 
-    if (!isUnscopedRole && ownSites.length > 0) {
-      // The patrols_detailed view computes scan counts. Doing this over an IN() 
+    if (!isUnscoped) {
+      if (ownSites.length === 0) {
+        // Site-less scoped user → their own patrols only.
+        return (await base().eq('guard_id', profile.id)).data ?? [];
+      }
+      // The patrols_detailed view computes scan counts. Doing this over an IN()
       // clause causes Postgres to evaluate the subquery before sorting, timing out.
       // Running per-site forces the index limit first.
       const results = await Promise.all(ownSites.map(sid => base().eq('site_id', sid)));

@@ -2,12 +2,13 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { can, loadMyCapabilities, requireProfile } from '@/lib/auth';
+import { siteScope } from '@/lib/site-scope';
 import { PageHeader } from '@/components/page-header';
 import {
   EvidencePhotosBrowser,
   type EvidenceOption,
 } from '@/components/occurrences/evidence-photos-browser';
-import type { Occurrence, OccurrenceImage, Profile } from '@digilog/shared';
+import type { Occurrence, OccurrenceImage } from '@digilog/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,20 +53,11 @@ async function loadAllImageRefs() {
   return refs;
 }
 
-function ownSiteIds(profile: Profile) {
-  const profSiteIds = (profile as Profile & { site_ids?: string[] | null }).site_ids ?? [];
-  return Array.from(new Set([
-    ...(Array.isArray(profSiteIds) ? profSiteIds : []),
-    ...(profile.site_id ? [profile.site_id] : []),
-  ]));
-}
-
 export default async function OccurrenceEvidencePage({ searchParams }: PageProps) {
-  const [profile, caps, params, imageRefs] = await Promise.all([
+  const [profile, caps, params] = await Promise.all([
     requireProfile(),
     loadMyCapabilities(),
     searchParams,
-    loadAllImageRefs(),
   ]);
 
   const canViewEvidence =
@@ -75,22 +67,21 @@ export default async function OccurrenceEvidencePage({ searchParams }: PageProps
 
   if (!canViewEvidence) redirect('/dashboard');
 
-  const isUnscopedRole = profile.role === 'admin' || profile.role === 'super_user';
-  const siteIds = ownSiteIds(profile);
+  const { ownSites: siteIds, isUnscoped: isUnscopedRole } = siteScope(profile);
   const selectedParam = typeof params.occurrenceId === 'string' ? Number(params.occurrenceId) : NaN;
 
+  const supabase = await createClient();
   let visibleOccurrences: Occurrence[] = [];
+  let imageRefs: ImageRef[] = [];
 
-  if (isUnscopedRole || siteIds.length > 0) {
-    const supabase = await createClient();
+  if (isUnscopedRole) {
+    // Admin / super_user: walk every image ref, then resolve the occurrences.
+    imageRefs = await loadAllImageRefs();
     const occurrenceIds = Array.from(new Set(imageRefs.map((row) => row.occurrence_id)));
-
     const batches = chunk(occurrenceIds, OCCURRENCE_CHUNK_SIZE);
     const results = await Promise.all(
       batches.map(async (ids) => {
-        let q = supabase.from('occurrences').select('*').in('id', ids);
-        if (!isUnscopedRole) q = q.in('site_id', siteIds);
-        const { data, error } = await q;
+        const { data, error } = await supabase.from('occurrences').select('*').in('id', ids);
         if (error) {
           console.error('Failed to load evidence occurrences batch', error);
           return [] as Occurrence[];
@@ -99,6 +90,36 @@ export default async function OccurrenceEvidencePage({ searchParams }: PageProps
       }),
     );
     visibleOccurrences = results.flat();
+  } else {
+    // Scoped roles: resolve the visible occurrences FIRST (explicit site /
+    // own-rows filter), then fetch image refs by occurrence id. Scanning the
+    // whole occurrence_images table under RLS runs a correlated subquery per
+    // row and times out → the page rendered empty for site-scoped users.
+    let occQ = supabase.from('occurrences').select('*');
+    occQ = siteIds.length > 0 ? occQ.in('site_id', siteIds) : occQ.eq('logged_by', profile.id);
+    const { data: occRows, error: occErr } = await occQ
+      .order('incident_at', { ascending: false })
+      .limit(2000);
+    if (occErr) console.error('Failed to load scoped evidence occurrences', occErr);
+    visibleOccurrences = (occRows ?? []) as Occurrence[];
+
+    const idBatches = chunk(visibleOccurrences.map((o) => o.id), OCCURRENCE_CHUNK_SIZE);
+    const refResults = await Promise.all(
+      idBatches.map(async (ids) => {
+        const { data, error } = await supabase
+          .from('occurrence_images')
+          .select('occurrence_id, ob_number, captured_at')
+          .in('occurrence_id', ids)
+          .order('captured_at', { ascending: false });
+        if (error) {
+          console.error('Failed to load scoped evidence image refs', error);
+          return [] as ImageRef[];
+        }
+        return (data ?? []) as ImageRef[];
+      }),
+    );
+    imageRefs = refResults.flat()
+      .sort((a, b) => new Date(b.captured_at).getTime() - new Date(a.captured_at).getTime());
   }
 
   const occurrenceMap = new Map(visibleOccurrences.map((occ) => [occ.id, occ]));

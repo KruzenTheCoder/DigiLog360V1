@@ -19,23 +19,27 @@ import type { OccurrenceReport } from '@digilog/shared';
  * filter reports to those. (RLS still guarantees org isolation regardless.)
  */
 export function ReportsClient({
-  ownSites, isUnscoped,
+  ownSites, isUnscoped, userId,
 }: {
   ownSites: string[];
   isUnscoped: boolean;
+  userId: string;
 }) {
-  const scoped = !isUnscoped && ownSites.length > 0;
-  const cacheKey = `reports:${isUnscoped ? 'all' : ownSites.slice().sort().join(',') || 'none'}`;
+  const cacheKey = `reports:${isUnscoped ? 'all' : ownSites.slice().sort().join(',') || `own:${userId}`}`;
 
   const { data, loading, refresh } = useCachedQuery<OccurrenceReport[]>(
     cacheKey,
     async () => {
       const sb = createClient();
       let allowedIds: number[] | null = null;
-      if (scoped) {
+      if (!isUnscoped) {
+        // Resolve the visible occurrence ids EXPLICITLY — a site-less scoped
+        // user gets only what they logged. (An unfiltered query would force a
+        // full-table RLS scan that times out → empty page.)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: occs } = await (sb as any).from('occurrences')
-          .select('id').in('site_id', ownSites);
+        let occQ = (sb as any).from('occurrences').select('id');
+        occQ = ownSites.length > 0 ? occQ.in('site_id', ownSites) : occQ.eq('logged_by', userId);
+        const { data: occs } = await occQ;
         allowedIds = (occs ?? []).map((o: { id: number }) => o.id);
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
