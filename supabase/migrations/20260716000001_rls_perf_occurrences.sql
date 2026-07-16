@@ -1,19 +1,21 @@
 -- ============================================================================
--- DigiLog 360 — Multi-site RLS, self-contained + performant.
+-- DigiLog 360 — Multi-site RLS, self-contained + defensive + performant.
 --
--- The remote DB never received migration 20260605000007, so the helper
--- functions the site-scoped policies rely on (current_site_ids, the updated
--- current_site_id, can_access_site) may not exist there. This script is
--- self-contained: it (re)creates the helpers, backfills profiles.site_ids,
--- then installs the policies. Idempotent — safe to re-run.
+-- Self-contained: (re)creates the helper functions the policies rely on
+-- (the remote never received migration 20260605000007 that introduced them),
+-- backfills profiles.site_ids, then installs the policies.
 --
--- Performance notes:
---   • Every helper call in a policy is wrapped in (select …) so Postgres
---     evaluates it ONCE per statement (InitPlan) instead of once per row —
---     without this, unfiltered counts scan-and-call across the whole table
---     and hit the statement timeout (the "KPIs show 0" bug).
---   • key_handovers has NO site_id column; it belongs to a site through its
---     key (key_id → keys.site_id), so its policy scopes through keys.
+-- Defensive: visitors / keys / key_handovers policies only install when the
+-- live table actually has the columns they reference. Some environments have
+-- older shapes of these tables ("create table if not exists" skips silently),
+-- and a single missing column aborts the whole transaction otherwise. The
+-- occurrences policy — the critical one — runs unconditionally.
+--
+-- Performant: every helper call is wrapped in (select …) so Postgres runs it
+-- ONCE per statement (InitPlan) instead of once per row. Without this,
+-- unfiltered counts hit the statement timeout and the UI shows 0.
+--
+-- Idempotent — safe to re-run.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -79,7 +81,7 @@ returns boolean language sql stable as $$
 $$;
 
 -- ----------------------------------------------------------------------------
--- 2. Policies (initplan-wrapped helper calls).
+-- 2. Occurrences policy — unconditional (columns verified on live schema).
 -- ----------------------------------------------------------------------------
 drop policy if exists occurrences_select on public.occurrences;
 create policy occurrences_select on public.occurrences
@@ -97,52 +99,104 @@ create policy occurrences_select on public.occurrences
     )
   );
 
-drop policy if exists visitors_select on public.visitors;
-create policy visitors_select on public.visitors
-  for select to authenticated using (
-    (select public.is_super_user())
-    or (
-      org_id = (select public.current_org_id())
-      and (
-        (select public.is_admin())
-        or site_id in (select unnest(public.current_site_ids()))
-      )
-    )
-  );
-
-drop policy if exists keys_select on public.keys;
-create policy keys_select on public.keys
-  for select to authenticated using (
-    (select public.is_super_user())
-    or (
-      org_id = (select public.current_org_id())
-      and (
-        (select public.is_admin())
-        or site_id in (select unnest(public.current_site_ids()))
-      )
-    )
-  );
-
--- key_handovers has NO site_id column — scope through its key. The
--- uncorrelated subquery is planned as a hashed SubPlan (evaluated once).
-drop policy if exists key_handovers_select on public.key_handovers;
-create policy key_handovers_select on public.key_handovers
-  for select to authenticated using (
-    (select public.is_super_user())
-    or (
-      org_id = (select public.current_org_id())
-      and (
-        (select public.is_admin())
-        or key_id in (
-          select k.id from public.keys k
-          where k.site_id in (select unnest(public.current_site_ids()))
-        )
-      )
-    )
-  );
-
--- ----------------------------------------------------------------------------
--- 3. Supporting index for org+site-scoped counts and lists.
--- ----------------------------------------------------------------------------
 create index if not exists idx_occurrences_org_site
   on public.occurrences (org_id, site_id);
+
+-- ----------------------------------------------------------------------------
+-- 3. visitors / keys / key_handovers — guarded: only when the live table has
+--    the columns the policy references; otherwise skip with a NOTICE and
+--    leave the table's existing policy untouched.
+-- ----------------------------------------------------------------------------
+do $$
+declare
+  has_cols boolean;
+begin
+  -- visitors: needs org_id + site_id
+  select count(*) = 2 into has_cols
+    from information_schema.columns
+   where table_schema = 'public' and table_name = 'visitors'
+     and column_name in ('org_id', 'site_id');
+  if has_cols then
+    drop policy if exists visitors_select on public.visitors;
+    create policy visitors_select on public.visitors
+      for select to authenticated using (
+        (select public.is_super_user())
+        or (
+          org_id = (select public.current_org_id())
+          and (
+            (select public.is_admin())
+            or site_id in (select unnest(public.current_site_ids()))
+          )
+        )
+      );
+  else
+    raise notice 'visitors: org_id/site_id missing — policy left unchanged';
+  end if;
+
+  -- keys: needs org_id + site_id
+  select count(*) = 2 into has_cols
+    from information_schema.columns
+   where table_schema = 'public' and table_name = 'keys'
+     and column_name in ('org_id', 'site_id');
+  if has_cols then
+    drop policy if exists keys_select on public.keys;
+    create policy keys_select on public.keys
+      for select to authenticated using (
+        (select public.is_super_user())
+        or (
+          org_id = (select public.current_org_id())
+          and (
+            (select public.is_admin())
+            or site_id in (select unnest(public.current_site_ids()))
+          )
+        )
+      );
+  else
+    raise notice 'keys: org_id/site_id missing — policy left unchanged';
+  end if;
+
+  -- key_handovers: needs org_id + key_id, and keys must have site_id
+  -- (a handover belongs to a site THROUGH its key — the table itself has
+  -- no site_id column).
+  select (
+    (select count(*) = 2 from information_schema.columns
+      where table_schema = 'public' and table_name = 'key_handovers'
+        and column_name in ('org_id', 'key_id'))
+    and
+    (select count(*) = 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'keys'
+        and column_name = 'site_id')
+  ) into has_cols;
+  if has_cols then
+    drop policy if exists key_handovers_select on public.key_handovers;
+    create policy key_handovers_select on public.key_handovers
+      for select to authenticated using (
+        (select public.is_super_user())
+        or (
+          org_id = (select public.current_org_id())
+          and (
+            (select public.is_admin())
+            or key_id in (
+              select k.id from public.keys k
+              where k.site_id in (select unnest(public.current_site_ids()))
+            )
+          )
+        )
+      );
+  else
+    raise notice 'key_handovers: required columns missing — policy left unchanged';
+  end if;
+end $$;
+
+-- ----------------------------------------------------------------------------
+-- 4. Diagnostic — runs last, shows what the live schema actually has so a
+--    skipped section is visible in the Results pane.
+-- ----------------------------------------------------------------------------
+select table_name,
+       string_agg(column_name, ', ' order by column_name) as columns_present
+  from information_schema.columns
+ where table_schema = 'public'
+   and table_name in ('occurrences', 'visitors', 'keys', 'key_handovers')
+   and column_name in ('org_id', 'site_id', 'key_id', 'deleted_at')
+ group by table_name
+ order by table_name;
