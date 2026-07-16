@@ -103,6 +103,61 @@ create index if not exists idx_occurrences_org_site
   on public.occurrences (org_id, site_id);
 
 -- ----------------------------------------------------------------------------
+-- 2b. Occurrences INSERT + UPDATE — multi-site aware. The legacy policies
+--     compared against the SINGLE current_site_id(), so a user assigned to
+--     sites via site_ids[] (or whose legacy site_id was cleared by the
+--     multi-site admin UI) got "new row violates row-level security policy"
+--     when logging an occurrence. Any assigned site now qualifies.
+--     (org_id is normally stamped by column default; the null-allowance keeps
+--     inserts working on environments where that default is missing.)
+-- ----------------------------------------------------------------------------
+drop policy if exists occurrences_insert on public.occurrences;
+create policy occurrences_insert on public.occurrences
+  for insert to authenticated with check (
+    (select public.is_super_user())
+    or (
+      (org_id is null or org_id = (select public.current_org_id()))
+      and (
+        (select public.is_admin())
+        or (
+          logged_by = (select auth.uid())
+          and (site_id is null or site_id in (select unnest(public.current_site_ids())))
+        )
+      )
+    )
+  );
+
+drop policy if exists occurrences_update on public.occurrences;
+create policy occurrences_update on public.occurrences
+  for update to authenticated using (
+    (select public.is_super_user())
+    or (
+      org_id = (select public.current_org_id())
+      and (
+        (select public.is_admin())
+        or logged_by = (select auth.uid())
+        or (
+          (select public.has_any_role(array['manager','control_room','supervisor']::public.app_role[]))
+          and site_id in (select unnest(public.current_site_ids()))
+        )
+      )
+    )
+  ) with check (
+    (select public.is_super_user())
+    or (
+      org_id = (select public.current_org_id())
+      and (
+        (select public.is_admin())
+        or logged_by = (select auth.uid())
+        or (
+          (select public.has_any_role(array['manager','control_room','supervisor']::public.app_role[]))
+          and site_id in (select unnest(public.current_site_ids()))
+        )
+      )
+    )
+  );
+
+-- ----------------------------------------------------------------------------
 -- 3. visitors / keys / key_handovers — guarded: only when the live table has
 --    the columns the policy references; otherwise skip with a NOTICE and
 --    leave the table's existing policy untouched.
