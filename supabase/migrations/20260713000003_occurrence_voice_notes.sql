@@ -28,11 +28,12 @@ alter table public.occurrence_voice_notes enable row level security;
 drop policy if exists voice_notes_select on public.occurrence_voice_notes;
 create policy voice_notes_select on public.occurrence_voice_notes
   for select to authenticated using (
-    public.is_admin()
+    (select public.is_admin())
     or exists (
       select 1 from public.occurrences o
       where o.id = occurrence_id
-        and (o.logged_by = auth.uid() or o.site_id = public.current_site_id())
+        and (o.logged_by = (select auth.uid())
+             or o.site_id in (select unnest(public.current_site_ids())))
     )
   );
 

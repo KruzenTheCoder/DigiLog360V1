@@ -80,6 +80,21 @@ export function primaryRole(p: WithRoles | null | undefined): AppRole | null {
   return r[0] ?? null;
 }
 
+/**
+ * Every site the user is assigned to: the union of the multi-site
+ * `site_ids[]` array and the legacy/primary `site_id` column. Queries that
+ * scope data per-user MUST use this (an `.eq('site_id', profile.site_id)`
+ * filter hides data from multi-site users).
+ */
+export function profileSiteIds(
+  p: { site_id?: string | null; site_ids?: string[] | null } | null | undefined,
+): string[] {
+  if (!p) return [];
+  const set = new Set<string>(Array.isArray(p.site_ids) ? p.site_ids : []);
+  if (p.site_id) set.add(p.site_id);
+  return Array.from(set);
+}
+
 export function hasRole(p: WithRoles | null | undefined, role: AppRole): boolean {
   return profileRoles(p).includes(role);
 }

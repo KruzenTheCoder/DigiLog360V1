@@ -10,7 +10,7 @@ import { getActivePatrol, recordScan, haversineMeters } from '@/lib/patrol';
 import { Button } from '@/components/ui';
 import { ScreenHeader } from '@/components/primitives';
 import { theme, spacing, radius } from '@/lib/theme';
-import { decodeCheckpointQr, type Patrol, type Checkpoint } from '@digilog/shared';
+import { decodeCheckpointQr, profileSiteIds, type Patrol, type Checkpoint } from '@digilog/shared';
 
 type Mode = 'qr' | 'nfc' | 'gps';
 type Result = { ok: boolean; message: string } | null;
@@ -37,9 +37,9 @@ export default function Scan() {
       try {
         const active = await getActivePatrol(profile.id);
         setPatrol(active);
-        if (profile.site_id) {
+        if (profileSiteIds(profile).length > 0) {
           const { data } = await supabase.from('checkpoints').select('*')
-            .eq('site_id', profile.site_id).eq('is_active', true);
+            .in('site_id', profileSiteIds(profile)).eq('is_active', true);
           setCheckpoints((data ?? []) as Checkpoint[]);
         }
       } finally {

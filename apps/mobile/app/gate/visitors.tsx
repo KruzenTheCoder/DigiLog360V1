@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { profileSiteIds } from '@digilog/shared';
 import { Button, Field, Badge } from '@/components/ui';
 import { Sheet, EmptyState, SkeletonRow, useToast, ListRow } from '@/components/primitives';
 import { theme, spacing, radius, type } from '@/lib/theme';
@@ -38,19 +39,20 @@ export default function VisitorsScreen() {
   const [addOpen, setAddOpen] = useState(false);
 
   const load = useCallback(async () => {
-    if (!profile?.site_id) {
+    const mySites = profileSiteIds(profile);
+    if (mySites.length === 0) {
       setItems([]); setLoading(false);
       return;
     }
     setLoading(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data } = await (supabase as any).from('visitors').select('*')
-      .eq('site_id', profile.site_id)
+      .in('site_id', mySites)
       .order('signed_in_at', { ascending: false })
       .limit(50);
     setItems((data ?? []) as Visitor[]);
     setLoading(false);
-  }, [profile?.site_id]);
+  }, [profile]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -238,21 +240,36 @@ function SignInSheet({
 
     if (result.kind === 'disk') {
       const d = result.data;
-      let filled: string[] = [];
+      const filled: string[] = [];
       if (d.vehicle_reg) { setVehicleReg(d.vehicle_reg); filled.push('reg'); }
       const mm = [d.make, d.model].filter(Boolean).join(' ');
       if (mm) { setVehicleMakeModel(mm + (d.color ? ` · ${d.color}` : '')); filled.push('make/model'); }
+      const expired = !!d.expires && d.expires < new Date().toISOString().slice(0, 10);
       toast.show(
-        filled.length > 0
-          ? `Disk scanned · filled ${filled.join(', ')}`
-          : 'Disk scanned but no fields recognised',
-        filled.length > 0 ? 'ok' : 'error',
+        expired
+          ? `Disk scanned · LICENCE EXPIRED ${d.expires}`
+          : filled.length > 0
+            ? `Disk scanned · filled ${filled.join(', ')}`
+            : 'Disk scanned but no fields recognised',
+        expired || filled.length === 0 ? 'error' : 'ok',
       );
     } else if (result.kind === 'license') {
       const d = result.data;
+      const filled: string[] = [];
       if (d.id_number) {
         setIdNumber(d.id_number);
-        toast.show('Driver\'s licence scanned · ID captured', 'ok');
+        filled.push('ID');
+      }
+      if (d.surname && d.initials) {
+        setFullName(`${d.initials} ${d.surname}`);
+        filled.push('name');
+      } else if (d.surname) {
+        setFullName(d.surname);
+        filled.push('name');
+      }
+      
+      if (filled.length > 0) {
+        toast.show(`Driver's licence scanned · filled ${filled.join(' & ')}`, 'ok');
       } else {
         toast.show('Driver\'s licence scanned · fill name + ID manually', 'info');
       }
@@ -285,12 +302,16 @@ function SignInSheet({
             barcodeScannerSettings={{
               barcodeTypes: ['pdf417', 'aztec', 'datamatrix', 'qr', 'code128', 'code39'],
             }}
-            onBarcodeScanned={({ data, type }) => {
+            onBarcodeScanned={(event) => {
+              const { data, type } = event;
+              // `raw` (Android) preserves binary PDF417 payloads better than
+              // `data` — pass both so the parser can try each.
+              const raw = (event as { raw?: string }).raw ?? null;
               // Dev-only: confirm the callback is firing if the user reports
               // "nothing happens" — visible in `expo start` logs.
               // eslint-disable-next-line no-console
               if (__DEV__) console.log('[visitor-scan] barcode', type, data.slice(0, 80));
-              applyScan(detectAndParse(data));
+              applyScan(detectAndParse(data, raw));
             }}
           />
           {/* Card-aspect reticle (≈1.6:1 like a credit card / SA driver's

@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { Badge } from '@/components/ui';
 import { EmptyState, SkeletonRow, useToast, SectionTitle, ListRow } from '@/components/primitives';
 import { theme, spacing, type } from '@/lib/theme';
-import { ROLE_LABELS, hasAnyRole, type AppRole } from '@digilog/shared';
+import { ROLE_LABELS, hasAnyRole, profileSiteIds, type AppRole } from '@digilog/shared';
 
 interface Member {
   id: string; full_name: string | null; email: string | null; phone: string | null;
@@ -38,24 +38,25 @@ export default function TeamScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    if (!profile?.site_id) { setLoading(false); return; }
+    const mySites = profileSiteIds(profile);
+    if (mySites.length === 0) { setLoading(false); return; }
     setLoading(true);
     const [mRes, sRes, pRes] = await Promise.all([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase as any).from('profiles').select('id, full_name, email, phone, role, is_active')
-        .eq('site_id', profile.site_id)
+        .in('site_id', mySites)
         .in('role', ['guard', 'supervisor']).order('full_name'),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase as any).from('shifts').select('id, user_id, user_name, started_at')
-        .eq('site_id', profile.site_id).is('ended_at', null),
+        .in('site_id', mySites).is('ended_at', null),
       supabase.from('patrols').select('id, guard_id, guard_name, started_at, route_id')
-        .eq('site_id', profile.site_id).eq('status', 'active'),
+        .in('site_id', mySites).eq('status', 'active'),
     ]);
     setMembers((mRes.data ?? []) as Member[]);
     setShifts((sRes.data ?? []) as Shift[]);
     setPatrols((pRes.data ?? []) as Patrol[]);
     setLoading(false);
-  }, [profile?.site_id]);
+  }, [profile]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 

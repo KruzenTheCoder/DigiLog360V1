@@ -32,6 +32,9 @@ export type Profile = Omit<WithOrg<T['profiles']['Row']>, 'role'> & {
   role: AppRole;
   /** Full set of roles held by this user. `role` is always `roles[0]`. */
   roles: AppRole[];
+  /** Every site the user is assigned to (multi-site). `site_id` stays the
+   *  legacy/primary site; queries should scope by the union of both. */
+  site_ids: string[] | null;
   employee_number: string | null;
   pin_hash: string | null;
   pin_set_at: string | null;

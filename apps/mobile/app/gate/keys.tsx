@@ -8,6 +8,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { profileSiteIds } from '@digilog/shared';
 import { Field, Button } from '@/components/ui';
 import { Sheet, EmptyState, SkeletonRow, useToast, ListRow } from '@/components/primitives';
 import { theme, spacing, radius, type } from '@/lib/theme';
@@ -34,21 +35,22 @@ export default function KeysScreen() {
   const [target, setTarget] = useState<Key | null>(null);
 
   const load = useCallback(async () => {
-    if (!profile?.site_id) {
+    const mySites = profileSiteIds(profile);
+    if (mySites.length === 0) {
       setKeys([]); setHandovers([]); setLoading(false);
       return;
     }
     setLoading(true);
     const [keysRes, hRes] = await Promise.all([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (supabase as any).from('keys').select('*').eq('site_id', profile.site_id).order('code'),
+      (supabase as any).from('keys').select('*').in('site_id', mySites).order('code'),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase as any).from('key_handovers').select('*').order('taken_at', { ascending: false }).limit(200),
     ]);
     setKeys((keysRes.data ?? []) as Key[]);
     setHandovers((hRes.data ?? []) as Handover[]);
     setLoading(false);
-  }, [profile?.site_id]);
+  }, [profile]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 

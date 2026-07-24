@@ -80,6 +80,21 @@ export function primaryRole(p: WithRoles | null | undefined): AppRole | null {
   return r[0] ?? null;
 }
 
+/**
+ * Every site the user is assigned to: the union of the multi-site
+ * `site_ids[]` array and the legacy/primary `site_id` column. Queries that
+ * scope data per-user MUST use this (an `.eq('site_id', profile.site_id)`
+ * filter hides data from multi-site users).
+ */
+export function profileSiteIds(
+  p: { site_id?: string | null; site_ids?: string[] | null } | null | undefined,
+): string[] {
+  if (!p) return [];
+  const set = new Set<string>(Array.isArray(p.site_ids) ? p.site_ids : []);
+  if (p.site_id) set.add(p.site_id);
+  return Array.from(set);
+}
+
 export function hasRole(p: WithRoles | null | undefined, role: AppRole): boolean {
   return profileRoles(p).includes(role);
 }
@@ -330,11 +345,37 @@ export interface OrgIncidentType {
 }
 
 /**
+ * Set `customized: true` when the org has forked the taxonomy: only the
+ * org's active rows — the built-in list is ignored, because it has already been
+ * materialised into those rows and may have been renamed/reordered/disabled
+ * since. Un-set (the default) keeps the original "built-in + custom" merge.
+ */
+export interface TaxonomyMergeOptions {
+  customized?: boolean;
+}
+
+/** Active org rows sorted by sort_order then name — the forked-org list. */
+function sortedActive<T extends { is_active: boolean; sort_order: number; name: string }>(rows: T[]): T[] {
+  return rows
+    .filter((r) => r.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+}
+
+/**
  * Built-in categories + active org-custom categories. Built-ins first
  * (declaration order), org-custom alphabetised after, de-duplicated by
  * lower-case name so an org can't shadow a built-in.
+ *
+ * When `options.customized` is set, the built-in list is skipped and the org's
+ * own active rows are the complete list (see TaxonomyMergeOptions).
  */
-export function mergeIncidentCategories(orgCategories: OrgIncidentCategory[]): string[] {
+export function mergeIncidentCategories(
+  orgCategories: OrgIncidentCategory[],
+  options?: TaxonomyMergeOptions,
+): string[] {
+  if (options?.customized) {
+    return sortedActive(orgCategories as (OrgIncidentCategory & { name: string })[]).map((c) => c.name);
+  }
   const builtin = [...INCIDENT_CATEGORIES] as string[];
   const lowerBuiltin = new Set(builtin.map((c) => c.toLowerCase()));
   const custom = orgCategories
@@ -351,9 +392,15 @@ export function mergeIncidentCategories(orgCategories: OrgIncidentCategory[]): s
 export function mergeIncidentSubcategories(
   category: string | null | undefined,
   orgSubcategories: OrgIncidentSubcategory[],
+  options?: TaxonomyMergeOptions,
 ): string[] {
-  const builtin = getSubcategories(category);
   if (!category) return [];
+  if (options?.customized) {
+    return sortedActive(
+      orgSubcategories.filter((s) => s.category.toLowerCase() === category.toLowerCase()),
+    ).map((s) => s.name);
+  }
+  const builtin = getSubcategories(category);
   const lowerBuiltin = new Set(builtin.map((s) => s.toLowerCase()));
   const custom = orgSubcategories
     .filter(
@@ -377,9 +424,19 @@ export function mergeIncidentTypes(
   category: string | null | undefined,
   subcategory: string | null | undefined,
   orgTypes: OrgIncidentType[],
+  options?: TaxonomyMergeOptions,
 ): string[] {
+  if (!category || !subcategory) return options?.customized ? [] : getIncidentTypes(category, subcategory);
+  if (options?.customized) {
+    return sortedActive(
+      orgTypes.filter(
+        (t) =>
+          (t.category ?? '').toLowerCase() === category.toLowerCase() &&
+          (t.subcategory ?? '').toLowerCase() === subcategory.toLowerCase(),
+      ) as (OrgIncidentType & { name: string })[],
+    ).map((t) => t.name);
+  }
   const builtin = getIncidentTypes(category, subcategory);
-  if (!category || !subcategory) return builtin;
   const lowerBuiltin = new Set(builtin.map((t) => t.toLowerCase()));
   const custom = orgTypes
     .filter((t) =>

@@ -34,16 +34,57 @@ const SA_REG_RE = /^[A-Z]{1,3}[\s-]?\d{1,4}[\s-]?[A-Z]{0,3}([\s-]?[A-Z]{2})?$/i;
 /**
  * Parse the %-delimited string from a SA vehicle licence disk PDF417.
  * Returns null if the text doesn't look like a licence disk.
+ *
+ * The disk payload has a FIXED field order whose tail is stable across every
+ * generation we've seen (MVL1CC…, VR1…, with/without extra header tokens):
+ *
+ *   … % licence-no(plate) % register-no % description % make % model %
+ *     colour % VIN % engine-no % expiry(yyyy-mm-dd)
+ *
+ * e.g. %MVL1CC12%0153%4025M09C%1%4025045HYS%TSR610GP%HTM540W%
+ *      Hatch back / Luikrug%TOYOTA%ETIOS%Silver / Silwer%AHT…373%2NR…552%2021-06-30%
+ *
+ * So we anchor on the tail (expiry last, VIN third-from-last) instead of
+ * guessing per-field — the old heuristic put the bilingual "description" into
+ * make and shifted model/colour one slot over. The heuristic loop remains as
+ * a fallback for exotic disks that fail tail validation.
  */
 export function parseVehicleLicenseDisk(text: string): VehicleDiskData | null {
   if (!text || !text.includes('%')) return null;
 
-  // Strip the header. Common ones: MVL1CC2010, MVL1CR2008, VR1, etc.
-  // Defensive: skip leading parts until we get past anything matching ^[A-Z]+
-  // with numbers — i.e. the metadata tokens.
-  const all = text.split('%').filter((p) => p.length > 0);
-  if (all.length < 5) return null;
+  const parts = text.split('%').map((p) => p.trim());
+  // Trailing separator produces empty tail entries — drop those, but KEEP
+  // interior empties (an absent engine number must not shift positions).
+  while (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
+  while (parts.length > 0 && parts[0] === '') parts.shift();
+  if (parts.length < 5) return null;
 
+  // ---- Tail-anchored positional parse (the reliable path) ----
+  const at = (fromEnd: number) => parts[parts.length - fromEnd] ?? '';
+  if (
+    parts.length >= 9 &&
+    DATE_RE.test(at(1)) &&
+    VIN_RE.test(at(3))
+  ) {
+    const data: VehicleDiskData = { unmatched: [] };
+    data.expires = at(1);
+    data.engine_no = at(2) ? at(2).toUpperCase() : undefined;
+    data.vin = at(3).toUpperCase();
+    data.color = bilingualFirst(at(4));
+    data.model = titleCase(at(5));
+    data.make = titleCase(at(6));
+    data.description = bilingualFirst(at(7));
+    data.license_no = at(8) ? at(8).toUpperCase() : undefined;
+    // The plate the gate cares about; some provinces only carry one value.
+    const plate = at(9) || at(8);
+    data.vehicle_reg = plate ? plate.toUpperCase().replace(/\s+/g, ' ') : undefined;
+    if (parts.length >= 10 && at(10)) data.license_disc_no = at(10).toUpperCase();
+    return data;
+  }
+
+  // ---- Heuristic fallback for non-standard disks ----
+  // Strip the header. Common ones: MVL1CC2010, MVL1CR2008, VR1, etc.
+  const all = parts.filter((p) => p.length > 0);
   let startIdx = 0;
   for (let i = 0; i < Math.min(3, all.length); i++) {
     if (/^(MVL|VR)/i.test(all[i])) {
@@ -95,6 +136,13 @@ export function parseVehicleLicenseDisk(text: string): VehicleDiskData | null {
   return data;
 }
 
+/** SA disk text fields are bilingual ("Silver / Silwer") — keep the first
+ *  (English) half, title-cased. */
+function bilingualFirst(s: string): string | undefined {
+  const first = s.split('/')[0]?.trim();
+  return first ? titleCase(first) : undefined;
+}
+
 function titleCase(s: string): string {
   return s
     .toLowerCase()
@@ -105,7 +153,9 @@ function titleCase(s: string): string {
 // SA Driver's Licence
 // ============================================================================
 
-export interface DriversLicenseData {
+import { decodeSADriversLicense, type ParsedSADriversLicense } from './sa-drivers-license';
+
+export interface DriversLicenseData extends Partial<ParsedSADriversLicense> {
   id_number?: string;
   /** Raw scan text, kept for diagnostics — never displayed to the user. */
   raw: string;
@@ -121,7 +171,12 @@ export interface DriversLicenseData {
 export function parseDriversLicenseBarcode(text: string): DriversLicenseData {
   const data: DriversLicenseData = { raw: text };
 
-  // SA ID: 13 digits, first 6 are YYMMDD (must be a plausible date), 11th
+  const parsed = decodeSADriversLicense(text);
+  if (parsed) {
+    return { ...parsed, raw: text, id_number: parsed.idNumber };
+  }
+
+  // Fallback: SA ID: 13 digits, first 6 are YYMMDD (must be a plausible date), 11th
   // digit is citizenship (0 or 1), 13th is a Luhn-style checksum.
   const matches = text.match(/\d{13}/g) ?? [];
   for (const candidate of matches) {
@@ -166,17 +221,26 @@ export type ScanResult =
   | { kind: 'license'; data: DriversLicenseData }
   | { kind: 'unknown'; raw: string };
 
-export function detectAndParse(text: string): ScanResult {
-  const disk = parseVehicleLicenseDisk(text);
+/**
+ * @param text     The decoded string from the barcode scanner (`data`).
+ * @param rawAlt   expo-camera's `raw` value when present — on Android this is
+ *                 the less-mangled representation of binary PDF417 payloads
+ *                 (SA driver's licences are binary), so we try both.
+ */
+export function detectAndParse(text: string, rawAlt?: string | null): ScanResult {
+  const disk = parseVehicleLicenseDisk(text) ?? (rawAlt ? parseVehicleLicenseDisk(rawAlt) : null);
   if (disk) return { kind: 'disk', data: disk };
   // Driver's licence barcodes are binary, so the string we get will be
   // largely unprintable — but the parser is forgiving and just looks for
   // an embedded ID number. We treat as "license" if we got one OR if the
   // content has many control characters (heuristic for the binary format).
-  const dl = parseDriversLicenseBarcode(text);
-  if (dl.id_number) return { kind: 'license', data: dl };
+  for (const candidate of [text, rawAlt ?? '']) {
+    if (!candidate) continue;
+    const dl = parseDriversLicenseBarcode(candidate);
+    if (dl.id_number) return { kind: 'license', data: dl };
+  }
   const controlRatio = countControlChars(text) / Math.max(text.length, 1);
-  if (controlRatio > 0.2) return { kind: 'license', data: dl };
+  if (controlRatio > 0.2) return { kind: 'license', data: parseDriversLicenseBarcode(rawAlt || text) };
   return { kind: 'unknown', raw: text };
 }
 

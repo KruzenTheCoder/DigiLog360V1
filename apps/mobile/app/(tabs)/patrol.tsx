@@ -8,7 +8,7 @@ import { getActivePatrol, startPatrol, endPatrol, scannedCheckpointIds } from '@
 import { startLocationReporting, stopLocationReporting } from '@/lib/location-reporter';
 import { Button, Card, Muted, Badge } from '@/components/ui';
 import { theme, spacing, radius } from '@/lib/theme';
-import type { Patrol, PatrolRoute, Checkpoint } from '@digilog/shared';
+import { profileSiteIds, type Patrol, type PatrolRoute, type Checkpoint } from '@digilog/shared';
 
 export default function PatrolScreen() {
   const { profile, can } = useAuth();
@@ -36,9 +36,9 @@ export default function PatrolScreen() {
       } else {
         setCheckpoints([]);
       }
-    } else if (profile.site_id) {
+    } else if (profileSiteIds(profile).length > 0) {
       const { data } = await supabase.from('patrol_routes').select('*')
-        .eq('site_id', profile.site_id).eq('is_active', true).order('name');
+        .in('site_id', profileSiteIds(profile)).eq('is_active', true).order('name');
       setRoutes((data ?? []) as PatrolRoute[]);
     }
   }, [profile]);

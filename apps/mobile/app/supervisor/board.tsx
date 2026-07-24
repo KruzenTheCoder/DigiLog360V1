@@ -10,6 +10,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { profileSiteIds } from '@digilog/shared';
 import { Badge, Field, Button } from '@/components/ui';
 import {
   Sheet, EmptyState, SkeletonRow, useToast, SectionTitle,
@@ -38,32 +39,34 @@ export default function SupervisorBoard() {
   const [target, setTarget] = useState<LiveOccurrence | null>(null);
 
   const load = useCallback(async () => {
-    if (!profile?.site_id) {
+    const mySites = profileSiteIds(profile);
+    if (mySites.length === 0) {
       setItems([]); setLoading(false);
       return;
     }
     setLoading(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data } = await (supabase as any).from('occurrences_live').select('*')
-      .eq('site_id', profile.site_id).order('incident_at', { ascending: false });
+      .in('site_id', mySites).order('incident_at', { ascending: false });
     setItems((data ?? []) as LiveOccurrence[]);
     setLoading(false);
-  }, [profile?.site_id]);
+  }, [profile]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  // Realtime updates from any occurrence row at my site.
+  // Realtime updates from any occurrence row at my site(s).
   useEffect(() => {
-    if (!profile?.site_id) return;
+    const mySites = profileSiteIds(profile);
+    if (mySites.length === 0) return;
     const ch = supabase
-      .channel(`supervisor-board-${profile.site_id}`)
+      .channel(`supervisor-board-${mySites.join('-')}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'occurrences',
-        filter: `site_id=eq.${profile.site_id}`,
+        filter: `site_id=in.(${mySites.join(',')})`,
       }, () => load())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [profile?.site_id, load]);
+  }, [profile, load]);
 
   const breached = items.filter((o) => o.is_sla_breached);
   const due = items.filter((o) => o.is_sla_update_due && !o.is_sla_breached);

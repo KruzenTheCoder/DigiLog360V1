@@ -16,7 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { Card } from '@/components/ui';
 import { SectionTitle, SkeletonRow, Press, Stat } from '@/components/primitives';
 import { theme, spacing, radius, type } from '@/lib/theme';
-import { hasAnyRole, profileRoles, ROLE_LABELS } from '@digilog/shared';
+import { hasAnyRole, profileRoles, profileSiteIds, ROLE_LABELS } from '@digilog/shared';
 interface Stats {
   open: number;
   today: number;
@@ -80,19 +80,19 @@ export default function Home() {
         .eq('user_id', profile.id).is('read_at', null),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase as any).from('shifts').select('id').eq('user_id', profile.id).is('ended_at', null).maybeSingle(),
-      isSupervisor && profile.site_id
+      isSupervisor && profileSiteIds(profile).length > 0
         ? supabase.from('occurrences').select('id', { count: 'exact', head: true })
-            .eq('site_id', profile.site_id).not('status', 'in', '(resolved,closed)')
+            .in('site_id', profileSiteIds(profile)).not('status', 'in', '(resolved,closed)')
         : Promise.resolve({ count: 0 }),
-      isSupervisor && profile.site_id
+      isSupervisor && profileSiteIds(profile).length > 0
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ? (supabase as any).from('occurrences_live').select('id', { count: 'exact', head: true })
-            .eq('site_id', profile.site_id).eq('is_sla_breached', true)
+            .in('site_id', profileSiteIds(profile)).eq('is_sla_breached', true)
         : Promise.resolve({ count: 0 }),
-      profile.site_id
+      profileSiteIds(profile).length > 0
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ? (supabase as any).from('visitors').select('id', { count: 'exact', head: true })
-            .eq('site_id', profile.site_id).is('signed_out_at', null)
+            .in('site_id', profileSiteIds(profile)).is('signed_out_at', null)
         : Promise.resolve({ count: 0 }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase as any).from('shift_handovers').select('id', { count: 'exact', head: true })
