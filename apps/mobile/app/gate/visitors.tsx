@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions, scanFromURLAsync } from 'expo-camera';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { profileSiteIds } from '@digilog/shared';
@@ -196,9 +196,43 @@ function SignInSheet({
   const [scanning, setScanning] = useState<ScanTarget | null>(null);
   const scanLock = useRef(false);
   const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<CameraView>(null);
   // Torch helps a lot: SA licence/disk PDF417 is dense and needs even,
   // bright light on the barcode to decode.
   const [torch, setTorch] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+
+  // The reliable path for the dense SA PDF417: take a FULL-RESOLUTION still
+  // and decode that, instead of relying on the heavily-downsampled live
+  // frames (which never carry enough detail to resolve the fine bars).
+  async function captureAndScan() {
+    if (!cameraRef.current || capturing) return;
+    setCapturing(true);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 1, skipProcessing: false });
+      if (!photo?.uri) {
+        toast.show('Could not capture photo — try again', 'error');
+        return;
+      }
+      const results = await scanFromURLAsync(photo.uri, ['pdf417']);
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.log('[visitor-scan] photo decode', results.length,
+          results[0] ? { type: results[0].type, hasRaw: !!(results[0] as { raw?: string }).raw, len: results[0].data?.length } : null);
+      }
+      if (results.length > 0) {
+        const r0 = results[0];
+        scanLock.current = false; // allow this deliberate capture to apply
+        applyScan(detectAndParse(r0.data, (r0 as { raw?: string }).raw ?? null));
+      } else {
+        toast.show('No barcode found — fill the frame, hold steady, try the torch', 'error');
+      }
+    } catch (e) {
+      toast.show('Scan failed — try again', 'error');
+    } finally {
+      setCapturing(false);
+    }
+  }
 
   function resetForm() {
     setFullName(''); setIdNumber(''); setCompany('');
@@ -295,6 +329,7 @@ function SignInSheet({
       >
         <View style={styles.cameraWrap}>
           <CameraView
+            ref={cameraRef}
             // Force a fresh native surface every time we open the scanner.
             // Without this key, the previous CameraView instance is reused
             // and the barcode scanner sometimes never re-attaches its
@@ -335,8 +370,8 @@ function SignInSheet({
           <View style={styles.cameraHintWrap} pointerEvents="none">
             <Text style={styles.cameraHint}>
               {scanning === 'disk'
-                ? 'Fill the frame with the disk barcode — hold ~15cm away and steady'
-                : 'Fill the frame with the barcode on the BACK of the licence — hold steady'}
+                ? 'Line up the wide disk barcode in the box, then tap Capture & scan'
+                : 'Line up the wide barcode strip on the licence, then tap Capture & scan'}
             </Text>
           </View>
           <TouchableOpacity
@@ -348,6 +383,13 @@ function SignInSheet({
           </TouchableOpacity>
         </View>
         <View style={{ height: spacing.sm }} />
+        <Button
+          title={capturing ? 'Scanning…' : 'Capture & scan'}
+          onPress={captureAndScan}
+          loading={capturing}
+          icon={<Ionicons name="scan" size={18} color="#fff" />}
+        />
+        <View style={{ height: spacing.xs }} />
         <Button title="Cancel scan" variant="ghost" onPress={() => { setTorch(false); setScanning(null); }} />
       </Sheet>
     );
@@ -438,9 +480,9 @@ const styles = StyleSheet.create({
   // and the barcode scanner never starts.
   cameraWrap: {
     width: '100%',
-    // Taller preview = users naturally hold the barcode closer and fill the
-    // frame, which is what the dense PDF417 needs to decode.
-    height: 340,
+    // Landscape preview to match the wide barcode strip on the card, and
+    // tall enough to give the capture a high-detail frame to decode.
+    height: 300,
     backgroundColor: '#000',
     borderRadius: radius.lg,
     overflow: 'hidden',
@@ -457,8 +499,9 @@ const styles = StyleSheet.create({
   // SA driver's licence). The four corner brackets are easier to read than
   // a full border when the camera preview is busy.
   reticle: {
+    // Wide, short band — the SA barcode is a wide strip, not a square.
     position: 'absolute',
-    top: '15%', bottom: '15%', left: '8%', right: '8%',
+    top: '26%', bottom: '26%', left: '6%', right: '6%',
   },
   reticleCorner: {
     position: 'absolute',
