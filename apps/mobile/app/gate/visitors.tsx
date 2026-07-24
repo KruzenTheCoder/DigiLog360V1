@@ -196,6 +196,9 @@ function SignInSheet({
   const [scanning, setScanning] = useState<ScanTarget | null>(null);
   const scanLock = useRef(false);
   const [permission, requestPermission] = useCameraPermissions();
+  // Torch helps a lot: SA licence/disk PDF417 is dense and needs even,
+  // bright light on the barcode to decode.
+  const [torch, setTorch] = useState(false);
 
   function resetForm() {
     setFullName(''); setIdNumber(''); setCompany('');
@@ -287,7 +290,7 @@ function SignInSheet({
     return (
       <Sheet
         visible={visible}
-        onClose={() => { setScanning(null); onClose(); }}
+        onClose={() => { setTorch(false); setScanning(null); onClose(); }}
         title={scanning === 'disk' ? 'Scan vehicle licence disk' : "Scan driver's licence"}
       >
         <View style={styles.cameraWrap}>
@@ -299,8 +302,14 @@ function SignInSheet({
             key={`cam-${scanning}`}
             style={StyleSheet.absoluteFill}
             facing="back"
+            autofocus="on"
+            enableTorch={torch}
             barcodeScannerSettings={{
-              barcodeTypes: ['pdf417', 'aztec', 'datamatrix', 'qr', 'code128', 'code39'],
+              // SA licence disks AND driver's licences are BOTH PDF417.
+              // Handing the native detector a single symbology (instead of
+              // six) dramatically improves its hit-rate on these very dense
+              // codes — the extra formats made it hesitate and never lock on.
+              barcodeTypes: ['pdf417'],
             }}
             onBarcodeScanned={(event) => {
               const { data, type } = event;
@@ -326,13 +335,20 @@ function SignInSheet({
           <View style={styles.cameraHintWrap} pointerEvents="none">
             <Text style={styles.cameraHint}>
               {scanning === 'disk'
-                ? 'Hold the disk barcode inside the frame'
-                : 'Hold the back of the licence inside the frame'}
+                ? 'Fill the frame with the disk barcode — hold ~15cm away and steady'
+                : 'Fill the frame with the barcode on the BACK of the licence — hold steady'}
             </Text>
           </View>
+          <TouchableOpacity
+            onPress={() => setTorch((t) => !t)}
+            style={styles.torchBtn}
+            activeOpacity={0.8}
+          >
+            <Ionicons name={torch ? 'flash' : 'flash-off'} size={20} color="#fff" />
+          </TouchableOpacity>
         </View>
         <View style={{ height: spacing.sm }} />
-        <Button title="Cancel scan" variant="ghost" onPress={() => setScanning(null)} />
+        <Button title="Cancel scan" variant="ghost" onPress={() => { setTorch(false); setScanning(null); }} />
       </Sheet>
     );
   }
@@ -422,11 +438,20 @@ const styles = StyleSheet.create({
   // and the barcode scanner never starts.
   cameraWrap: {
     width: '100%',
-    height: 280,
+    // Taller preview = users naturally hold the barcode closer and fill the
+    // frame, which is what the dense PDF417 needs to decode.
+    height: 340,
     backgroundColor: '#000',
     borderRadius: radius.lg,
     overflow: 'hidden',
     position: 'relative',
+  },
+  torchBtn: {
+    position: 'absolute',
+    top: 10, right: 10,
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
   },
   // Card-orientation reticle (~1.6:1 ratio, like a credit card / SA disk /
   // SA driver's licence). The four corner brackets are easier to read than
