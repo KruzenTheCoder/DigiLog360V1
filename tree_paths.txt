@@ -1,0 +1,7 @@
+README.md
+SPEC.md
+index.html
+license-sample-parsed.json
+license-sample.base64
+license-sample.raw
+script.js
