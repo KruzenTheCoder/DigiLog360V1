@@ -393,6 +393,7 @@ function SignInSheet({
         />
         <View style={{ height: spacing.xs }} />
         <Button title="Cancel scan" variant="ghost" onPress={() => { setTorch(false); setScanning(null); }} />
+        <toast.ToastView />
       </Sheet>
     );
   }
@@ -426,6 +427,7 @@ function SignInSheet({
       <View style={{ height: spacing.sm }} />
       <Button title="Sign In" onPress={save} loading={busy}
         icon={<Ionicons name="log-in" size={18} color="#fff" />} />
+      <toast.ToastView />
     </Sheet>
   );
 }
