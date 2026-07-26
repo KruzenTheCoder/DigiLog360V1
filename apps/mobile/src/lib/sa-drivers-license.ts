@@ -94,9 +94,43 @@ function recoverBytes(rawString: string): Uint8Array {
   return bytes;
 }
 
+const B64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/** Dependency-free base64 → exact bytes (Hermes has no reliable atob). */
+function base64ToBytes(b64: string): Uint8Array {
+  const clean = b64.replace(/[^A-Za-z0-9+/]/g, '');
+  const out: number[] = [];
+  for (let i = 0; i < clean.length; i += 4) {
+    const c0 = B64_ALPHABET.indexOf(clean[i]);
+    const c1 = B64_ALPHABET.indexOf(clean[i + 1]);
+    const c2 = i + 2 < clean.length ? B64_ALPHABET.indexOf(clean[i + 2]) : -1;
+    const c3 = i + 3 < clean.length ? B64_ALPHABET.indexOf(clean[i + 3]) : -1;
+    const n = (c0 << 18) | ((c1 & 0x3f) << 12) | ((c2 & 0x3f) << 6) | (c3 & 0x3f);
+    out.push((n >> 16) & 0xff);
+    if (c2 !== -1) out.push((n >> 8) & 0xff);
+    if (c3 !== -1) out.push(n & 0xff);
+  }
+  return Uint8Array.from(out);
+}
+
+/**
+ * Decode from the barcode's EXACT bytes (base64). This is the reliable path:
+ * the native side (patched expo-camera) hands us MLKit's raw bytes so the
+ * encrypted binary payload survives intact — unlike the lossy `data` string.
+ */
+export function decodeSADriversLicenseFromBase64(b64: string): ParsedSADriversLicense | null {
+  if (!b64) return null;
+  return decodeSADriversLicenseFromBytes(base64ToBytes(b64));
+}
+
+/** String entry point — bytes recovered via charCodeAt (lossy for binary; kept
+ *  as a fallback only). Prefer {@link decodeSADriversLicenseFromBase64}. */
 export function decodeSADriversLicense(rawPayload: string): ParsedSADriversLicense | null {
+  return decodeSADriversLicenseFromBytes(recoverBytes(rawPayload));
+}
+
+export function decodeSADriversLicenseFromBytes(data: Uint8Array): ParsedSADriversLicense | null {
   try {
-    const data = recoverBytes(rawPayload);
     const MIN_LENGTH = 6 + (5 * 128) + 74; // header + 5 blocks + 1 block
     if (data.length < MIN_LENGTH) {
       console.error('Data too short:', data.length);

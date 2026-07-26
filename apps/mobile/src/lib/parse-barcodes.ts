@@ -153,7 +153,7 @@ function titleCase(s: string): string {
 // SA Driver's Licence
 // ============================================================================
 
-import { decodeSADriversLicense, type ParsedSADriversLicense } from './sa-drivers-license';
+import { decodeSADriversLicense, decodeSADriversLicenseFromBase64, type ParsedSADriversLicense } from './sa-drivers-license';
 
 export interface DriversLicenseData extends Partial<ParsedSADriversLicense> {
   id_number?: string;
@@ -168,8 +168,17 @@ export interface DriversLicenseData extends Partial<ParsedSADriversLicense> {
  * if it happens to appear in unencrypted bytes. Returns the raw text so the
  * operator can confirm a scan happened even when extraction fails.
  */
-export function parseDriversLicenseBarcode(text: string): DriversLicenseData {
+export function parseDriversLicenseBarcode(text: string, rawBase64?: string | null): DriversLicenseData {
   const data: DriversLicenseData = { raw: text };
+
+  // Preferred path: exact bytes from the patched native scanner (base64).
+  // This is the only path that can survive the encrypted binary payload.
+  if (rawBase64) {
+    const fromBytes = decodeSADriversLicenseFromBase64(rawBase64);
+    if (fromBytes && fromBytes.idNumber) {
+      return { ...fromBytes, raw: text, id_number: fromBytes.idNumber };
+    }
+  }
 
   const parsed = decodeSADriversLicense(text);
   if (parsed) {
@@ -222,25 +231,33 @@ export type ScanResult =
   | { kind: 'unknown'; raw: string };
 
 /**
- * @param text     The decoded string from the barcode scanner (`data`).
- * @param rawAlt   expo-camera's `raw` value when present — on Android this is
- *                 the less-mangled representation of binary PDF417 payloads
- *                 (SA driver's licences are binary), so we try both.
+ * @param text      The decoded string from the barcode scanner (`data`).
+ * @param rawAlt    expo-camera's `raw` value when present.
+ * @param rawBase64 The barcode's EXACT bytes, base64-encoded, from the patched
+ *                  native scanner. This is the only representation that keeps an
+ *                  encrypted SA driver's-licence payload intact — the `data`/
+ *                  `raw` strings are UTF-8-mangled and cannot be decrypted.
  */
-export function detectAndParse(text: string, rawAlt?: string | null): ScanResult {
+export function detectAndParse(text: string, rawAlt?: string | null, rawBase64?: string | null): ScanResult {
   const disk = parseVehicleLicenseDisk(text) ?? (rawAlt ? parseVehicleLicenseDisk(rawAlt) : null);
   if (disk) return { kind: 'disk', data: disk };
-  // Driver's licence barcodes are binary, so the string we get will be
-  // largely unprintable — but the parser is forgiving and just looks for
-  // an embedded ID number. We treat as "license" if we got one OR if the
-  // content has many control characters (heuristic for the binary format).
+
+  // Reliable licence path first: decrypt straight from the exact bytes.
+  if (rawBase64) {
+    const dl = parseDriversLicenseBarcode(text, rawBase64);
+    if (dl.id_number) return { kind: 'license', data: dl };
+  }
+
+  // Fallbacks (lossy): look for an embedded ID in the string forms.
   for (const candidate of [text, rawAlt ?? '']) {
     if (!candidate) continue;
     const dl = parseDriversLicenseBarcode(candidate);
     if (dl.id_number) return { kind: 'license', data: dl };
   }
   const controlRatio = countControlChars(text) / Math.max(text.length, 1);
-  if (controlRatio > 0.2) return { kind: 'license', data: parseDriversLicenseBarcode(rawAlt || text) };
+  if (rawBase64 || controlRatio > 0.2) {
+    return { kind: 'license', data: parseDriversLicenseBarcode(rawAlt || text, rawBase64) };
+  }
   return { kind: 'unknown', raw: text };
 }
 

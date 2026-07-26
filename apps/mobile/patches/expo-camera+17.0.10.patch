@@ -1,0 +1,73 @@
+diff --git a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/analyzers/BarcodeAnalyzer.kt b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/analyzers/BarcodeAnalyzer.kt
+index 5167a59..dcdc7b4 100644
+--- a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/analyzers/BarcodeAnalyzer.kt
++++ b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/analyzers/BarcodeAnalyzer.kt
+@@ -42,6 +42,9 @@ class BarcodeAnalyzer(private val lensFacing: CameraType, formats: List<BarcodeT
+           }
+           val barcode = barcodes.first()
+           val raw = barcode.rawValue ?: barcode.rawBytes?.let { String(it) }
++          val rawBase64 = barcode.rawBytes?.let {
++            android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
++          }
+ 
+           val cornerPoints = barcode.cornerPoints?.let { points ->
+             // Pre-allocate array
+@@ -62,7 +65,8 @@ class BarcodeAnalyzer(private val lensFacing: CameraType, formats: List<BarcodeT
+               extra,
+               cornerPoints,
+               imageProxy.width,
+-              imageProxy.height
++              imageProxy.height,
++              rawBase64
+             )
+           )
+         }
+diff --git a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/analyzers/BarcodeScannerResultSerializer.kt b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/analyzers/BarcodeScannerResultSerializer.kt
+index 119454d..6e0802d 100644
+--- a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/analyzers/BarcodeScannerResultSerializer.kt
++++ b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/analyzers/BarcodeScannerResultSerializer.kt
+@@ -11,6 +11,7 @@ object BarCodeScannerResultSerializer {
+     Bundle().apply {
+       putString("data", result.value)
+       putString("raw", result.raw)
++      putString("rawBase64", result.rawBase64)
+       putInt("type", result.type)
+       putBundle("extra", result.extra)
+       val cornerPointsAndBoundingBox = getCornerPointsAndBoundingBox(result.cornerPoints, result.boundingBox, density)
+@@ -20,6 +21,10 @@ object BarCodeScannerResultSerializer {
+ 
+   fun parseBarcodeScanningResult(barcode: Barcode, inputImage: InputImage? = null): BarCodeScannerResult {
+     val raw = barcode.rawValue ?: barcode.rawBytes?.let { String(it) }
++    // Preserve the exact bytes (base64) so binary payloads survive the bridge.
++    val rawBase64 = barcode.rawBytes?.let {
++      android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
++    }
+     val value = if (barcode.valueType == Barcode.TYPE_CONTACT_INFO) {
+       raw
+     } else {
+@@ -33,7 +38,7 @@ object BarCodeScannerResultSerializer {
+     }
+ 
+     val extra = parseExtraDate(barcode)
+-    return BarCodeScannerResult(barcode.format, value, raw, extra, cornerPoints, inputImage?.height ?: 0, inputImage?.width ?: 0)
++    return BarCodeScannerResult(barcode.format, value, raw, extra, cornerPoints, inputImage?.height ?: 0, inputImage?.width ?: 0, rawBase64)
+   }
+ 
+   private fun getCornerPointsAndBoundingBox(
+diff --git a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/utils/BarCodeScannerResult.kt b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/utils/BarCodeScannerResult.kt
+index 05a5cbf..1caf31b 100644
+--- a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/utils/BarCodeScannerResult.kt
++++ b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/utils/BarCodeScannerResult.kt
+@@ -9,7 +9,11 @@ class BarCodeScannerResult(
+   val extra: Bundle,
+   var cornerPoints: MutableList<Int>,
+   var height: Int,
+-  var width: Int
++  var width: Int,
++  // Base64 of the barcode's exact raw bytes. Needed for binary payloads
++  // (e.g. encrypted SA driver's licences) whose bytes are destroyed when
++  // MLKit decodes them into a UTF-8 String. Null when not available.
++  val rawBase64: String? = null
+ ) {
+   data class BoundingBox(val x: Int, val y: Int, val width: Int, val height: Int)
+ 

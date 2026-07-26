@@ -216,14 +216,15 @@ function SignInSheet({
       }
       const results = await scanFromURLAsync(photo.uri, ['pdf417']);
       if (__DEV__) {
+        const r = results[0] as { type?: string; rawBase64?: string; data?: string } | undefined;
         // eslint-disable-next-line no-console
         console.log('[visitor-scan] photo decode', results.length,
-          results[0] ? { type: results[0].type, hasRaw: !!(results[0] as { raw?: string }).raw, len: results[0].data?.length } : null);
+          r ? { type: r.type, hasBytes: !!r.rawBase64, byteLen: r.rawBase64 ? Math.floor((r.rawBase64.length * 3) / 4) : 0, dataLen: r.data?.length } : null);
       }
       if (results.length > 0) {
-        const r0 = results[0];
+        const r0 = results[0] as { data: string; raw?: string; rawBase64?: string };
         scanLock.current = false; // allow this deliberate capture to apply
-        applyScan(detectAndParse(r0.data, (r0 as { raw?: string }).raw ?? null));
+        applyScan(detectAndParse(r0.data, r0.raw ?? null, r0.rawBase64 ?? null));
       } else {
         toast.show('No barcode found — fill the frame, hold steady, try the torch', 'error');
       }
@@ -348,14 +349,15 @@ function SignInSheet({
             }}
             onBarcodeScanned={(event) => {
               const { data, type } = event;
-              // `raw` (Android) preserves binary PDF417 payloads better than
-              // `data` — pass both so the parser can try each.
-              const raw = (event as { raw?: string }).raw ?? null;
-              // Dev-only: confirm the callback is firing if the user reports
-              // "nothing happens" — visible in `expo start` logs.
+              const e = event as { raw?: string; rawBase64?: string };
+              // `rawBase64` (patched native scanner) carries the EXACT bytes —
+              // the only form that can decrypt an SA licence. `raw` is a lossy
+              // fallback used for the plaintext disk.
+              const raw = e.raw ?? null;
+              const rawBase64 = e.rawBase64 ?? null;
               // eslint-disable-next-line no-console
-              if (__DEV__) console.log('[visitor-scan] barcode', type, data.slice(0, 80));
-              applyScan(detectAndParse(data, raw));
+              if (__DEV__) console.log('[visitor-scan] barcode', type, 'hasBytes', !!rawBase64, data.slice(0, 40));
+              applyScan(detectAndParse(data, raw, rawBase64));
             }}
           />
           {/* Card-aspect reticle (≈1.6:1 like a credit card / SA driver's
