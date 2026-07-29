@@ -6,7 +6,7 @@
   "license": "UNLICENSED",
   "main": "expo-router/entry",
   "scripts": {
-    "postinstall": "patch-package && node scripts/verify-patches.mjs",
+    "postinstall": "node scripts/apply-native-overrides.mjs",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
@@ -16,7 +16,8 @@
     "build:production": "npx eas-cli build --profile production --platform android",
     "update:preview": "npx eas-cli update --branch preview",
     "update:production": "npx eas-cli update --branch production",
-    "verify:patches": "node scripts/verify-patches.mjs"
+    "verify:patches": "node scripts/apply-native-overrides.mjs",
+    "eas-build-post-install": "node scripts/apply-native-overrides.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
