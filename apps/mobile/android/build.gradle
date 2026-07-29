@@ -22,3 +22,64 @@ allprojects {
 
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
+
+// ---------------------------------------------------------------------------
+// Apply our expo-camera native override before anything compiles.
+//
+// A South African driver's licence PDF417 carries an ENCRYPTED payload, so it
+// can only be decrypted from the barcode's exact bytes. Stock expo-camera
+// decodes ML Kit's result into a UTF-8 string, destroying them. Our override
+// adds a `rawBase64` field that carries them intact across the bridge; without
+// it licence scanning cannot work at all.
+//
+// This lives in Gradle, not in an npm script, because THREE production APKs
+// shipped without the override and nobody could tell:
+//   * `postinstall` never ran — apps/mobile is not a root workspace member, so
+//     an install driven from the repo root skips its lifecycle scripts;
+//   * the script called the bare `patch-package` binary, unresolvable when
+//     devDependencies are absent, so it failed instead of patching;
+//   * `eas-build-post-install` did not run either.
+//
+// Gradle always runs for an Android build. This executes at CONFIGURATION time
+// — before any compileKotlin task exists — which matters because expo-camera is
+// its own Gradle module and compiles before anything in :app.
+// ---------------------------------------------------------------------------
+def nativeOverrideDir = file("${rootDir}/../native-overrides/expo-camera")
+def expoCameraSrc = file("${rootDir}/../node_modules/expo-camera/android/src/main/java/expo/modules/camera")
+
+if (!expoCameraSrc.exists()) {
+  throw new GradleException(
+    "expo-camera sources not found at ${expoCameraSrc}.\n" +
+    "Install dependencies in apps/mobile before building.")
+}
+if (!nativeOverrideDir.exists()) {
+  throw new GradleException(
+    "native-overrides/expo-camera is missing.\n" +
+    "It is required — without it the built APK cannot read driver's licences.")
+}
+
+def overrideTargets = [
+  "BarCodeScannerResult.kt"          : new File(expoCameraSrc, "utils/BarCodeScannerResult.kt"),
+  "BarcodeScannerResultSerializer.kt": new File(expoCameraSrc, "analyzers/BarcodeScannerResultSerializer.kt"),
+  "BarcodeAnalyzer.kt"               : new File(expoCameraSrc, "analyzers/BarcodeAnalyzer.kt"),
+]
+
+overrideTargets.each { name, dest ->
+  def src = new File(nativeOverrideDir, name)
+  if (!src.exists()) throw new GradleException("Missing native override file: ${src}")
+  if (!dest.exists()) throw new GradleException("Missing expo-camera target: ${dest}")
+  if (dest.text != src.text) {
+    dest.text = src.text
+    logger.lifecycle("native-override: applied ${name}")
+  }
+}
+
+// Read back from node_modules, so a silent no-op cannot pass for success.
+overrideTargets.each { name, dest ->
+  if (!dest.text.contains("rawBase64")) {
+    throw new GradleException(
+      "native-override did not take effect on ${name}.\n" +
+      "Refusing to build an APK whose licence scanner cannot work.")
+  }
+}
+logger.lifecycle("native-override: expo-camera rawBase64 override verified OK")

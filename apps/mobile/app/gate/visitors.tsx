@@ -233,7 +233,11 @@ function SignInSheet({
       return 'no-barcode';
     }
 
-    const r0 = results[0] as { data: string; raw?: string; rawBase64?: string };
+    const r0 = results[0] as {
+      data: string; raw?: string; rawBase64?: string;
+      /** "1" when the native override is compiled in. Never null — see below. */
+      rawBytesSupport?: string;
+    };
     const result = detectAndParse(r0.data, r0.raw ?? null, r0.rawBase64 ?? null);
 
     // Field-visible diagnostic. Only shapes and header bytes — never payload
@@ -250,9 +254,13 @@ function SignInSheet({
     // whose ML Kit simply returned no raw bytes has the key present but null.
     //   field=absent -> the APK does not contain the patch
     //   field=null   -> patch is there; ML Kit gave us no bytes for this symbol
-    const field = !('rawBase64' in r0) ? 'absent' : r0.rawBase64 === null ? 'null' : 'set';
+    // `rawBytesSupport` is set to "1" by the override and is never null, so it
+    // survives a bridge that drops null-valued keys — unlike rawBase64 itself.
+    //   support=no  -> this APK was compiled WITHOUT the native override
+    //   support=yes -> override is in; ML Kit simply returned no bytes
+    const support = r0.rawBytesSupport === '1' ? 'yes' : 'no';
     setDiag(
-      `${source}: bytes=${bytes ? 'yes' : 'NO'} field=${field} len=${bytes?.length ?? 0} ` +
+      `${source}: bytes=${bytes ? 'yes' : 'NO'} support=${support} len=${bytes?.length ?? 0} ` +
       `hdr=${hdr} text=${r0.data?.length ?? 0} → ${result.kind}`,
     );
 

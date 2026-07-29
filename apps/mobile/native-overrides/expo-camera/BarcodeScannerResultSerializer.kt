@@ -12,6 +12,11 @@ object BarCodeScannerResultSerializer {
       putString("data", result.value)
       putString("raw", result.raw)
       putString("rawBase64", result.rawBase64)
+      // Sentinel that is NEVER null, so JS can tell "this build has the byte
+      // passthrough but ML Kit gave us nothing" apart from "this build was
+      // compiled without the override". A null rawBase64 alone cannot
+      // distinguish those if the bridge drops null-valued keys.
+      putString("rawBytesSupport", "1")
       putInt("type", result.type)
       putBundle("extra", result.extra)
       val cornerPointsAndBoundingBox = getCornerPointsAndBoundingBox(result.cornerPoints, result.boundingBox, density)
