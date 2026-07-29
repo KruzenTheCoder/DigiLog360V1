@@ -78,13 +78,11 @@ export default function VisitorsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
+      {/* Sign-in has exactly ONE entry point: the FAB below. The header icon and
+          the empty-state button were two more controls doing the identical
+          thing, which just made the screen busier for a guard working one-handed. */}
       <Header onBack={() => router.back()} title="Visitor Log"
         subtitle={`${onsite.length} currently on site`}
-        right={
-          <TouchableOpacity onPress={() => setAddOpen(true)} style={styles.headerBtn}>
-            <Ionicons name="person-add" size={20} color={theme.brand} />
-          </TouchableOpacity>
-        }
       />
 
       <ScrollView
@@ -102,7 +100,6 @@ export default function VisitorsScreen() {
             icon="people-outline"
             title="No visitors on site"
             hint="Tap + to sign someone in"
-            action={{ label: 'Sign visitor in', onPress: () => setAddOpen(true) }}
           />
         ) : (
           onsite.map((v) => (
@@ -155,8 +152,8 @@ export default function VisitorsScreen() {
 }
 
 // ---------------------------------------------------------------------------
-function Header({ title, subtitle, onBack, right }: {
-  title: string; subtitle?: string; onBack: () => void; right?: React.ReactNode;
+function Header({ title, subtitle, onBack }: {
+  title: string; subtitle?: string; onBack: () => void;
 }) {
   return (
     <View style={styles.header}>
@@ -167,7 +164,6 @@ function Header({ title, subtitle, onBack, right }: {
         <Text style={[type.h2]}>{title}</Text>
         {subtitle && <Text style={[type.muted, { marginTop: 2 }]}>{subtitle}</Text>}
       </View>
-      {right}
     </View>
   );
 }
@@ -229,7 +225,20 @@ function SignInSheet({
         toast.show('No barcode found — fill the frame, hold steady, try the torch', 'error');
       }
     } catch (e) {
-      toast.show('Scan failed — try again', 'error');
+      // Separate "this device can never scan" from a one-off failure. ML Kit
+      // ships inside Google Play Services, so on a gate tablet without it every
+      // scan fails forever — and the old generic message gave no hint why.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.log('[visitor-scan] capture failed', msg);
+      }
+      toast.show(
+        /MLKit|Google Play/i.test(msg)
+          ? 'This device can\'t scan barcodes — Google Play Services is missing'
+          : 'Scan failed — try again',
+        'error',
+      );
     } finally {
       setCapturing(false);
     }
