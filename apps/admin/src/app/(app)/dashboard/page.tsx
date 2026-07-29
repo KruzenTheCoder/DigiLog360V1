@@ -43,6 +43,9 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   const params = await searchParams;
   const siteParam = typeof params.site === 'string' ? params.site : undefined;
 
+  const now = new Date();
+  const last30 = new Date(now.getTime() - 30 * 864e5);
+  const last60 = new Date(now.getTime() - 60 * 864e5);
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
@@ -60,32 +63,80 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   let sitesQ = supabase.from('sites').select('id, name').order('name');
   if (!isUnscoped && ownSites.length > 0) sitesQ = sitesQ.in('id', ownSites);
 
-  const fetchDashboardOccurrences = async () => {
-    let base = supabase
-      .from('occurrences')
-      .select('id, status, severity, occurrence_type, site_name, site_id, incident_at, sla_due_at, last_sla_update_at, sla_hours, closed_at')
-      .gte('incident_at', sixMonthsAgo.toISOString())
-      .order('incident_at', { ascending: false });
+  // PostgREST caps EVERY response at `max_rows` (1000 — see supabase/config.toml).
+  // A single unpaged select therefore truncates the 6-month window silently on a
+  // busy org, and every KPI derived from it counts "rows we happened to receive"
+  // instead of "rows that match the filter". Two fixes, below: page through the
+  // rows the breakdowns aggregate over, and read the headline totals from an
+  // exact count rather than from an array length.
+  const PAGE_SIZE = 1000;
+  const MAX_PAGES = 25; // runaway guard — 25k rows across six months
 
-    // If they picked a specific site from the chips, honour it — but a scoped
-    // user can only pick within their own sites.
+  // The active site filter, resolved once. If they picked a site from the chips
+  // honour it — but a scoped user can only pick within their own sites; a
+  // site-less scoped user falls back to their own rows (an unfiltered query
+  // forces RLS across the whole table and times out).
+  const scope = (() => {
     if (siteParam && (isUnscoped || ownSites.includes(siteParam))) {
-      return (await base.eq('site_id', siteParam)).data ?? [];
+      return { col: 'site_id', op: 'eq' as const, val: siteParam };
     }
+    if (isUnscoped) return null;
+    return ownSites.length > 0
+      ? { col: 'site_id', op: 'in' as const, val: ownSites }
+      : { col: 'logged_by', op: 'eq' as const, val: profile.id };
+  })();
 
-    if (!isUnscoped) {
-      // Site-less scoped user → own rows only (unfiltered would time out).
-      base = ownSites.length > 0
-        ? base.in('site_id', ownSites)
-        : base.eq('logged_by', profile.id);
+  /**
+   * Applies that scope to any occurrences query, so the paged row fetch and the
+   * headline counts can never disagree about what "the filter" means.
+   */
+  function withScope<T>(q: T): T {
+    if (!scope) return q;
+    const b = q as unknown as {
+      eq: (c: string, v: string) => T;
+      in: (c: string, v: string[]) => T;
+    };
+    return scope.op === 'in' ? b.in(scope.col, scope.val as string[]) : b.eq(scope.col, scope.val as string);
+  }
+
+  const occurrenceRowsQuery = () => supabase
+    .from('occurrences')
+    .select('id, status, severity, occurrence_type, site_name, site_id, incident_at, sla_due_at, last_sla_update_at, sla_hours, closed_at')
+    .gte('incident_at', sixMonthsAgo.toISOString())
+    .order('incident_at', { ascending: false });
+
+  const fetchDashboardOccurrences = async () => {
+    const rows: DashboardOcc[] = [];
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const from = page * PAGE_SIZE;
+      const { data } = await withScope(occurrenceRowsQuery()).range(from, from + PAGE_SIZE - 1);
+      const batch = (data ?? []) as DashboardOcc[];
+      rows.push(...batch);
+      if (batch.length < PAGE_SIZE) break; // short page → set exhausted
     }
-
-    return (await base).data ?? [];
+    return rows;
   };
 
-  const [{ data: allSites }, data] = await Promise.all([
+  // Exact server-side count for a date window under the same scope — this is
+  // what the hero KPI reports, so the headline is the true total for the filter
+  // regardless of how many rows were transferred.
+  const countBetween = async (from: Date, to?: Date) => {
+    let q = withScope(
+      supabase
+        .from('occurrences')
+        .select('id', { count: 'exact', head: true })
+        .gte('incident_at', from.toISOString()),
+    );
+    if (to) q = q.lt('incident_at', to.toISOString());
+    const { count } = await q;
+    return count ?? 0;
+  };
+
+  const [{ data: allSites }, data, total30, prevTotal] = await Promise.all([
     sitesQ,
     fetchDashboardOccurrences(),
+    countBetween(last30),          // "Total Incidents" hero — last 30 days
+    countBetween(last60, last30),  // previous window, for the trend delta
   ]);
   const activeSite = siteParam ? (allSites ?? []).find((s) => s.id === siteParam) : null;
 
@@ -100,12 +151,13 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
     return `/occurrences/all${qs ? `?${qs}` : ''}`;
   };
 
-  const occ = (data ?? []) as DashboardOcc[];
-  const now = new Date();
-  const last30 = new Date(now.getTime() - 30 * 864e5);
-  const last60 = new Date(now.getTime() - 60 * 864e5);
+  const occ = data;
   const occ30 = occ.filter((o) => new Date(o.incident_at) >= last30);
-  const total30 = occ30.length;
+  // Denominator for the breakdown bars/percentages. `total30` above is the true
+  // filtered total (exact count); this is the set the breakdowns could actually
+  // aggregate over. They're the same number unless the runaway guard truncated
+  // the fetch, in which case the bars still add to 100% of what they describe.
+  const total30Rows = occ30.length;
   const isTerminal = (o: DashboardOcc) => (TERMINAL_STATUSES as readonly string[]).includes(o.status);
   // "Open / Live" = every non-terminal occurrence (open, acknowledged, in_progress,
   // on_patrol), not just the literal 'open' status — so Open/Live + Resolved = Total.
@@ -113,7 +165,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   const resolved = occ30.filter(isTerminal).length;
   // Percentages are kept as precise floats and only formatted (to 2 dp) at the
   // point of display — no rounding-up that hides the real figure.
-  const resolutionRate = total30 ? (resolved / total30) * 100 : 0;
+  const resolutionRate = total30Rows ? (resolved / total30Rows) * 100 : 0;
   // Currently-actionable SLA state (age-independent) — drives the alert banner.
   const breached = occ.filter((o) => isSlaBreached(o, now)).length;
   const updateDue = occ.filter((o) => isSlaUpdateDue(o, now) && !isSlaBreached(o, now)).length;
@@ -121,11 +173,8 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   // same 30-day window (the banner keeps the age-independent `breached`).
   const breached30 = occ30.filter((o) => isSlaBreached(o, now)).length;
 
-  // Previous 30-day window (days 31–60) for the trend delta on the hero card.
-  const prevTotal = occ.filter((o) => {
-    const d = new Date(o.incident_at);
-    return d >= last60 && d < last30;
-  }).length;
+  // Trend delta on the hero card — both sides come from exact counts, so the
+  // percentage compares real volumes rather than two truncated page loads.
   const trendPct = prevTotal ? ((total30 - prevTotal) / prevTotal) * 100 : null;
 
   // Average time-to-close (hours) over occurrences that OCCURRED in the last 30
@@ -335,14 +384,14 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
               {statusCounts.map((s) => (
                 <div
                   key={s.key}
-                  style={{ width: `${(s.count / total30) * 100}%`, background: s.color }}
+                  style={{ width: `${(s.count / total30Rows) * 100}%`, background: s.color }}
                   title={`${s.label}: ${s.count}`}
                 />
               ))}
             </div>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
               {statusCounts.map((s) => {
-                const pct = total30 ? (s.count / total30) * 100 : 0;
+                const pct = total30Rows ? (s.count / total30Rows) * 100 : 0;
                 return (
                   <a key={s.key} href={drill({ status: s.key })} className="flex items-center gap-1.5 text-xs hover:underline">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
@@ -371,7 +420,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
               // sliver when many types each hold a small % of the total.
               const maxCount = typeBreakdown[0]?.count || 1;
               return typeBreakdown.map((t, i) => {
-                const pct = total30 ? (t.count / total30) * 100 : 0;
+                const pct = total30Rows ? (t.count / total30Rows) * 100 : 0;
                 const barWidth = Math.max(Math.round((t.count / maxCount) * 100), 8);
                 const color = BAR_PALETTE[i % BAR_PALETTE.length];
                 return (
@@ -419,7 +468,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           <div className="space-y-3">
             {topSites.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
             {topSites.map((s) => {
-              const pct = total30 ? (s.count / total30) * 100 : 0;
+              const pct = total30Rows ? (s.count / total30Rows) * 100 : 0;
               return (
                 <a key={s.name} href={drill({ site_name: s.name === 'Unassigned' ? undefined : s.name })} className="block rounded-md p-1 -m-1 transition hover:bg-slate-50 dark:hover:bg-slate-800/40">
                   <div className="mb-1 flex justify-between text-sm">
