@@ -244,8 +244,15 @@ function SignInSheet({
     const hdr = bytes
       ? [...bytes.subarray(0, 4)].map((b) => b.toString(16).padStart(2, '0')).join(' ')
       : '--';
+    // Distinguishes the two reasons bytes can be missing, which need completely
+    // different fixes. Our patch calls putString("rawBase64", …) unconditionally,
+    // so an unpatched build has NO SUCH KEY (undefined) while a patched build
+    // whose ML Kit simply returned no raw bytes has the key present but null.
+    //   field=absent -> the APK does not contain the patch
+    //   field=null   -> patch is there; ML Kit gave us no bytes for this symbol
+    const field = !('rawBase64' in r0) ? 'absent' : r0.rawBase64 === null ? 'null' : 'set';
     setDiag(
-      `${source}: bytes=${bytes ? 'yes' : 'NO'} len=${bytes?.length ?? 0} ` +
+      `${source}: bytes=${bytes ? 'yes' : 'NO'} field=${field} len=${bytes?.length ?? 0} ` +
       `hdr=${hdr} text=${r0.data?.length ?? 0} → ${result.kind}`,
     );
 
