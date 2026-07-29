@@ -121,6 +121,58 @@ describe('parseDecryptedPayload', () => {
   });
 });
 
+/**
+ * Mirrors the byte layout observed on a REAL v2 licence (with invented personal
+ * data): the 0x82 marker at offset 13, byte[5] = 0x02, empty leading
+ * vehicle-code fields, then the text fields, then the 13-digit ID immediately
+ * followed by the packed binary section with no delimiter between them.
+ *
+ * The old parser treated byte[5] as the string-section length, giving a window
+ * that ended at offset 12 — before the marker at 13 — so every text field came
+ * back empty and the binary section was read from the wrong offset.
+ */
+function buildRealV2Layout(): Uint8Array {
+  const head = [0x01, 0x02, 0x03, 0x04, 0x05, 0x02, 0x33, 0x27, 0x03, 0x00, 0x31, 0x01, 0x16];
+  const text: number[] = [0x82, 0x5b, 0x42, 0xe1, 0xe1, 0xe1];
+  const push = (s: string) => { for (const c of s) text.push(c.charCodeAt(0)); };
+  push('MOKOENA'); text.push(0xe0);
+  push('S'); text.push(0xe1);
+  push('ZA'); text.push(0xe0);
+  push('ZA'); text.push(0xe0);
+  push('0'); text.push(0xe1, 0xe1, 0xe1);
+  push('123456789ABC'); text.push(0xe0);
+  push('8001015009087'); // ID closes the text section — no delimiter follows
+  const hex = '02' + '20031201' + 'aaa' + '00' + 'a' + '01'
+    + '19800101' + '20200101' + '20300101' + '01';
+  const bin = (hex.match(/../g) ?? []).map((h) => parseInt(h, 16));
+  return Uint8Array.from([...head, ...text, ...bin]);
+}
+
+describe('real v2 card layout (regression)', () => {
+  const p = parseDecryptedPayload(buildRealV2Layout());
+
+  it('reads every text field', () => {
+    expect(p).not.toBeNull();
+    expect(p!.surname).toBe('MOKOENA');
+    expect(p!.initials).toBe('S');
+    expect(p!.idNumber).toBe('8001015009087');
+    expect(p!.licenseNumber).toBe('123456789ABC');
+  });
+
+  it('reads the binary section from after the ID digits', () => {
+    expect(p!.birthDate).toBe('1980-01-01');
+    expect(p!.validFrom).toBe('2020-01-01');
+    expect(p!.validTo).toBe('2030-01-01');
+    expect(p!.gender).toBe('01');
+  });
+
+  it('is not fooled by byte[5] looking like a length', () => {
+    // byte[5] is 0x02 here, exactly as on a real card.
+    expect(buildRealV2Layout()[5]).toBe(0x02);
+    expect(p!.surname).not.toBe('');
+  });
+});
+
 describe('surname extraction across real SA name shapes', () => {
   // A letters-only match used to skip every one of these and then take the
   // NEXT field as the surname — a silently wrong name in the sign-in form.

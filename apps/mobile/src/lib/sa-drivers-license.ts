@@ -129,6 +129,41 @@ export function decodeSADriversLicense(rawPayload: string): ParsedSADriversLicen
   return decodeSADriversLicenseFromBytes(recoverBytes(rawPayload));
 }
 
+/**
+ * RSA step only — returns the decrypted payload without parsing it. Exposed so
+ * diagnostics can inspect the real byte layout of a card.
+ */
+export function decryptSADriversLicenseBytes(data: Uint8Array): Uint8Array | null {
+  try {
+    const MIN_LENGTH = 6 + (5 * 128) + 74; // header + 5 blocks + 1 block
+    if (data.length < MIN_LENGTH) return null;
+
+    let keys;
+    if (matchesHeader(data, V1_HEADER)) keys = KEYS.v1;
+    else if (matchesHeader(data, V2_HEADER)) keys = KEYS.v2;
+    else return null;
+
+    const decrypted = new Uint8Array(5 * 128 + 74);
+    let offset = 6;
+    let outOffset = 0;
+
+    for (let i = 0; i < 5; i++) {
+      const block = data.subarray(offset, offset + 128);
+      const dec = bigIntToBytes(modPow(bytesToBigInt(block), keys.pk128.exp, keys.pk128.mod), 128);
+      decrypted.set(dec, outOffset);
+      offset += 128;
+      outOffset += 128;
+    }
+
+    const finalBlock = data.subarray(offset, offset + 74);
+    const decFinal = bigIntToBytes(modPow(bytesToBigInt(finalBlock), keys.pk74.exp, keys.pk74.mod), 74);
+    decrypted.set(decFinal, outOffset);
+    return decrypted;
+  } catch {
+    return null;
+  }
+}
+
 export function decodeSADriversLicenseFromBytes(data: Uint8Array): ParsedSADriversLicense | null {
   try {
     const MIN_LENGTH = 6 + (5 * 128) + 74; // header + 5 blocks + 1 block
@@ -171,37 +206,43 @@ export function decodeSADriversLicenseFromBytes(data: Uint8Array): ParsedSADrive
 }
 
 export function parseDecryptedPayload(bytes: Uint8Array): ParsedSADriversLicense | null {
-  // String section starts at byte 10.
-  // The first 10 bytes:
-  // [0] barcode version
-  // [5] string section length
-  // [7] binary section length
-  const stringSectionLength = bytes[5];
-  const stringSectionStart = 10;
-  const stringSectionEnd = stringSectionStart + stringSectionLength;
-  
-  if (stringSectionEnd > bytes.length) {
-    console.error('String section extends beyond payload', stringSectionEnd, bytes.length);
-    return null;
-  }
-
-  // The string section starts with 0x82
-  let startIdx = 0;
-  while (startIdx < bytes.length && bytes[startIdx] !== 0x82) startIdx++;
-  startIdx++; // skip 0x82
+  // Text fields begin just after the 0x82 marker, separated by 0xe0 / 0xe1.
+  //
+  // There is NO trustworthy length prefix for this section. The previous code
+  // used `bytes[5]` as the string-section length; on a real v2 card that byte
+  // is 0x02, which produced a 2-byte window ending at offset 12 while the 0x82
+  // marker sits at offset 13. The read loop therefore never executed and EVERY
+  // text field (surname, initials, ID, licence number) came back empty, while
+  // the binary section was read from the wrong offset and yielded garbage
+  // dates. Verified against a real v2 licence.
+  //
+  // Instead: read fields until the ID number. The 13-digit ID is the last text
+  // field, and the packed binary section starts immediately after its digits
+  // with no delimiter in between.
+  let startIdx = bytes.indexOf(0x82);
+  if (startIdx < 0) return null;
+  startIdx += 1; // skip the marker itself
 
   const strings: string[] = [];
   let currentString = '';
-  for (let i = startIdx; i < stringSectionEnd; i++) {
+  let binarySectionStart = -1;
+
+  for (let i = startIdx; i < bytes.length; i++) {
     const b = bytes[i];
     if (b === 0xe0 || b === 0xe1) {
-      if (currentString) strings.push(currentString.trim());
+      strings.push(currentString.trim());
       currentString = '';
-    } else {
-      currentString += String.fromCharCode(b);
+      continue;
+    }
+    currentString += String.fromCharCode(b);
+    // The ID number closes the text section — nothing delimits it.
+    if (currentString.length === 13 && /^\d{13}$/.test(currentString)) {
+      strings.push(currentString);
+      binarySectionStart = i + 1;
+      break;
     }
   }
-  if (currentString) strings.push(currentString.trim());
+  if (binarySectionStart < 0 && currentString) strings.push(currentString.trim());
 
   const license: ParsedSADriversLicense = {
     vehicleLicensesCode: '',
@@ -236,8 +277,9 @@ export function parseDecryptedPayload(bytes: Uint8Array): ParsedSADriversLicense
     if (surnameIdx + 1 < strings.length) license.initials = strings[surnameIdx + 1];
   }
 
-  // The binary section (dates, gender, restrictions) starts after the string section.
-  const binarySectionStart = stringSectionEnd;
+  // Packed binary section (dates, gender, restrictions) — starts right after
+  // the ID digits located above.
+  if (binarySectionStart < 0) return license;
   const hexValues = Array.from(bytes.subarray(binarySectionStart)).map(b => b.toString(16).padStart(2, '0')).join('');
 
   // The binary layout (nibbles) from the spec:

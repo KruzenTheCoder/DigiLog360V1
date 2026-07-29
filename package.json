@@ -41,8 +41,11 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@zxing/library": "^0.23.0",
+    "jimp": "^1.6.1",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "zxing-wasm": "^3.1.2"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.33.0",
