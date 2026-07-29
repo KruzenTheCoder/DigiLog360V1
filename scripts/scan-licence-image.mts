@@ -37,14 +37,55 @@ if (Math.max(W, H) <= 1280) {
   console.log('         PDF417 needs roughly 2500px on the long edge to survive.');
 }
 
-// A phone photo is usually rotated, and contrast/scale preprocessing makes a
-// real difference on a laminated card.
-const variants = [
-  { name: 'as-is', build: () => base.clone() },
-  { name: 'grey+contrast', build: () => base.clone().greyscale().contrast(0.4) },
-  { name: '2x grey+contrast', build: () => base.clone().greyscale().contrast(0.4).scale(2) },
-  { name: '2x normalized', build: () => base.clone().greyscale().normalize().scale(2) },
+// A laminated card under room light is a hard target: glare washes out part of
+// the symbol and the plastic sleeve adds scratches. No single preprocessing
+// wins on every photo, so sweep a range. Crops matter too — restricting to the
+// barcode band removes the pink category table, which otherwise dominates the
+// binarizer's global threshold and flattens the bars.
+const crops: { name: string; box: [number, number, number, number] | null }[] = [
+  { name: 'full', box: null },
+  // The barcode occupies roughly the top third of the card in either
+  // orientation, so try both bands rather than guessing the rotation.
+  { name: 'top-45%', box: [0, 0, 1, 0.45] },
+  { name: 'left-45%', box: [0, 0, 0.45, 1] },
 ];
+
+const tones: { name: string; apply: (i: ReturnType<typeof base.clone>) => void }[] = [
+  { name: 'grey', apply: (i) => { i.greyscale(); } },
+  { name: 'normalize', apply: (i) => { i.greyscale().normalize(); } },
+  { name: 'contrast.3', apply: (i) => { i.greyscale().contrast(0.3); } },
+  { name: 'contrast.6', apply: (i) => { i.greyscale().contrast(0.6); } },
+  { name: 'norm+contrast', apply: (i) => { i.greyscale().normalize().contrast(0.35); } },
+];
+
+// Aim for a working long edge rather than blind 2x — upscaling an already-large
+// photo just burns memory, and the decoder wants ~3px per module, not more.
+const targets = [2600, 3600, 1800];
+
+const variants: { name: string; build: () => ReturnType<typeof base.clone> }[] = [];
+for (const c of crops) {
+  for (const t of targets) {
+    for (const tone of tones) {
+      variants.push({
+        name: `${c.name}/${t}px/${tone.name}`,
+        build: () => {
+          const img = base.clone();
+          if (c.box) {
+            const { width: w, height: h } = img.bitmap;
+            img.crop({
+              x: Math.round(c.box[0] * w), y: Math.round(c.box[1] * h),
+              w: Math.round(c.box[2] * w), h: Math.round(c.box[3] * h),
+            });
+          }
+          const longEdge = Math.max(img.bitmap.width, img.bitmap.height);
+          if (longEdge !== t) img.scale(t / longEdge);
+          tone.apply(img);
+          return img;
+        },
+      });
+    }
+  }
+}
 
 let bytes: Uint8Array | null = null;
 let how = '';
