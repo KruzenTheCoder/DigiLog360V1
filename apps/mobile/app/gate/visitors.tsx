@@ -4,7 +4,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +17,7 @@ import { Button, Field, Badge } from '@/components/ui';
 import { Sheet, EmptyState, SkeletonRow, useToast, ListRow } from '@/components/primitives';
 import { theme, spacing, radius, type } from '@/lib/theme';
 import { detectAndParse, type ScanResult } from '@/lib/parse-barcodes';
+import { base64ToBytes } from '@/lib/sa-drivers-license';
 
 interface Visitor {
   id: string;
@@ -214,6 +215,10 @@ function SignInSheet({
   // bright light on the barcode to decode.
   const [torch, setTorch] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  // Last scan's technical result, shown in the scanner panel. Survives long
+  // enough to be read out to support; a successful scan closes the panel so it
+  // is only ever visible after a failure.
+  const [diag, setDiag] = useState<string | null>(null);
 
   /**
    * Decode a PDF417 from an image file and apply it to the form.
@@ -223,16 +228,26 @@ function SignInSheet({
    */
   async function decodeAndApply(uri: string, source: 'capture' | 'gallery'): Promise<ScanOutcome> {
     const results = await scanFromURLAsync(uri, ['pdf417']);
-    if (__DEV__) {
-      const r = results[0] as { type?: string; rawBase64?: string; data?: string } | undefined;
-      // eslint-disable-next-line no-console
-      console.log(`[visitor-scan] ${source} decode`, results.length,
-        r ? { type: r.type, hasBytes: !!r.rawBase64, byteLen: r.rawBase64 ? Math.floor((r.rawBase64.length * 3) / 4) : 0, dataLen: r.data?.length } : null);
+    if (results.length === 0) {
+      setDiag(`${source}: no symbol found in image`);
+      return 'no-barcode';
     }
-    if (results.length === 0) return 'no-barcode';
 
     const r0 = results[0] as { data: string; raw?: string; rawBase64?: string };
     const result = detectAndParse(r0.data, r0.raw ?? null, r0.rawBase64 ?? null);
+
+    // Field-visible diagnostic. Only shapes and header bytes — never payload
+    // contents — so it is safe to read out over the phone to support.
+    // "bytes=NO" is the decisive signal: the native scanner did not hand us the
+    // raw bytes, which no JS update can fix.
+    const bytes = r0.rawBase64 ? base64ToBytes(r0.rawBase64) : null;
+    const hdr = bytes
+      ? [...bytes.subarray(0, 4)].map((b) => b.toString(16).padStart(2, '0')).join(' ')
+      : '--';
+    setDiag(
+      `${source}: bytes=${bytes ? 'yes' : 'NO'} len=${bytes?.length ?? 0} ` +
+      `hdr=${hdr} text=${r0.data?.length ?? 0} → ${result.kind}`,
+    );
 
     // A licence payload is encrypted binary, so it can ONLY be read from the
     // barcode's exact bytes. Those arrive as `rawBase64` from our patched
@@ -499,6 +514,12 @@ function SignInSheet({
             />
           </>
         )}
+        {diag && (
+          <>
+            <View style={{ height: spacing.xs }} />
+            <Text style={styles.diag} selectable>{diag}</Text>
+          </>
+        )}
         <View style={{ height: spacing.xs }} />
         <Button title="Cancel scan" variant="ghost" onPress={() => { setTorch(false); setScanning(null); }} />
         <toast.ToastView />
@@ -630,6 +651,14 @@ const styles = StyleSheet.create({
     position: 'absolute', left: 0, right: 0, bottom: 12,
     alignItems: 'center', paddingHorizontal: 16,
   },
+  // Technical read-out after a failed scan. Deliberately plain and small —
+  // it exists to be read out to support, not to be pretty.
+  diag: {
+    color: theme.textMuted, fontSize: 11,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    textAlign: 'center',
+  },
+
   cameraHint: {
     color: '#fff', fontSize: 12, textAlign: 'center',
     backgroundColor: 'rgba(0,0,0,0.55)',

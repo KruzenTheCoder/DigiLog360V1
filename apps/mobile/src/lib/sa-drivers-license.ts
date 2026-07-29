@@ -97,7 +97,7 @@ function recoverBytes(rawString: string): Uint8Array {
 const B64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 /** Dependency-free base64 → exact bytes (Hermes has no reliable atob). */
-function base64ToBytes(b64: string): Uint8Array {
+export function base64ToBytes(b64: string): Uint8Array {
   const clean = b64.replace(/[^A-Za-z0-9+/]/g, '');
   const out: number[] = [];
   for (let i = 0; i < clean.length; i += 4) {
