@@ -171,6 +171,16 @@ function Header({ title, subtitle, onBack }: {
 
 type ScanTarget = 'disk' | 'license';
 
+/**
+ * Why a scan attempt ended. `needs-newer-build` is the important one: the
+ * barcode WAS read, but this build's native scanner cannot hand us the exact
+ * bytes an encrypted SA licence needs. No JS/OTA update can change that.
+ */
+type ScanOutcome = 'ok' | 'no-barcode' | 'needs-newer-build';
+
+const NEEDS_BUILD_MSG =
+  'Licence read, but this app version can\'t decode it — a new app build is needed (not an update)';
+
 function SignInSheet({
   visible, onClose, siteId, currentUserId, currentUserName, onDone,
 }: {
@@ -211,7 +221,7 @@ function SignInSheet({
    * file URI to the same native decoder. Returns false when nothing decoded so
    * each caller can word its own advice.
    */
-  async function decodeAndApply(uri: string, source: 'capture' | 'gallery') {
+  async function decodeAndApply(uri: string, source: 'capture' | 'gallery'): Promise<ScanOutcome> {
     const results = await scanFromURLAsync(uri, ['pdf417']);
     if (__DEV__) {
       const r = results[0] as { type?: string; rawBase64?: string; data?: string } | undefined;
@@ -219,11 +229,22 @@ function SignInSheet({
       console.log(`[visitor-scan] ${source} decode`, results.length,
         r ? { type: r.type, hasBytes: !!r.rawBase64, byteLen: r.rawBase64 ? Math.floor((r.rawBase64.length * 3) / 4) : 0, dataLen: r.data?.length } : null);
     }
-    if (results.length === 0) return false;
+    if (results.length === 0) return 'no-barcode';
+
     const r0 = results[0] as { data: string; raw?: string; rawBase64?: string };
+    const result = detectAndParse(r0.data, r0.raw ?? null, r0.rawBase64 ?? null);
+
+    // A licence payload is encrypted binary, so it can ONLY be read from the
+    // barcode's exact bytes. Those arrive as `rawBase64` from our patched
+    // expo-camera; without the patch the payload is a UTF-8-mangled string that
+    // decrypts to nothing and lands here as 'unknown'. That is a native gap, so
+    // an over-the-air JS update cannot fix it — the device needs a newer build.
+    // Vehicle disks are plaintext and still work, hence the 'unknown' check.
+    if (result.kind === 'unknown' && !r0.rawBase64) return 'needs-newer-build';
+
     scanLock.current = false; // allow this deliberate scan to apply
-    applyScan(detectAndParse(r0.data, r0.raw ?? null, r0.rawBase64 ?? null));
-    return true;
+    applyScan(result);
+    return 'ok';
   }
 
   // The reliable path for the dense SA PDF417: take a FULL-RESOLUTION still
@@ -238,8 +259,11 @@ function SignInSheet({
         toast.show('Could not capture photo — try again', 'error');
         return;
       }
-      if (!(await decodeAndApply(photo.uri, 'capture'))) {
+      const outcome = await decodeAndApply(photo.uri, 'capture');
+      if (outcome === 'no-barcode') {
         toast.show('No barcode found — fill the frame, hold steady, try the torch', 'error');
+      } else if (outcome === 'needs-newer-build') {
+        toast.show(NEEDS_BUILD_MSG, 'error');
       }
     } catch (e) {
       // Separate "this device can never scan" from a one-off failure. ML Kit
@@ -284,8 +308,11 @@ function SignInSheet({
 
     setCapturing(true);
     try {
-      if (!(await decodeAndApply(res.assets[0].uri, 'gallery'))) {
+      const outcome = await decodeAndApply(res.assets[0].uri, 'gallery');
+      if (outcome === 'no-barcode') {
         toast.show('No barcode in that photo — use the original, not a screenshot or forwarded copy', 'error');
+      } else if (outcome === 'needs-newer-build') {
+        toast.show(NEEDS_BUILD_MSG, 'error');
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
