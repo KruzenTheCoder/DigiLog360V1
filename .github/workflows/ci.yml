@@ -38,6 +38,9 @@ jobs:
         working-directory: apps/mobile
         run: npx tsc --noEmit
 
+      - name: Unit tests (barcode / licence parsing)
+        run: npm test
+
   build:
     name: Build admin
     runs-on: ubuntu-latest

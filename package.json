@@ -11,6 +11,7 @@
     "apps/admin"
   ],
   "scripts": {
+    "test": "vitest run",
     "diag:tmp": "node --env-file=.env scripts/_tmp_dp2_diag.mjs",
     "admin": "npm run dev --workspace=@digilog/admin",
     "admin:build": "npm run build --workspace=@digilog/admin",
@@ -40,7 +41,8 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.33.0",
