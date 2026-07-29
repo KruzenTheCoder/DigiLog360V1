@@ -216,14 +216,24 @@ export function parseDecryptedPayload(bytes: Uint8Array): ParsedSADriversLicense
 
   license.idNumber = strings.find(s => /^\d{13}$/.test(s)) || '';
   license.licenseNumber = strings.find(s => /^[A-Z0-9]{10,14}$/i.test(s) && s !== license.idNumber) || '';
-  
-  // Surname is typically the first purely alphabetic string >= 3 characters (bypasses vehicle codes)
-  license.surname = strings.find(s => /^[A-Z]{3,}$/i.test(s) && s !== license.licenseNumber && s !== 'ZA') || '';
-  
-  // Initials typically follow the surname
-  const surnameIdx = strings.indexOf(license.surname);
-  if (surnameIdx >= 0 && surnameIdx + 1 < strings.length) {
-    license.initials = strings[surnameIdx + 1];
+
+  // Surname = the first name-like string. A letters-only match (/^[A-Z]{3,}$/)
+  // silently skipped every surname containing a space, hyphen or apostrophe —
+  // "Van der Merwe", "Du Plessis", "O'Brien", "Botha-Smit" — and then picked up
+  // whatever field came next instead, producing a confidently wrong name.
+  // Requiring a run of 3+ letters keeps short vehicle-code groups ("EB EC")
+  // from being mistaken for a surname.
+  const isNameLike = (s: string) =>
+    /^[A-Za-z][A-Za-z'\- ]*$/.test(s) &&
+    /[A-Za-z]{3,}/.test(s) &&
+    s.toUpperCase() !== 'ZA' &&
+    s !== license.licenseNumber;
+
+  const surnameIdx = strings.findIndex(isNameLike);
+  if (surnameIdx >= 0) {
+    license.surname = strings[surnameIdx];
+    // Initials are the field immediately after the surname.
+    if (surnameIdx + 1 < strings.length) license.initials = strings[surnameIdx + 1];
   }
 
   // The binary section (dates, gender, restrictions) starts after the string section.

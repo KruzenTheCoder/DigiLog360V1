@@ -75,8 +75,12 @@ describe('isValidSouthAfricanId', () => {
 // Synthetic DECRYPTED licence payload. We cannot forge an encrypted payload
 // (that needs the private key), but the decrypted-block parser is where all the
 // field-extraction logic lives, so it is exercised directly.
-function buildDecryptedPayload(): Uint8Array {
-  const strings = 'ZA\xe1ZA\xe1SMITH\xe0J\xe01234567890AB\xe08001015009087';
+function buildDecryptedPayload(
+  surname = 'SMITH',
+  initials = 'J',
+  lead = 'ZA\xe1ZA\xe1',
+): Uint8Array {
+  const strings = `${lead}${surname}\xe0${initials}\xe01234567890AB\xe08001015009087`;
   const stringBytes = Uint8Array.from([...strings].map((c) => c.charCodeAt(0)));
 
   // Binary section: idType, 4 absent vehicle dates ('a'), restriction, absent
@@ -114,6 +118,39 @@ describe('parseDecryptedPayload', () => {
     expect(parsed!.validFrom).toBe('2020-01-01');
     expect(parsed!.validTo).toBe('2030-01-01');
     expect(parsed!.gender).toBe('01');
+  });
+});
+
+describe('surname extraction across real SA name shapes', () => {
+  // A letters-only match used to skip every one of these and then take the
+  // NEXT field as the surname — a silently wrong name in the sign-in form.
+  const cases = [
+    ['SMITH', 'J'],
+    ['NAIDOO', 'K'],
+    ['VAN DER MERWE', 'J H'],
+    ['DU PLESSIS', 'P'],
+    ["O'BRIEN", 'M'],
+    ['BOTHA-SMIT', 'A B'],
+    ['NKOSI', 'S'],
+  ] as const;
+
+  for (const [surname, initials] of cases) {
+    it(`reads "${surname}"`, () => {
+      const p = parseDecryptedPayload(buildDecryptedPayload(surname, initials));
+      expect(p).not.toBeNull();
+      expect(p!.surname).toBe(surname);
+      expect(p!.initials).toBe(initials);
+      // The ID must still be found regardless of the name shape.
+      expect(p!.idNumber).toBe('8001015009087');
+    });
+  }
+
+  it('does not mistake a short vehicle-code group for the surname', () => {
+    // Codes like "EB EC" precede the name and contain no 3-letter run.
+    const p = parseDecryptedPayload(
+      buildDecryptedPayload('VAN DER MERWE', 'J H', 'EB EC\xe1ZA\xe1'),
+    );
+    expect(p!.surname).toBe('VAN DER MERWE');
   });
 });
 
