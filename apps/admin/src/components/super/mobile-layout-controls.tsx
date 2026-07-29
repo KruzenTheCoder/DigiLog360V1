@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Loader2, Check, EyeOff, Eye, Smartphone, LayoutGrid } from 'lucide-react';
+import { Loader2, Check, EyeOff, Eye, Smartphone, LayoutGrid, ScanLine } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,15 @@ const HOME_ITEMS: { key: string; label: string }[] = [
   { key: 'mobile.home.kpi',            label: 'KPI strip' },
   { key: 'mobile.home.supervisor_board', label: 'Site Board (supervisor)' },
   { key: 'mobile.home.team',           label: 'Team (supervisor)' },
+];
+
+// Feature switches inside a mobile screen (not a nav container).
+const SCANNER_ITEMS: { key: string; label: string; hint: string }[] = [
+  {
+    key: 'mobile.visitors.gallery_pick',
+    label: 'Scan licence from gallery',
+    hint: 'Lets guards pick an existing photo instead of the live camera. Turn off to require a live scan at the gate.',
+  },
 ];
 
 const MASTER = 'mobile.tab_bar';
@@ -183,6 +192,23 @@ export function MobileLayoutControls({
               label={h.label}
               on={isOn(h.key)} busy={isBusy(h.key)}
               onChange={(v) => setCap(h.key, v)}
+            />
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* In-screen feature switches */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><ScanLine className="h-5 w-5 text-brand" /> Visitor Scanner</CardTitle>
+        </CardHeader>
+        <CardContent className="divide-y">
+          {SCANNER_ITEMS.map((s) => (
+            <ToggleRow
+              key={s.key}
+              label={s.label} hint={s.hint}
+              on={isOn(s.key)} busy={isBusy(s.key)}
+              onChange={(v) => setCap(s.key, v)}
             />
           ))}
         </CardContent>

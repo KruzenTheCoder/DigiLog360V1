@@ -9,6 +9,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, scanFromURLAsync } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { profileSiteIds } from '@digilog/shared';
@@ -178,6 +179,12 @@ function SignInSheet({
   onDone: () => void;
 }) {
   const toast = useToast();
+  const { can, capabilities } = useAuth();
+  // Picking a stored photo is capability-gated so a site can switch it off —
+  // signing someone in from a saved image weakens the "physically here"
+  // assumption. Mirrors the home screen: treat it as visible while
+  // capabilities are still loading so the button doesn't pop in late.
+  const galleryEnabled = capabilities === null ? true : can('mobile.visitors.gallery_pick');
   const [fullName, setFullName] = useState('');
   const [idNumber, setIdNumber] = useState('');
   const [company, setCompany] = useState('');
@@ -198,6 +205,27 @@ function SignInSheet({
   const [torch, setTorch] = useState(false);
   const [capturing, setCapturing] = useState(false);
 
+  /**
+   * Decode a PDF417 from an image file and apply it to the form.
+   * Shared by the live capture and the gallery pick — both end up handing a
+   * file URI to the same native decoder. Returns false when nothing decoded so
+   * each caller can word its own advice.
+   */
+  async function decodeAndApply(uri: string, source: 'capture' | 'gallery') {
+    const results = await scanFromURLAsync(uri, ['pdf417']);
+    if (__DEV__) {
+      const r = results[0] as { type?: string; rawBase64?: string; data?: string } | undefined;
+      // eslint-disable-next-line no-console
+      console.log(`[visitor-scan] ${source} decode`, results.length,
+        r ? { type: r.type, hasBytes: !!r.rawBase64, byteLen: r.rawBase64 ? Math.floor((r.rawBase64.length * 3) / 4) : 0, dataLen: r.data?.length } : null);
+    }
+    if (results.length === 0) return false;
+    const r0 = results[0] as { data: string; raw?: string; rawBase64?: string };
+    scanLock.current = false; // allow this deliberate scan to apply
+    applyScan(detectAndParse(r0.data, r0.raw ?? null, r0.rawBase64 ?? null));
+    return true;
+  }
+
   // The reliable path for the dense SA PDF417: take a FULL-RESOLUTION still
   // and decode that, instead of relying on the heavily-downsampled live
   // frames (which never carry enough detail to resolve the fine bars).
@@ -210,18 +238,7 @@ function SignInSheet({
         toast.show('Could not capture photo — try again', 'error');
         return;
       }
-      const results = await scanFromURLAsync(photo.uri, ['pdf417']);
-      if (__DEV__) {
-        const r = results[0] as { type?: string; rawBase64?: string; data?: string } | undefined;
-        // eslint-disable-next-line no-console
-        console.log('[visitor-scan] photo decode', results.length,
-          r ? { type: r.type, hasBytes: !!r.rawBase64, byteLen: r.rawBase64 ? Math.floor((r.rawBase64.length * 3) / 4) : 0, dataLen: r.data?.length } : null);
-      }
-      if (results.length > 0) {
-        const r0 = results[0] as { data: string; raw?: string; rawBase64?: string };
-        scanLock.current = false; // allow this deliberate capture to apply
-        applyScan(detectAndParse(r0.data, r0.raw ?? null, r0.rawBase64 ?? null));
-      } else {
+      if (!(await decodeAndApply(photo.uri, 'capture'))) {
         toast.show('No barcode found — fill the frame, hold steady, try the torch', 'error');
       }
     } catch (e) {
@@ -237,6 +254,49 @@ function SignInSheet({
         /MLKit|Google Play/i.test(msg)
           ? 'This device can\'t scan barcodes — Google Play Services is missing'
           : 'Scan failed — try again',
+        'error',
+      );
+    } finally {
+      setCapturing(false);
+    }
+  }
+
+  /**
+   * Decode from a photo already on the device. A live capture has to win on
+   * focus, glare and a laminated sleeve all at once; an existing full-resolution
+   * photo of the barcode often decodes when the camera cannot.
+   */
+  async function pickAndScan() {
+    if (capturing) return;
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      toast.show('Photo library permission needed to pick an image', 'error');
+      return;
+    }
+    // quality 1, no editing: any downscale or recompression destroys the fine
+    // bar detail a dense PDF417 needs. Messenger-compressed copies never decode.
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+      allowsEditing: false,
+    });
+    if (res.canceled || !res.assets[0]?.uri) return;
+
+    setCapturing(true);
+    try {
+      if (!(await decodeAndApply(res.assets[0].uri, 'gallery'))) {
+        toast.show('No barcode in that photo — use the original, not a screenshot or forwarded copy', 'error');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.log('[visitor-scan] gallery failed', msg);
+      }
+      toast.show(
+        /MLKit|Google Play/i.test(msg)
+          ? 'This device can\'t scan barcodes — Google Play Services is missing'
+          : 'Could not read that image — try another',
         'error',
       );
     } finally {
@@ -400,6 +460,18 @@ function SignInSheet({
           loading={capturing}
           icon={<Ionicons name="scan" size={18} color="#fff" />}
         />
+        {galleryEnabled && (
+          <>
+            <View style={{ height: spacing.xs }} />
+            <Button
+              title="Pick photo from gallery"
+              variant="secondary"
+              onPress={pickAndScan}
+              disabled={capturing}
+              icon={<Ionicons name="images-outline" size={18} color="#fff" />}
+            />
+          </>
+        )}
         <View style={{ height: spacing.xs }} />
         <Button title="Cancel scan" variant="ghost" onPress={() => { setTorch(false); setScanning(null); }} />
         <toast.ToastView />

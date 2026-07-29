@@ -74,6 +74,8 @@ export const CAPABILITY_KEYS = [
   'mobile.home.kpi',
   'mobile.home.supervisor_board',
   'mobile.home.team',
+  // Mobile visitor scanner.
+  'mobile.visitors.gallery_pick',
   // Mobile bottom tab bar — master switch + per-tab visibility.
   'mobile.tab_bar',
   'mobile.tab.home',
