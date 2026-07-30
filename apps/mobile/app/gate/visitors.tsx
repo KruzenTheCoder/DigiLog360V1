@@ -2,7 +2,7 @@
 // Live list of on-site visitors, swipe-style "Sign out" button, fast add form
 // with PDF417 scan support for SA vehicle licence disks and driver's licences.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform,
 } from 'react-native';
@@ -343,29 +343,6 @@ function SignInSheet({
     }
   }
 
-  // Auto-scan the driver's licence. Its PDF417 is far denser than the vehicle
-  // disk's, so it rarely resolves from the downsampled live frames the disk
-  // decodes from — only the full-resolution still does.
-  //
-  // A fixed interval was wrong: it fired shots faster than each decode finished
-  // and never let autofocus lock, so every frame was blurry and nothing read.
-  // Instead run a self-pacing cycle — AWAIT the full capture+decode, then pause
-  // with the live preview running so autofocus can re-settle before the next
-  // shot. A successful decode closes the panel, which tears this loop down.
-  useEffect(() => {
-    if (!(visible && scanning === 'license')) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const cycle = async () => {
-      if (cancelled || scanLock.current) return;
-      await captureAndScan(true);            // waits for capture + decode
-      if (cancelled || scanLock.current) return;
-      timer = setTimeout(cycle, 900);        // let autofocus re-lock, then retry
-    };
-    timer = setTimeout(cycle, 1200);         // initial autofocus settle
-    return () => { cancelled = true; clearTimeout(timer); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, scanning]);
 
   /**
    * Decode from a photo already on the device. A live capture has to win on
@@ -526,6 +503,9 @@ function SignInSheet({
               barcodeTypes: ['pdf417'],
             }}
             onBarcodeScanned={(event) => {
+              // Already locked on — ignore the stream of duplicate frames ML Kit
+              // keeps firing, so we never run the RSA decrypt more than needed.
+              if (scanLock.current) return;
               const { data, type } = event;
               const e = event as { raw?: string; rawBase64?: string };
               // `rawBase64` (patched native scanner) carries the EXACT bytes —
