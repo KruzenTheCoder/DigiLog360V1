@@ -2,7 +2,7 @@
 // Live list of on-site visitors, swipe-style "Sign out" button, fast add form
 // with PDF417 scan support for SA vehicle licence disks and driver's licences.
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform,
 } from 'react-native';
@@ -234,6 +234,10 @@ function SignInSheet({
   // Ref mirror of `capturing` so the auto-scan interval and the manual button
   // share one fresh in-flight guard without stale-closure races.
   const capturingRef = useRef(false);
+  // Rate-limit the detection-triggered auto capture so a continuous stream of
+  // "detected but not decoded" frames can't machine-gun the shutter — one
+  // focused attempt at a time, matched to how long a capture+decode takes.
+  const lastAutoRef = useRef(0);
   // Last scan's technical result, shown in the scanner panel. Survives long
   // enough to be read out to support; a successful scan closes the panel so it
   // is only ever visible after a failure.
@@ -343,6 +347,38 @@ function SignInSheet({
     }
   }
 
+  // Focused auto-capture for the licence. Live frames on many devices can't even
+  // DETECT the dense licence PDF417 (let alone decrypt it), so waiting on the
+  // live scanner leaves it stuck. Instead: let continuous autofocus lock onto
+  // the held card, then take a full-resolution still — the same shot the manual
+  // button takes, which decodes reliably.
+  //
+  // Strictly bounded so it can never machine-gun the shutter again: a settle
+  // delay before the first shot, a pause between shots for autofocus to re-lock,
+  // and a hard cap after which it stops and asks the operator to reframe and tap
+  // Scan now. A successful decode closes the panel, ending the loop early. The
+  // detection-trigger in onBarcodeScanned can still lock faster when live works.
+  useEffect(() => {
+    if (!(visible && scanning === 'license')) return;
+    let cancelled = false;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const run = async () => {
+      if (cancelled || scanLock.current) return;
+      if (attempts >= 5) {
+        setDiag('Fill the box with the barcode and hold still, then tap Scan now');
+        return;
+      }
+      attempts += 1;
+      lastAutoRef.current = Date.now();
+      await captureAndScan(true);        // waits for capture + decode
+      if (cancelled || scanLock.current) return;
+      timer = setTimeout(run, 1700);     // let autofocus re-lock, then retry
+    };
+    timer = setTimeout(run, 1500);       // initial autofocus settle
+    return () => { cancelled = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, scanning]);
 
   /**
    * Decode from a photo already on the device. A live capture has to win on
@@ -424,6 +460,7 @@ function SignInSheet({
       }
     }
     scanLock.current = false;
+    lastAutoRef.current = 0;
     setScanning(target);
   }
 
@@ -517,11 +554,18 @@ function SignInSheet({
               if (__DEV__) console.log('[visitor-scan] barcode', type, 'hasBytes', !!rawBase64, data.slice(0, 40));
               const result = detectAndParse(data, raw, rawBase64);
               // A downsampled live frame usually can't fully decrypt the dense
-              // licence PDF417. Ignore anything that isn't a COMPLETE licence
-              // here, so a lossy frame doesn't close the scanner as
-              // "unrecognised" — the paced full-resolution capture handles the
-              // licence. The disk is plaintext and decodes fine from live frames.
+              // licence PDF417 — but ML Kit still DETECTED it, which means it's
+              // framed and in focus right now. That's the ideal moment to grab
+              // one full-resolution still, which resolves it. captureAndScan is
+              // guarded against overlap, so this fires a single focused capture
+              // per lock-on rather than a blind timed burst. A complete live
+              // decode (rare) still applies directly; the disk always does.
               if (scanning === 'license' && !(result.kind === 'license' && result.data.id_number)) {
+                const now = Date.now();
+                if (now - lastAutoRef.current > 1500) {
+                  lastAutoRef.current = now;
+                  captureAndScan(true);
+                }
                 return;
               }
               applyScan(result);
@@ -540,7 +584,7 @@ function SignInSheet({
             <Text style={styles.cameraHint}>
               {scanning === 'disk'
                 ? 'Line up the wide disk barcode in the box, then tap Capture & scan'
-                : 'Hold the licence barcode steady in the box — it scans automatically'}
+                : 'Fill the box with the barcode strip, hold steady — it scans automatically'}
             </Text>
           </View>
           <TouchableOpacity
@@ -688,13 +732,15 @@ const styles = StyleSheet.create({
   // SA driver's licence). The four corner brackets are easier to read than
   // a full border when the camera preview is busy.
   reticle: {
-    // Wide, short band — the SA barcode is a wide strip, not a square.
+    // Wide, tall-ish box the barcode should FILL — more pixels per bar decodes
+    // far more reliably than a distant strip. Leaves a small margin so the
+    // whole symbol (with its quiet zone) stays inside the frame.
     position: 'absolute',
-    top: '26%', bottom: '26%', left: '6%', right: '6%',
+    top: '16%', bottom: '16%', left: '5%', right: '5%',
   },
   reticleCorner: {
     position: 'absolute',
-    width: 28, height: 28,
+    width: 34, height: 34,
     borderColor: theme.brand,
     borderTopWidth: 0, borderBottomWidth: 0, borderLeftWidth: 0, borderRightWidth: 0,
   },
