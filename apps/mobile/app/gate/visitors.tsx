@@ -39,6 +39,7 @@ export default function VisitorsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [scanOutOpen, setScanOutOpen] = useState(false);
 
   const load = useCallback(async () => {
     const mySites = profileSiteIds(profile);
@@ -102,7 +103,15 @@ export default function VisitorsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={theme.brand} />}
       >
         {/* ----- on site ----- */}
-        <Text style={styles.section}>On site now</Text>
+        <View style={styles.sectionRow}>
+          <Text style={styles.section}>On site now</Text>
+          {onsite.length > 0 && (
+            <TouchableOpacity onPress={() => setScanOutOpen(true)} style={styles.scanOutBtn} activeOpacity={0.7}>
+              <Ionicons name="scan-outline" size={15} color={theme.brand} />
+              <Text style={styles.scanOutBtnText}>Scan out</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         {loading ? (
           <View style={{ paddingHorizontal: spacing.lg }}>
             <SkeletonRow /><SkeletonRow />
@@ -163,6 +172,12 @@ export default function VisitorsScreen() {
         currentUserId={profile?.id ?? ''}
         currentUserName={profile?.full_name ?? profile?.email ?? 'Gate Guard'}
         onDone={() => { setAddOpen(false); load(); toast.show('Visitor signed in', 'ok'); }}
+      />
+      <ScanOutSheet
+        visible={scanOutOpen}
+        onClose={() => setScanOutOpen(false)}
+        onsite={onsite}
+        onMatch={(v) => { setScanOutOpen(false); signOut(v); }}
       />
       <toast.ToastView />
     </View>
@@ -671,6 +686,128 @@ function SignInSheet({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Sign a visitor out by scanning their vehicle licence disk (or driver's
+// licence) at the gate, instead of hunting for their row and tapping "Out".
+// The disk decodes reliably from live frames, so this stays a simple live
+// scanner with a Capture fallback — deliberately NOT the sign-in licence
+// scanner's full-res auto-capture machinery, so the working sign-in flow is
+// untouched.
+function ScanOutSheet({
+  visible, onClose, onsite, onMatch,
+}: {
+  visible: boolean; onClose: () => void;
+  onsite: Visitor[]; onMatch: (v: Visitor) => void;
+}) {
+  const toast = useToast();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [torch, setTorch] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const cameraRef = useRef<CameraView>(null);
+  const lock = useRef(false);
+  // Dedupe the stream of identical frames so a scan that matches nobody doesn't
+  // spam the same toast many times a second.
+  const lastHandled = useRef<{ key: string; t: number }>({ key: '', t: 0 });
+
+  useEffect(() => {
+    if (!visible) return;
+    lock.current = false;
+    lastHandled.current = { key: '', t: 0 };
+    if (!permission?.granted) requestPermission();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const norm = (s?: string | null) => (s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  function handle(result: ScanResult) {
+    if (lock.current) return;
+    const reg = result.kind === 'disk' ? result.data.vehicle_reg : undefined;
+    const id = result.kind === 'license' ? result.data.id_number : undefined;
+    const key = reg ? `R${norm(reg)}` : id ? `I${id}` : '';
+    if (!key) return; // not a usable disk/licence — keep scanning silently
+
+    const now = Date.now();
+    if (key === lastHandled.current.key && now - lastHandled.current.t < 3000) return;
+    lastHandled.current = { key, t: now };
+
+    const found = reg
+      ? onsite.filter((v) => norm(v.vehicle_reg) === norm(reg))
+      : onsite.filter((v) => (v.id_number ?? '') === id);
+    const label = reg ? reg : `ID …${(id ?? '').slice(-4)}`;
+
+    if (found.length === 0) { toast.show(`No visitor on site with ${label}`, 'error'); return; }
+    if (found.length > 1) { toast.show(`${found.length} on-site match ${label} — use the Out button`, 'info'); return; }
+
+    lock.current = true;
+    setTorch(false);
+    onMatch(found[0]);
+  }
+
+  async function captureScan() {
+    if (!cameraRef.current || capturing) return;
+    setCapturing(true);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 1, skipProcessing: false });
+      if (photo?.uri) {
+        const results = await scanFromURLAsync(photo.uri, ['pdf417']);
+        if (results.length > 0) {
+          const r0 = results[0] as { data: string; raw?: string; rawBase64?: string };
+          handle(detectAndParse(r0.data, r0.raw ?? null, r0.rawBase64 ?? null));
+        } else {
+          toast.show('No barcode found — fill the frame, hold steady', 'error');
+        }
+      }
+    } catch {
+      toast.show('Scan failed — try again', 'error');
+    } finally {
+      setCapturing(false);
+    }
+  }
+
+  if (!visible) return null;
+  return (
+    <Sheet visible={visible} onClose={() => { setTorch(false); onClose(); }} title="Scan out a visitor">
+      <View style={styles.cameraWrap}>
+        <CameraView
+          ref={cameraRef}
+          key="cam-scanout"
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          autofocus="on"
+          enableTorch={torch}
+          barcodeScannerSettings={{ barcodeTypes: ['pdf417'] }}
+          onBarcodeScanned={(event) => {
+            const e = event as { data: string; raw?: string; rawBase64?: string };
+            handle(detectAndParse(e.data, e.raw ?? null, e.rawBase64 ?? null));
+          }}
+        />
+        <View style={styles.reticle} pointerEvents="none">
+          <View style={[styles.reticleCorner, styles.reticleTL]} />
+          <View style={[styles.reticleCorner, styles.reticleTR]} />
+          <View style={[styles.reticleCorner, styles.reticleBL]} />
+          <View style={[styles.reticleCorner, styles.reticleBR]} />
+        </View>
+        <View style={styles.cameraHintWrap} pointerEvents="none">
+          <Text style={styles.cameraHint}>Scan the vehicle licence disk to sign the visitor out</Text>
+        </View>
+        <TouchableOpacity onPress={() => setTorch((t) => !t)} style={styles.torchBtn} activeOpacity={0.8}>
+          <Ionicons name={torch ? 'flash' : 'flash-off'} size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
+      <View style={{ height: spacing.sm }} />
+      <Button
+        title={capturing ? 'Scanning…' : 'Capture & scan'}
+        onPress={captureScan}
+        loading={capturing}
+        icon={<Ionicons name="scan" size={18} color="#fff" />}
+      />
+      <View style={{ height: spacing.xs }} />
+      <Button title="Cancel" variant="ghost" onPress={() => { setTorch(false); onClose(); }} />
+      <toast.ToastView />
+    </Sheet>
+  );
+}
+
 const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -683,6 +820,18 @@ const styles = StyleSheet.create({
     ...type.caption, paddingHorizontal: spacing.lg,
     marginTop: spacing.md, marginBottom: spacing.sm,
   },
+
+  // "On site now" header row with the Scan-out action on the right.
+  sectionRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingRight: spacing.lg,
+  },
+  scanOutBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill,
+    borderWidth: 1, borderColor: theme.brand,
+  },
+  scanOutBtnText: { color: theme.brand, fontWeight: '700', fontSize: 12 },
 
   outBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
