@@ -59,5 +59,12 @@
     "postinstall-postinstall": "^2.1.0",
     "react-refresh": "^0.18.0",
     "typescript": "^5.6.3"
+  },
+  "expo": {
+    "autolinking": {
+      "buildFromSource": [
+        "expo-camera"
+      ]
+    }
   }
 }
