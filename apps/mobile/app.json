@@ -126,6 +126,7 @@
           "cameraPermission": "Allow DigiLog to scan checkpoints and capture photos."
         }
       ],
+      "./plugins/withExpoCameraRawBytes",
       [
         "expo-location",
         {
