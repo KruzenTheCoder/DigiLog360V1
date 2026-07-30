@@ -535,7 +535,16 @@ function SignInSheet({
               const rawBase64 = e.rawBase64 ?? null;
               // eslint-disable-next-line no-console
               if (__DEV__) console.log('[visitor-scan] barcode', type, 'hasBytes', !!rawBase64, data.slice(0, 40));
-              applyScan(detectAndParse(data, raw, rawBase64));
+              const result = detectAndParse(data, raw, rawBase64);
+              // A downsampled live frame usually can't fully decrypt the dense
+              // licence PDF417. Ignore anything that isn't a COMPLETE licence
+              // here, so a lossy frame doesn't close the scanner as
+              // "unrecognised" — the paced full-resolution capture handles the
+              // licence. The disk is plaintext and decodes fine from live frames.
+              if (scanning === 'license' && !(result.kind === 'license' && result.data.id_number)) {
+                return;
+              }
+              applyScan(result);
             }}
           />
           {/* Card-aspect reticle (≈1.6:1 like a credit card / SA driver's
