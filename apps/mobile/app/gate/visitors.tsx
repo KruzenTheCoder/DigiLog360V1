@@ -345,18 +345,25 @@ function SignInSheet({
 
   // Auto-scan the driver's licence. Its PDF417 is far denser than the vehicle
   // disk's, so it rarely resolves from the downsampled live frames the disk
-  // decodes from — only the full-resolution still does. Poll that capture on a
-  // timer while the licence scanner is open so it decodes on its own, like the
-  // disk, instead of making the operator tap Capture repeatedly. captureAndScan
-  // guards against overlap, and a successful decode closes the panel (which
-  // tears this loop down). A short lead-in lets autofocus settle first.
+  // decodes from — only the full-resolution still does.
+  //
+  // A fixed interval was wrong: it fired shots faster than each decode finished
+  // and never let autofocus lock, so every frame was blurry and nothing read.
+  // Instead run a self-pacing cycle — AWAIT the full capture+decode, then pause
+  // with the live preview running so autofocus can re-settle before the next
+  // shot. A successful decode closes the panel, which tears this loop down.
   useEffect(() => {
     if (!(visible && scanning === 'license')) return;
     let cancelled = false;
-    const shoot = () => { if (!cancelled && !scanLock.current) captureAndScan(true); };
-    const lead = setTimeout(shoot, 700);
-    const id = setInterval(shoot, 1600);
-    return () => { cancelled = true; clearTimeout(lead); clearInterval(id); };
+    let timer: ReturnType<typeof setTimeout>;
+    const cycle = async () => {
+      if (cancelled || scanLock.current) return;
+      await captureAndScan(true);            // waits for capture + decode
+      if (cancelled || scanLock.current) return;
+      timer = setTimeout(cycle, 900);        // let autofocus re-lock, then retry
+    };
+    timer = setTimeout(cycle, 1200);         // initial autofocus settle
+    return () => { cancelled = true; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, scanning]);
 
