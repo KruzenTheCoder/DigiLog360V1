@@ -143,7 +143,13 @@ export default function VisitorsScreen() {
 
       <SignInSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
-        siteId={profile?.site_id ?? null}
+        // Save the visitor to a site that is guaranteed to be in the same set
+        // load() filters on (profileSiteIds). A multi-site guard can have a null
+        // legacy site_id while being assigned via site_ids[]; saving with that
+        // null wrote a row the .in('site_id', mySites) query then excluded, so
+        // the visitor "saved" but never appeared. Prefer the legacy site_id when
+        // present (it's included in mySites), else the first assigned site.
+        siteId={profile?.site_id ?? profileSiteIds(profile)[0] ?? null}
         currentUserId={profile?.id ?? ''}
         currentUserName={profile?.full_name ?? profile?.email ?? 'Gate Guard'}
         onDone={() => { setAddOpen(false); load(); toast.show('Visitor signed in', 'ok'); }}
