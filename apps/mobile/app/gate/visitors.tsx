@@ -2,7 +2,7 @@
 // Live list of on-site visitors, swipe-style "Sign out" button, fast add form
 // with PDF417 scan support for SA vehicle licence disks and driver's licences.
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform,
 } from 'react-native';
@@ -231,6 +231,9 @@ function SignInSheet({
   // bright light on the barcode to decode.
   const [torch, setTorch] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  // Ref mirror of `capturing` so the auto-scan interval and the manual button
+  // share one fresh in-flight guard without stale-closure races.
+  const capturingRef = useRef(false);
   // Last scan's technical result, shown in the scanner panel. Survives long
   // enough to be read out to support; a successful scan closes the panel so it
   // is only ever visible after a failure.
@@ -296,16 +299,22 @@ function SignInSheet({
   // The reliable path for the dense SA PDF417: take a FULL-RESOLUTION still
   // and decode that, instead of relying on the heavily-downsampled live
   // frames (which never carry enough detail to resolve the fine bars).
-  async function captureAndScan() {
-    if (!cameraRef.current || capturing) return;
+  //
+  // `auto` = driven by the licence auto-scan loop rather than a button tap.
+  // In that mode a miss is expected (we're polling), so failure toasts are
+  // suppressed — only a successful decode surfaces anything.
+  async function captureAndScan(auto = false) {
+    if (!cameraRef.current || capturingRef.current) return;
+    capturingRef.current = true;
     setCapturing(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 1, skipProcessing: false });
       if (!photo?.uri) {
-        toast.show('Could not capture photo — try again', 'error');
+        if (!auto) toast.show('Could not capture photo — try again', 'error');
         return;
       }
       const outcome = await decodeAndApply(photo.uri, 'capture');
+      if (auto) return; // misses are silent while polling; a hit already applied
       if (outcome === 'no-barcode') {
         toast.show('No barcode found — fill the frame, hold steady, try the torch', 'error');
       } else if (outcome === 'needs-newer-build') {
@@ -320,16 +329,36 @@ function SignInSheet({
         // eslint-disable-next-line no-console
         console.log('[visitor-scan] capture failed', msg);
       }
-      toast.show(
-        /MLKit|Google Play/i.test(msg)
-          ? 'This device can\'t scan barcodes — Google Play Services is missing'
-          : 'Scan failed — try again',
-        'error',
-      );
+      if (!auto) {
+        toast.show(
+          /MLKit|Google Play/i.test(msg)
+            ? 'This device can\'t scan barcodes — Google Play Services is missing'
+            : 'Scan failed — try again',
+          'error',
+        );
+      }
     } finally {
+      capturingRef.current = false;
       setCapturing(false);
     }
   }
+
+  // Auto-scan the driver's licence. Its PDF417 is far denser than the vehicle
+  // disk's, so it rarely resolves from the downsampled live frames the disk
+  // decodes from — only the full-resolution still does. Poll that capture on a
+  // timer while the licence scanner is open so it decodes on its own, like the
+  // disk, instead of making the operator tap Capture repeatedly. captureAndScan
+  // guards against overlap, and a successful decode closes the panel (which
+  // tears this loop down). A short lead-in lets autofocus settle first.
+  useEffect(() => {
+    if (!(visible && scanning === 'license')) return;
+    let cancelled = false;
+    const shoot = () => { if (!cancelled && !scanLock.current) captureAndScan(true); };
+    const lead = setTimeout(shoot, 700);
+    const id = setInterval(shoot, 1600);
+    return () => { cancelled = true; clearTimeout(lead); clearInterval(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, scanning]);
 
   /**
    * Decode from a photo already on the device. A live capture has to win on
@@ -515,7 +544,7 @@ function SignInSheet({
             <Text style={styles.cameraHint}>
               {scanning === 'disk'
                 ? 'Line up the wide disk barcode in the box, then tap Capture & scan'
-                : 'Line up the wide barcode strip on the licence, then tap Capture & scan'}
+                : 'Hold the licence barcode steady in the box — it scans automatically'}
             </Text>
           </View>
           <TouchableOpacity
@@ -528,8 +557,8 @@ function SignInSheet({
         </View>
         <View style={{ height: spacing.sm }} />
         <Button
-          title={capturing ? 'Scanning…' : 'Capture & scan'}
-          onPress={captureAndScan}
+          title={capturing ? 'Scanning…' : scanning === 'license' ? 'Scan now' : 'Capture & scan'}
+          onPress={() => captureAndScan(false)}
           loading={capturing}
           icon={<Ionicons name="scan" size={18} color="#fff" />}
         />
