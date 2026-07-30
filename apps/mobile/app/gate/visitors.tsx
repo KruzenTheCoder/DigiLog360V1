@@ -238,6 +238,10 @@ function SignInSheet({
   // "detected but not decoded" frames can't machine-gun the shutter — one
   // focused attempt at a time, matched to how long a capture+decode takes.
   const lastAutoRef = useRef(0);
+  // Once the operator taps Scan now, hand full control to them and stop the
+  // auto loop, so the two don't fight over the camera and disrupt each other's
+  // focus.
+  const manualTakeoverRef = useRef(false);
   // Last scan's technical result, shown in the scanner panel. Survives long
   // enough to be read out to support; a successful scan closes the panel so it
   // is only ever visible after a failure.
@@ -308,6 +312,7 @@ function SignInSheet({
   // In that mode a miss is expected (we're polling), so failure toasts are
   // suppressed — only a successful decode surfaces anything.
   async function captureAndScan(auto = false) {
+    if (!auto) manualTakeoverRef.current = true; // operator took over → stop auto
     if (!cameraRef.current || capturingRef.current) return;
     capturingRef.current = true;
     setCapturing(true);
@@ -364,18 +369,21 @@ function SignInSheet({
     let attempts = 0;
     let timer: ReturnType<typeof setTimeout>;
     const run = async () => {
-      if (cancelled || scanLock.current) return;
-      if (attempts >= 5) {
+      if (cancelled || scanLock.current || manualTakeoverRef.current) return;
+      if (attempts >= 3) {
         setDiag('Fill the box with the barcode and hold still, then tap Scan now');
         return;
       }
       attempts += 1;
       lastAutoRef.current = Date.now();
       await captureAndScan(true);        // waits for capture + decode
-      if (cancelled || scanLock.current) return;
-      timer = setTimeout(run, 1700);     // let autofocus re-lock, then retry
+      if (cancelled || scanLock.current || manualTakeoverRef.current) return;
+      // Long pause: back-to-back captures never let continuous autofocus
+      // re-converge, so the shots come out soft and nothing decodes. Give it
+      // room to lock before the next shot.
+      timer = setTimeout(run, 3000);
     };
-    timer = setTimeout(run, 1500);       // initial autofocus settle
+    timer = setTimeout(run, 2500);       // generous initial autofocus settle
     return () => { cancelled = true; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, scanning]);
@@ -461,6 +469,8 @@ function SignInSheet({
     }
     scanLock.current = false;
     lastAutoRef.current = 0;
+    manualTakeoverRef.current = false;
+    setDiag(null);
     setScanning(target);
   }
 
@@ -617,7 +627,7 @@ function SignInSheet({
         {diag && (
           <>
             <View style={{ height: spacing.xs }} />
-            <Text style={styles.diag} selectable>{diag}</Text>
+            <Text style={styles.diag} selectable>Last scan → {diag}</Text>
           </>
         )}
         <View style={{ height: spacing.xs }} />
@@ -753,12 +763,15 @@ const styles = StyleSheet.create({
     position: 'absolute', left: 0, right: 0, bottom: 12,
     alignItems: 'center', paddingHorizontal: 16,
   },
-  // Technical read-out after a failed scan. Deliberately plain and small —
-  // it exists to be read out to support, not to be pretty.
+  // Technical read-out after a scan attempt — exists to be read out to support.
+  // Made legible (bordered, monospace) so it can be reported accurately.
   diag: {
-    color: theme.textMuted, fontSize: 11,
+    color: theme.text, fontSize: 12,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     textAlign: 'center',
+    borderWidth: 1, borderColor: theme.border, borderRadius: radius.sm,
+    paddingVertical: 6, paddingHorizontal: 8,
+    backgroundColor: theme.surfaceAlt,
   },
 
   cameraHint: {
