@@ -42,16 +42,26 @@ export default function VisitorsScreen() {
 
   const load = useCallback(async () => {
     const mySites = profileSiteIds(profile);
-    if (mySites.length === 0) {
+    if (mySites.length === 0 && !profile?.id) {
       setItems([]); setLoading(false);
       return;
     }
     setLoading(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase as any).from('visitors').select('*')
-      .in('site_id', mySites)
+    let q = (supabase as any).from('visitors').select('*')
       .order('signed_in_at', { ascending: false })
       .limit(50);
+    if (mySites.length > 0) {
+      // Assigned guard: show every visitor at the sites they cover.
+      q = q.in('site_id', mySites);
+    } else {
+      // Site-less user (e.g. a manager not assigned to a site): the old code
+      // returned an empty list here, so a visitor they signed in never showed
+      // even though it saved. Fall back to the visitors they personally signed
+      // in — which the visitors_read RLS policy allows (signed_in_by = auth.uid()).
+      q = q.eq('signed_in_by', profile!.id);
+    }
+    const { data } = await q;
     setItems((data ?? []) as Visitor[]);
     setLoading(false);
   }, [profile]);
