@@ -14,7 +14,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { profileSiteIds } from '@digilog/shared';
 import { Button, Field, Badge } from '@/components/ui';
-import { Sheet, EmptyState, SkeletonRow, useToast, ListRow } from '@/components/primitives';
+import { Sheet, EmptyState, SkeletonRow, useToast } from '@/components/primitives';
 import { theme, spacing, radius, type } from '@/lib/theme';
 import { detectAndParse, type ScanResult } from '@/lib/parse-barcodes';
 import { base64ToBytes } from '@/lib/sa-drivers-license';
@@ -99,12 +99,17 @@ export default function VisitorsScreen() {
       />
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 80 }}
+        contentContainerStyle={{ paddingTop: spacing.xs, paddingBottom: 96 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={theme.brand} />}
       >
         {/* ----- on site ----- */}
         <View style={styles.sectionRow}>
-          <Text style={styles.section}>On site now</Text>
+          <View style={styles.sectionTitleWrap}>
+            <Text style={styles.section}>On site</Text>
+            {onsite.length > 0 && (
+              <View style={styles.countChip}><Text style={styles.countChipText}>{onsite.length}</Text></View>
+            )}
+          </View>
           {onsite.length > 0 && (
             <TouchableOpacity onPress={() => setScanOutOpen(true)} style={styles.scanOutBtn} activeOpacity={0.7}>
               <Ionicons name="scan-outline" size={15} color={theme.brand} />
@@ -112,10 +117,9 @@ export default function VisitorsScreen() {
             </TouchableOpacity>
           )}
         </View>
+
         {loading ? (
-          <View style={{ paddingHorizontal: spacing.lg }}>
-            <SkeletonRow /><SkeletonRow />
-          </View>
+          <View style={styles.card}><SkeletonRow /><SkeletonRow /></View>
         ) : onsite.length === 0 ? (
           <EmptyState
             icon="people-outline"
@@ -123,35 +127,50 @@ export default function VisitorsScreen() {
             hint="Tap + to sign someone in"
           />
         ) : (
-          onsite.map((v) => (
-            <ListRow
-              key={v.id}
-              icon="person-circle"
-              title={v.full_name}
-              subtitle={[v.company, v.vehicle_reg].filter(Boolean).join(' · ') || 'No details'}
-              right={
-                <TouchableOpacity onPress={() => signOut(v)} style={styles.outBtn}>
-                  <Ionicons name="log-out-outline" size={16} color={theme.text} />
-                  <Text style={styles.outBtnText}>Out</Text>
+          <View style={styles.card}>
+            {onsite.map((v, i) => (
+              <View key={v.id} style={[styles.vrow, i > 0 && styles.vrowDivider]}>
+                <View style={styles.vAvatar}>
+                  <Ionicons name="person" size={18} color={theme.brand} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.vName} numberOfLines={1}>{v.full_name}</Text>
+                  <Text style={styles.vMeta} numberOfLines={1}>
+                    {`In ${new Date(v.signed_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                    {[v.company, v.vehicle_reg].filter(Boolean).length > 0
+                      ? ` · ${[v.company, v.vehicle_reg].filter(Boolean).join(' · ')}` : ''}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => signOut(v)} style={styles.outBtn} activeOpacity={0.8}>
+                  <Ionicons name="log-out-outline" size={15} color={theme.brand} />
+                  <Text style={styles.outBtnText}>Sign out</Text>
                 </TouchableOpacity>
-              }
-            />
-          ))
+              </View>
+            ))}
+          </View>
         )}
 
         {/* ----- recent ----- */}
         {recent.length > 0 && (
           <>
-            <Text style={styles.section}>Recent</Text>
-            {recent.slice(0, 20).map((v) => (
-              <ListRow
-                key={v.id}
-                icon="person-outline"
-                title={v.full_name}
-                subtitle={`${new Date(v.signed_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → ${v.signed_out_at ? new Date(v.signed_out_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}`}
-                tint={theme.textMuted}
-              />
-            ))}
+            <View style={styles.sectionRow}>
+              <Text style={styles.section}>Recently signed out</Text>
+            </View>
+            <View style={styles.card}>
+              {recent.slice(0, 20).map((v, i) => (
+                <View key={v.id} style={[styles.vrow, i > 0 && styles.vrowDivider]}>
+                  <View style={[styles.vAvatar, styles.vAvatarMuted]}>
+                    <Ionicons name="person-outline" size={16} color={theme.textMuted} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.vName, styles.vNameMuted]} numberOfLines={1}>{v.full_name}</Text>
+                    <Text style={styles.vMeta} numberOfLines={1}>
+                      {`${new Date(v.signed_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → ${v.signed_out_at ? new Date(v.signed_out_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}`}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
           </>
         )}
       </ScrollView>
@@ -816,16 +835,24 @@ const styles = StyleSheet.create({
   },
   headerBtn: { padding: 6 },
 
-  section: {
-    ...type.caption, paddingHorizontal: spacing.lg,
-    marginTop: spacing.md, marginBottom: spacing.sm,
-  },
+  section: { ...type.caption },
 
-  // "On site now" header row with the Scan-out action on the right.
+  // Section header: title + count chip on the left, action on the right.
+  // Horizontal padding lives here (not on `section`) so headers align with
+  // the card edges below.
   sectionRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingRight: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.lg, marginBottom: spacing.sm,
+    minHeight: 30,
   },
+  sectionTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  countChip: {
+    minWidth: 22, paddingHorizontal: 7, paddingVertical: 2,
+    borderRadius: radius.pill, backgroundColor: theme.brandTint,
+    alignItems: 'center',
+  },
+  countChipText: { color: theme.brandSoft, fontSize: 11, fontWeight: '800' },
   scanOutBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill,
@@ -833,12 +860,38 @@ const styles = StyleSheet.create({
   },
   scanOutBtnText: { color: theme.brand, fontWeight: '700', fontSize: 12 },
 
-  outBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: theme.surfaceHi,
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill,
+  // Lists sit in inset rounded cards instead of full-bleed hairline rows —
+  // calmer edges, and a clear visual boundary between On-site and Recent.
+  card: {
+    marginHorizontal: spacing.lg,
+    backgroundColor: theme.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1, borderColor: theme.borderSoft,
+    overflow: 'hidden',
   },
-  outBtnText: { color: theme.text, fontWeight: '700', fontSize: 12 },
+  vrow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.md,
+  },
+  vrowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.borderSoft },
+  vAvatar: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: theme.brandTint,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  vAvatarMuted: { backgroundColor: theme.surfaceAlt },
+  vName: { color: theme.text, fontSize: 15, fontWeight: '700' },
+  vNameMuted: { color: theme.textSecondary, fontWeight: '600' },
+  vMeta: { color: theme.textMuted, fontSize: 12, marginTop: 2 },
+
+  // Sign-out pill on each on-site row — brand-tinted so the single action on
+  // the row reads as tappable without shouting.
+  outBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: theme.brandTint,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill,
+  },
+  outBtnText: { color: theme.brand, fontWeight: '700', fontSize: 12 },
 
   fab: {
     position: 'absolute', right: 20, bottom: 24,
