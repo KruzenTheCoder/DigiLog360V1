@@ -31,6 +31,7 @@ import { theme, spacing, radius, type } from '@/lib/theme';
 import {
   SEVERITIES, SEVERITY_LABELS, SEVERITY_COLORS,
   mergeIncidentCategories, mergeIncidentSubcategories, mergeIncidentTypes,
+  profileSiteIds,
   type SeverityLevel,
   type OrgIncidentType, type OrgIncidentCategory, type OrgIncidentSubcategory,
 } from '@digilog/shared';
@@ -80,9 +81,13 @@ export default function NewOccurrence() {
   // types). All three tables are queried in parallel; each is a no-op fallback
   // if its table isn't deployed yet.
   useEffect(() => {
-    if (!profile?.site_id) { setSiteName(null); }
+    // Use the same effective site the insert will use — a multi-site guard can
+    // have a null legacy site_id while being assigned via site_ids[], and
+    // reading only site_id showed "No site assigned" and logged with no site.
+    const effectiveSiteId = profile?.site_id ?? profileSiteIds(profile)[0] ?? null;
+    if (!effectiveSiteId) { setSiteName(null); }
     else {
-      supabase.from('sites').select('name').eq('id', profile.site_id).maybeSingle()
+      supabase.from('sites').select('name').eq('id', effectiveSiteId).maybeSingle()
         .then(({ data }) => setSiteName(data?.name ?? null));
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -218,29 +223,22 @@ export default function NewOccurrence() {
       severity,
       description: description.trim(),
       incident_at: new Date().toISOString(),
-      site_id: profile.site_id ?? null,
+      // Same effective-site rule as the site-name lookup above, so an
+      // occurrence never lands with a null site for a user who does have one
+      // (which would hide it from every site-filtered list).
+      site_id: profile.site_id ?? profileSiteIds(profile)[0] ?? null,
       site_name: siteName,
       logged_by: profile.id,
       logged_by_name: profile.full_name ?? profile.email,
       status: 'open' as const,
     };
 
-    const online = await isOnline();
-
-    if (!online) {
-      await enqueueOccurrence({
-        occurrence,
-        photos: photos.map((p) => ({ base64: p.base64 })),
-        voiceNotes: voiceNotes.map((v) => ({ base64: v.base64, durationMs: v.durationMs })),
-      });
-      const left = await pendingCount();
-      setPending(left);
-      setSaving(false);
-      resetForm();
-      toast.show(`Saved offline · ${left} waiting to sync`, 'info');
-      return;
-    }
-
+    // NOTE: we deliberately do NOT pre-check connectivity here. NetInfo's
+    // reachability probe reports false on plenty of working networks (filtered
+    // WiFi, captive portals, some carriers), which made every log queue as
+    // "pending sync" even with a good connection — and flushQueue used the same
+    // check, so the queue could never drain. Just attempt the insert: success is
+    // proof of connectivity, and only a genuine network failure queues.
     try {
       const { data: occ, error } = await supabase
         .from('occurrences').insert(occurrence)
@@ -283,7 +281,26 @@ export default function NewOccurrence() {
       // Navigate to detail so the user sees their submission landed.
       setTimeout(() => router.push(`/occurrence/${occ.id}`), 300);
     } catch (e) {
-      // Network died mid-request → queue for retry.
+      // Only a NETWORK failure should queue. A rejection from the server
+      // (RLS violation, constraint, bad column) will fail identically on every
+      // retry, so queueing it hid a real error behind a permanent "pending
+      // sync" and the operator never learned what was wrong. Postgres errors
+      // carry a SQLSTATE code; fetch failures do not.
+      const err = e as { code?: string; message?: string; details?: string };
+      const isServerRejection = typeof err?.code === 'string' && /^[0-9A-Z]{5}$/.test(err.code);
+
+      if (isServerRejection) {
+        setSaving(false);
+        haptic('error');
+        const why = err.code === '42501'
+          ? 'you do not have permission to log at this site'
+          : (err.message ?? 'rejected by the server');
+        // Keep the form populated so the operator can correct and resubmit.
+        toast.show(`Not logged — ${why}`, 'error');
+        return;
+      }
+
+      // Genuine network failure → queue for retry.
       await enqueueOccurrence({
         occurrence,
         photos: photos.map((p) => ({ base64: p.base64 })),

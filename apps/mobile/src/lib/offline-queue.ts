@@ -102,7 +102,13 @@ export async function inspectQueue(): Promise<{
 /** Returns true if there's network connectivity right now. */
 export async function isOnline(): Promise<boolean> {
   const state = await NetInfo.fetch();
-  return Boolean(state.isConnected && state.isInternetReachable !== false);
+  // Trust `isConnected` only. NetInfo's `isInternetReachable` probe returns
+  // false on plenty of working networks (filtered WiFi, captive portals, some
+  // carriers), and gating on it stranded the queue: flushQueue refused to run,
+  // so items sat as "pending sync" forever on a perfectly good connection.
+  // A wrong "online" here is harmless — the request simply fails and the item
+  // stays queued — whereas a wrong "offline" blocks syncing entirely.
+  return state.isConnected !== false;
 }
 
 /**
