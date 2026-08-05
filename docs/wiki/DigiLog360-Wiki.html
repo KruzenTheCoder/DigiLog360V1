@@ -1,0 +1,1961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DigiLog 360 — Platform Wiki &amp; Operations Manual</title>
+<style>
+  /* ============ PRINT SETUP ============ */
+  @page { size: A4; margin: 15mm 14mm 16mm 14mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: 'Segoe UI', 'Segoe UI Variable', -apple-system, Roboto, Arial, sans-serif;
+    font-size: 9.6pt; line-height: 1.55; color: #1e293b; background: #fff;
+  }
+
+  /* ============ BRAND TOKENS ============ */
+  :root {
+    --primary: #667eea; --primary-dark: #5469d4; --accent: #764ba2;
+    --ink: #0f172a; --muted: #64748b; --line: #e2e8f0; --soft: #f1f5f9;
+    --crit: #dc2626; --high: #ea580c; --med: #d97706; --low: #16a34a;
+    --blue: #3b82f6; --cyan: #0891b2; --green: #16a34a; --violet: #7c3aed;
+  }
+
+  .grad-text { background: linear-gradient(90deg, #667eea, #764ba2); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  /* ============ PAGE FLOW ============ */
+  .pagebreak { page-break-before: always; }
+  h1, h2, h3, h4 { break-after: avoid; page-break-after: avoid; }
+  table, .card, .step, .callout, .flow, .kv, .task, svg { break-inside: avoid; page-break-inside: avoid; }
+
+  /* ============ COVER ============ */
+  .cover {
+    height: 262mm; border-radius: 6mm; overflow: hidden; position: relative;
+    background: linear-gradient(150deg, #0f172a 0%, #1e1b4b 45%, #4c1d95 100%);
+    color: #fff; display: flex; flex-direction: column; justify-content: space-between;
+    padding: 18mm 16mm;
+  }
+  .cover::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 85% 12%, rgba(102,126,234,.35) 0, transparent 42%),
+      radial-gradient(circle at 10% 88%, rgba(118,75,162,.45) 0, transparent 45%);
+  }
+  .cover > * { position: relative; }
+  .cover .brandline { display: flex; align-items: center; gap: 10px; }
+  .cover .mark {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15pt; color: #fff;
+  }
+  .cover .brandline span { font-size: 11pt; letter-spacing: .16em; text-transform: uppercase; color: #c7d2fe; font-weight: 600; }
+  .cover-mid h1 { font-size: 33pt; line-height: 1.12; font-weight: 800; letter-spacing: -.01em; }
+  .cover-mid h1 em { font-style: normal; background: linear-gradient(90deg, #a5b4fc, #d8b4fe); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .cover-mid .sub { margin-top: 7mm; font-size: 12.5pt; color: #cbd5e1; max-width: 130mm; line-height: 1.6; }
+  .cover-chips { margin-top: 9mm; display: flex; flex-wrap: wrap; gap: 6px; }
+  .cover-chips b {
+    font-weight: 600; font-size: 8.5pt; padding: 4px 11px; border-radius: 999px;
+    background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.2); color: #e0e7ff;
+  }
+  .cover-foot { display: flex; justify-content: space-between; align-items: flex-end; font-size: 8.5pt; color: #94a3b8; }
+  .cover-foot b { color: #e2e8f0; display: block; font-size: 9.5pt; }
+
+  /* ============ CHAPTER OPENER ============ */
+  .chapter {
+    border-radius: 4mm; padding: 9mm 10mm; color: #fff; margin-bottom: 7mm;
+    background: linear-gradient(120deg, #1e1b4b 0%, #4338ca 55%, #7c3aed 100%);
+    position: relative; overflow: hidden;
+  }
+  .chapter::after {
+    content: attr(data-num); position: absolute; right: 6mm; top: 50%; transform: translateY(-50%);
+    font-size: 46pt; font-weight: 800; color: rgba(255,255,255,.13); line-height: 1;
+  }
+  .chapter .part { font-size: 8pt; letter-spacing: .22em; text-transform: uppercase; color: #c7d2fe; font-weight: 700; margin-bottom: 2mm; }
+  .chapter h1 { font-size: 20pt; font-weight: 800; letter-spacing: -.01em; }
+  .chapter p { margin-top: 2.5mm; color: #dbe3ff; font-size: 10pt; max-width: 145mm; }
+
+  /* Part divider */
+  .part-divider {
+    height: 262mm; border-radius: 6mm; color: #fff; display: flex; flex-direction: column; justify-content: center;
+    background: linear-gradient(150deg, #0f172a, #312e81 60%, #6d28d9); padding: 20mm; position: relative; overflow: hidden;
+  }
+  .part-divider::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 80% 20%, rgba(102,126,234,.3), transparent 50%); }
+  .part-divider .kicker { font-size: 11pt; letter-spacing: .3em; text-transform: uppercase; color: #a5b4fc; font-weight: 700; }
+  .part-divider h1 { font-size: 30pt; font-weight: 800; margin-top: 5mm; max-width: 150mm; line-height: 1.15; }
+  .part-divider p { margin-top: 6mm; font-size: 11.5pt; color: #cbd5e1; max-width: 140mm; line-height: 1.7; }
+  .part-divider ul { margin-top: 8mm; list-style: none; }
+  .part-divider li { font-size: 10pt; color: #e0e7ff; padding: 2.2mm 0; border-bottom: 1px solid rgba(255,255,255,.12); }
+  .part-divider li b { color: #fff; }
+
+  /* ============ TYPOGRAPHY ============ */
+  h2 { font-size: 13.5pt; font-weight: 750; color: var(--ink); margin: 7mm 0 3mm; padding-bottom: 1.5mm; border-bottom: 2px solid var(--line); }
+  h2 .no { color: var(--primary); font-weight: 800; margin-right: 2mm; }
+  h3 { font-size: 11pt; font-weight: 700; color: #334155; margin: 5mm 0 2mm; }
+  h4 { font-size: 9.8pt; font-weight: 700; color: #475569; margin: 3.5mm 0 1.5mm; }
+  p { margin: 0 0 2.6mm; }
+  p.lead { font-size: 10.6pt; color: #475569; }
+  ul.plain { margin: 0 0 3mm 5mm; }
+  ul.plain li { margin-bottom: 1.2mm; }
+  code {
+    font-family: 'Cascadia Code', Consolas, monospace; font-size: 8.6pt;
+    background: #eef2ff; color: #4338ca; padding: .5px 4px; border-radius: 3px;
+  }
+  .path { font-weight: 600; color: var(--primary-dark); }
+  a { color: var(--primary-dark); text-decoration: none; }
+
+  /* ============ TABLES ============ */
+  table { width: 100%; border-collapse: collapse; margin: 3mm 0 4mm; font-size: 8.8pt; }
+  th {
+    text-align: left; font-size: 7.6pt; letter-spacing: .08em; text-transform: uppercase;
+    color: #fff; background: linear-gradient(90deg, #4338ca, #6d28d9);
+    padding: 2.2mm 3mm; font-weight: 700;
+  }
+  th:first-child { border-radius: 2mm 0 0 0; } th:last-child { border-radius: 0 2mm 0 0; }
+  td { padding: 2mm 3mm; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  table.compact td, table.compact th { padding: 1.6mm 2.4mm; }
+
+  /* ============ CARDS & GRIDS ============ */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin: 3mm 0 4mm; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3.5mm; margin: 3mm 0 4mm; }
+  .card { border: 1px solid var(--line); border-radius: 3mm; padding: 4mm 4.5mm; background: #fff; }
+  .card.tint { background: linear-gradient(160deg, #eef2ff, #faf5ff); border-color: #ddd6fe; }
+  .card h4 { margin: 0 0 1.5mm; color: var(--ink); }
+  .card .tag { display: inline-block; font-size: 7.2pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--primary-dark); background: #e0e7ff; border-radius: 999px; padding: 1px 8px; margin-bottom: 1.8mm; }
+  .card p { font-size: 8.8pt; color: #475569; margin: 0; }
+
+  /* ============ BADGES ============ */
+  .b { display: inline-block; font-size: 7.6pt; font-weight: 700; padding: 1px 8px; border-radius: 999px; color: #fff; }
+  .b.crit { background: var(--crit); } .b.high { background: var(--high); }
+  .b.med { background: var(--med); } .b.low { background: var(--low); }
+  .b.open { background: var(--blue); } .b.ack { background: var(--violet); }
+  .b.prog { background: #0ea5e9; } .b.pat { background: var(--cyan); }
+  .b.res { background: var(--green); } .b.closed { background: #475569; }
+  .b.ghost { background: #eef2ff; color: #4338ca; }
+  .role-chip { display: inline-block; font-weight: 700; font-size: 8pt; padding: 1.5px 10px; border-radius: 999px; color: #fff; }
+  .r-super { background: #0f172a; } .r-admin { background: #7c3aed; } .r-manager { background: #667eea; }
+  .r-control { background: #0891b2; } .r-supervisor { background: #059669; } .r-guard { background: #64748b; }
+
+  /* ============ CALLOUTS ============ */
+  .callout { border-radius: 3mm; padding: 3.2mm 4mm 3.2mm 4.5mm; margin: 3mm 0; font-size: 9pt; border-left: 4px solid; }
+  .callout b.cap { display: block; font-size: 7.6pt; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 1mm; }
+  .callout.tip { background: #f0fdf4; border-color: #16a34a; color: #14532d; }
+  .callout.tip b.cap { color: #16a34a; }
+  .callout.note { background: #eff6ff; border-color: #3b82f6; color: #1e3a8a; }
+  .callout.note b.cap { color: #2563eb; }
+  .callout.warn { background: #fffbeb; border-color: #d97706; color: #78350f; }
+  .callout.warn b.cap { color: #b45309; }
+
+  /* ============ HOW-TO TASK CARD ============ */
+  .task { border: 1px solid #ddd6fe; border-radius: 3.5mm; margin: 4mm 0; overflow: hidden; }
+  .task-head {
+    background: linear-gradient(90deg, #eef2ff, #f5f3ff); padding: 3mm 4.5mm;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 4mm;
+    border-bottom: 1px solid #ddd6fe;
+  }
+  .task-head h4 { margin: 0; font-size: 10.4pt; color: #312e81; }
+  .task-head .where { font-size: 8pt; color: var(--muted); text-align: right; white-space: nowrap; }
+  .task-body { padding: 3.5mm 4.5mm 2mm; }
+  .steps { list-style: none; counter-reset: st; }
+  .steps li { counter-increment: st; position: relative; padding: 0 0 2.6mm 9.5mm; }
+  .steps li::before {
+    content: counter(st); position: absolute; left: 0; top: .2mm;
+    width: 6.2mm; height: 6.2mm; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2); color: #fff;
+    font-size: 8pt; font-weight: 800; display: flex; align-items: center; justify-content: center;
+  }
+  .steps li:not(:last-child)::after {
+    content: ''; position: absolute; left: 3mm; top: 7mm; bottom: 0; width: 1px; background: #ddd6fe;
+  }
+  .steps b { color: var(--ink); }
+  .task-foot { padding: 0 4.5mm 3mm; font-size: 8.2pt; color: var(--muted); }
+  .task-foot .cap-key { font-family: Consolas, monospace; font-size: 7.8pt; color: #6d28d9; background: #f5f3ff; border-radius: 3px; padding: .5px 4px; }
+
+  /* ============ FLOW (horizontal pipeline) ============ */
+  .flow { display: flex; align-items: stretch; gap: 0; margin: 3.5mm 0 4.5mm; flex-wrap: wrap; row-gap: 3mm; }
+  .flow .n {
+    flex: 1; min-width: 26mm; border: 1.5px solid #c7d2fe; background: #f8faff;
+    border-radius: 2.5mm; padding: 2.4mm 2.8mm; position: relative; margin-right: 6.5mm;
+  }
+  .flow .n:last-child { margin-right: 0; }
+  .flow .n::after {
+    content: '→'; position: absolute; right: -5.6mm; top: 50%; transform: translateY(-50%);
+    color: #764ba2; font-weight: 800; font-size: 11pt;
+  }
+  .flow .n:last-child::after { content: none; }
+  .flow .n b { display: block; font-size: 8.6pt; color: #312e81; margin-bottom: .6mm; }
+  .flow .n span { font-size: 7.8pt; color: var(--muted); line-height: 1.4; display: block; }
+  .flow .n.dark { background: linear-gradient(135deg, #667eea, #764ba2); border-color: transparent; }
+  .flow .n.dark b, .flow .n.dark span { color: #fff; }
+  .flow .n.good { border-color: #86efac; background: #f0fdf4; }
+  .flow .n.good b { color: #14532d; }
+  .flow .n.bad { border-color: #fca5a5; background: #fef2f2; }
+  .flow .n.bad b { color: #7f1d1d; }
+
+  /* ============ KV STRIP ============ */
+  .kv { display: flex; gap: 3.5mm; margin: 3mm 0 4mm; }
+  .kv > div { flex: 1; border-radius: 3mm; padding: 3.2mm; text-align: center; background: linear-gradient(160deg,#eef2ff,#faf5ff); border: 1px solid #ddd6fe; }
+  .kv b { display: block; font-size: 14pt; font-weight: 800; color: #4338ca; }
+  .kv span { font-size: 7.6pt; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; font-weight: 600; }
+
+  /* ============ TOC ============ */
+  .toc-cols { column-count: 2; column-gap: 8mm; margin-top: 4mm; }
+  .toc-part { break-inside: avoid; margin-bottom: 5mm; }
+  .toc-part > b { display: block; font-size: 8pt; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.6mm; }
+  .toc-part ol { list-style: none; }
+  .toc-part li { display: flex; gap: 2.5mm; padding: 1.2mm 0; border-bottom: 1px dotted var(--line); font-size: 9.4pt; }
+  .toc-part li .n { color: var(--primary); font-weight: 800; min-width: 6mm; }
+
+  .footer-note { margin-top: 6mm; padding-top: 2mm; border-top: 1px solid var(--line); font-size: 7.6pt; color: #94a3b8; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<!-- ================= COVER ================= -->
+<div class="cover">
+  <div class="brandline">
+    <div class="mark">D</div>
+    <span>DigiLog&nbsp;360</span>
+  </div>
+  <div class="cover-mid">
+    <h1>Platform Wiki &amp;<br><em>Operations Manual</em></h1>
+    <p class="sub">The complete guide to the DigiLog 360 multi-tenant security operations platform — architecture, technology stack, every role, every workflow, and step-by-step instructions for every task on web and mobile.</p>
+    <div class="cover-chips">
+      <b>Admin Console · Next.js 15</b>
+      <b>Mobile App · Expo / React Native</b>
+      <b>Backend · Supabase</b>
+      <b>6 Roles</b>
+      <b>Multi-Tenant</b>
+      <b>Realtime SLA</b>
+      <b>Offline-First Mobile</b>
+    </div>
+  </div>
+  <div class="cover-foot">
+    <div><b>Netstream Intergrated Solutions</b>Proprietary &amp; Confidential — © 2026 Kruz Naidoo. All Rights Reserved.</div>
+    <div style="text-align:right"><b>Edition 1.0</b>August 2026</div>
+  </div>
+</div>
+
+<!-- ================= ABOUT / HOW TO USE ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="i">
+  <div class="part">Before you begin</div>
+  <h1>About This Manual</h1>
+  <p>What this document covers, who each part is written for, and the conventions used throughout.</p>
+</div>
+
+<p class="lead">DigiLog 360 replaces the paper occurrence book, the patrol clock, the visitor register, and the key register with one connected platform. This manual is both a <b>training guide</b> for every role and a <b>reference</b> for administrators and operators of the platform.</p>
+
+<h2>Who should read what</h2>
+<table>
+  <tr><th>You are…</th><th>Read first</th><th>Then</th></tr>
+  <tr><td><span class="role-chip r-guard">Guard</span></td><td>Ch. 6 (Signing in) · Ch. 8 (Guard playbook)</td><td>Ch. 15, 17, 18, 19 for feature detail</td></tr>
+  <tr><td><span class="role-chip r-supervisor">Supervisor</span></td><td>Ch. 8 + Ch. 9 (Supervisor playbook)</td><td>Ch. 14, 16, 17</td></tr>
+  <tr><td><span class="role-chip r-control">Control Room</span></td><td>Ch. 10 (Control Room playbook)</td><td>Ch. 14–16, 21, 22</td></tr>
+  <tr><td><span class="role-chip r-manager">Manager</span></td><td>Ch. 11 (Manager playbook)</td><td>Ch. 14, 21</td></tr>
+  <tr><td><span class="role-chip r-admin">Administrator</span></td><td>Ch. 12 (Admin playbook)</td><td>Ch. 5, 16, 23</td></tr>
+  <tr><td><span class="role-chip r-super">Super User</span></td><td>Ch. 13 (Super User playbook)</td><td>Everything — you run the platform</td></tr>
+  <tr><td>Engineer / IT operator</td><td>Ch. 2–5</td><td>Ch. 23–25 + <code>PRODUCTION.md</code> in the repo</td></tr>
+</table>
+
+<div class="callout note"><b class="cap">Terminology</b>An <b>occurrence</b> is any logged incident or event — the digital equivalent of an entry in the paper Occurrence Book. Each one receives a sequential <b>OB number</b> (e.g. <code>OB-2026-04180</code>) the moment it is saved. "Occurrence" and "incident" are used interchangeably in this manual.</div>
+
+<h2>Conventions</h2>
+<div class="grid2">
+  <div class="card">
+    <h4>Navigation paths</h4>
+    <p>Menu locations are written as <span class="path">Sidebar → Occurrences → Log New Occurrence</span> for the web console and <span class="path">Home → Quick actions → Log occurrence</span> for mobile.</p>
+  </div>
+  <div class="card">
+    <h4>Capability keys</h4>
+    <p>Every gated feature lists its capability key, e.g. <code>occurrences.log</code>. If you can't see a screen described here, that capability isn't granted to your role — see Chapter 5.</p>
+  </div>
+  <div class="card">
+    <h4>Badges</h4>
+    <p>Severity and status appear exactly as in the apps: <span class="b crit">Critical</span> <span class="b high">High</span> <span class="b med">Medium</span> <span class="b low">Low</span> · <span class="b open">Open</span> <span class="b res">Resolved</span> <span class="b closed">Closed</span></p>
+  </div>
+  <div class="card">
+    <h4>Callouts</h4>
+    <p><b style="color:#16a34a">Tip</b> = a faster way to work · <b style="color:#2563eb">Note</b> = background you should know · <b style="color:#b45309">Warning</b> = an action that is hard to undo.</p>
+  </div>
+</div>
+
+<h2>Related documents in the repository</h2>
+<div class="grid3">
+  <div class="card">
+    <h4>README.md</h4>
+    <p>The engineering reference: full schema, migration timeline, RLS helpers, edge-function internals and demo-account details.</p>
+  </div>
+  <div class="card">
+    <h4>PRODUCTION.md</h4>
+    <p>The operator runbook: deployment, secret rotation cadence, monitoring setup, backup / disaster recovery and the pre-release checklist.</p>
+  </div>
+  <div class="card">
+    <h4>PERFORMANCE_OPTIMIZATIONS.md</h4>
+    <p>Measured before/after numbers behind the console's speed: bundle diet, parallel fetching, realtime instead of polling, composite indexes.</p>
+  </div>
+</div>
+
+<div class="callout tip"><b class="cap">Keeping this manual current</b>This wiki is generated from <code>docs/wiki/DigiLog360-Wiki.html</code> in the repository. When a feature lands, edit that file and re-print it to PDF — the source of truth stays in version control alongside the code it documents.</div>
+
+<!-- ================= TOC ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="ii">
+  <div class="part">Contents</div>
+  <h1>Table of Contents</h1>
+  <p>Five parts: the platform, getting started, role playbooks, feature deep dives, and operations.</p>
+</div>
+
+<div class="toc-cols">
+  <div class="toc-part">
+    <b>Part I — The Platform</b>
+    <ol>
+      <li><span class="n">1</span><span>Platform Overview</span></li>
+      <li><span class="n">2</span><span>Technology Stack</span></li>
+      <li><span class="n">3</span><span>System Architecture</span></li>
+      <li><span class="n">4</span><span>Core Concepts</span></li>
+      <li><span class="n">5</span><span>Roles, Permissions &amp; the Capability Matrix</span></li>
+    </ol>
+  </div>
+  <div class="toc-part">
+    <b>Part II — Getting Started</b>
+    <ol>
+      <li><span class="n">6</span><span>Signing In — Web Password &amp; Mobile PIN</span></li>
+      <li><span class="n">7</span><span>Finding Your Way Around</span></li>
+    </ol>
+  </div>
+  <div class="toc-part">
+    <b>Part III — Role Playbooks</b>
+    <ol>
+      <li><span class="n">8</span><span>Guard (Mobile)</span></li>
+      <li><span class="n">9</span><span>Supervisor (Mobile + Web)</span></li>
+      <li><span class="n">10</span><span>Control Room (Web)</span></li>
+      <li><span class="n">11</span><span>Manager (Web)</span></li>
+      <li><span class="n">12</span><span>Administrator (Web)</span></li>
+      <li><span class="n">13</span><span>Super User (Web)</span></li>
+    </ol>
+  </div>
+  <div class="toc-part">
+    <b>Part IV — Feature Deep Dives</b>
+    <ol>
+      <li><span class="n">14</span><span>The Incident Lifecycle, End to End</span></li>
+      <li><span class="n">15</span><span>Logging an Occurrence — Every Method</span></li>
+      <li><span class="n">16</span><span>The SLA Engine &amp; Alerts</span></li>
+      <li><span class="n">17</span><span>Patrols &amp; Checkpoint Scanning</span></li>
+      <li><span class="n">18</span><span>Gate-House: Visitors &amp; Keys</span></li>
+      <li><span class="n">19</span><span>Shifts &amp; Handovers</span></li>
+      <li><span class="n">20</span><span>Tasks</span></li>
+      <li><span class="n">21</span><span>Reports &amp; PDF Export</span></li>
+      <li><span class="n">22</span><span>Notifications &amp; Deep Links</span></li>
+    </ol>
+  </div>
+  <div class="toc-part">
+    <b>Part V — Administration &amp; Operations</b>
+    <ol>
+      <li><span class="n">23</span><span>Integrations — Webhooks, API Tokens, Edge Functions</span></li>
+      <li><span class="n">24</span><span>Deployment &amp; Operations Runbook</span></li>
+      <li><span class="n">25</span><span>Security Posture</span></li>
+      <li><span class="n">26</span><span>Appendix — Accounts, Glossary, Data Model</span></li>
+    </ol>
+  </div>
+</div>
+
+<!-- ================= PART I DIVIDER ================= -->
+<div class="pagebreak"></div>
+<div class="part-divider">
+  <div class="kicker">Part I</div>
+  <h1>The Platform</h1>
+  <p>What DigiLog 360 is, the technology it is built on, how the pieces fit together, and the concepts — organisations, occurrences, OB numbers, SLAs, capabilities — that every other chapter builds on.</p>
+  <ul>
+    <li><b>Chapter 1</b> — Platform Overview</li>
+    <li><b>Chapter 2</b> — Technology Stack</li>
+    <li><b>Chapter 3</b> — System Architecture</li>
+    <li><b>Chapter 4</b> — Core Concepts</li>
+    <li><b>Chapter 5</b> — Roles, Permissions &amp; the Capability Matrix</li>
+  </ul>
+</div>
+
+<!-- ================= CH 1 ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="01">
+  <div class="part">Part I · The Platform</div>
+  <h1>Platform Overview</h1>
+  <p>A multi-tenant security operations platform: control room, manager review, field guards, gate-house, patrols and supervision — across many sites and many client organisations from one deployment.</p>
+</div>
+
+<p class="lead">DigiLog 360 digitises the daily operations of a security company. Guards log incidents with photos and voice notes from their phones — even without signal. Patrols are verified with real QR, NFC and GPS checkpoint scans. The control room watches a live SLA board that flags breaches the moment they happen. Managers review and sign off every incident. Administrators shape the platform per organisation, and a super user runs many client companies from one deployment.</p>
+
+<h2><span class="no">1.1</span>Three surfaces, one platform</h2>
+<div class="grid3">
+  <div class="card tint">
+    <span class="tag">Web</span>
+    <h4>Admin Console</h4>
+    <p>Next.js 15 web app for the control room, managers, admins and super users. Live dashboards, occurrence explorer, reports, user &amp; site management, platform settings.</p>
+  </div>
+  <div class="card tint">
+    <span class="tag">Mobile</span>
+    <h4>Guard App</h4>
+    <p>Expo / React Native app for guards and supervisors. PIN-only sign-in, occurrence logging with photos, patrol scanning, gate-house registers, shifts and handovers. Works offline.</p>
+  </div>
+  <div class="card tint">
+    <span class="tag">Backend</span>
+    <h4>Supabase Cloud</h4>
+    <p>Postgres database with row-level security, authentication, file storage, realtime WebSocket streams and 15 serverless edge functions. One project hosts every tenant.</p>
+  </div>
+</div>
+
+<h2><span class="no">1.2</span>What it replaces</h2>
+<p>DigiLog 360 is a ground-up rebuild of the legacy ASP.NET MVC "OccurrenceBook" application. Everything the old system did is here, plus:</p>
+<table>
+  <tr><th>Area</th><th>Legacy system</th><th>DigiLog 360</th></tr>
+  <tr><td>Tenancy</td><td>One deployment per client</td><td>True multi-tenant — one deployment, many organisations, hard data isolation</td></tr>
+  <tr><td>Patrols</td><td>Start/end timer only</td><td>Verified checkpoint scans — QR, NFC and GPS geofence — plus schedules &amp; late alerts</td></tr>
+  <tr><td>Mobile login</td><td>Email + password</td><td>Employee number + 4-digit PIN with brute-force lockout</td></tr>
+  <tr><td>SLA</td><td>Static report</td><td>Live realtime board, per-org SLA matrix, automatic push/email breach alerts</td></tr>
+  <tr><td>Connectivity</td><td>Online only</td><td>Offline queue — guards log without signal; syncs automatically</td></tr>
+  <tr><td>Permissions</td><td>Fixed roles</td><td>Six ranked roles, multi-role users, and a per-org capability matrix the super user edits live</td></tr>
+  <tr><td>Evidence</td><td>Photos only</td><td>Photos, voice notes with Whisper transcription, OCR of handwritten notes, SA licence scanning</td></tr>
+  <tr><td>Integration</td><td>None</td><td>Signed outbound webhooks, org-scoped API tokens, public health check</td></tr>
+</table>
+
+<h2><span class="no">1.3</span>The operational day at a glance</h2>
+<div class="flow">
+  <div class="n dark"><b>Clock in</b><span>Guard starts a shift on mobile</span></div>
+  <div class="n"><b>Patrol</b><span>Route-based or ad-hoc; QR/NFC/GPS scans verify checkpoints</span></div>
+  <div class="n"><b>Log occurrences</b><span>Incidents with photos &amp; voice notes; SLA clock starts</span></div>
+  <div class="n"><b>Control room</b><span>Live board tracks every open OB against its SLA</span></div>
+  <div class="n"><b>Manager review</b><span>Acknowledge, escalate or reject each occurrence</span></div>
+  <div class="n good"><b>Close &amp; report</b><span>PDF report generated; audit trail complete</span></div>
+</div>
+
+<div class="callout tip"><b class="cap">Tip</b>Every arrow above is automatic. Guards don't hand anything over on paper: the moment an occurrence is saved on a phone, it is on the control-room board with its SLA countdown running, and the manager's queue updates in realtime.</div>
+
+<!-- ================= CH 2 ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="02">
+  <div class="part">Part I · The Platform</div>
+  <h1>Technology Stack</h1>
+  <p>Modern TypeScript everywhere — Next.js 15 on the web, Expo on mobile, Supabase underneath, one shared types package binding them together.</p>
+</div>
+
+<h2><span class="no">2.1</span>Backend — Supabase</h2>
+<table>
+  <tr><th>Component</th><th>Technology</th><th>Role in the platform</th></tr>
+  <tr><td>Database</td><td>Postgres 15 (+ <code>pgcrypto</code>, <code>uuid-ossp</code>, <code>pg_trgm</code>)</td><td>All domain data; row-level security enforces tenant + role isolation on every table</td></tr>
+  <tr><td>Auth</td><td>Supabase Auth (JWT)</td><td>Web email/password sessions, optional TOTP 2FA, magic-link minting for the mobile PIN flow</td></tr>
+  <tr><td>Storage</td><td>Supabase Storage</td><td>Private buckets for occurrence photos &amp; voice notes; public bucket for org branding</td></tr>
+  <tr><td>Realtime</td><td>Postgres replication → WebSockets</td><td>Live boards, notification bells, guard map markers, comment threads</td></tr>
+  <tr><td>Serverless</td><td>Edge Functions (Deno / TypeScript)</td><td>15 functions: PIN login, user/org provisioning, email, webhooks, SLA monitor, patrol watcher, Whisper transcription, health check</td></tr>
+  <tr><td>Scheduling</td><td>pg_cron</td><td>Runs the SLA monitor and patrol watcher every 5 minutes</td></tr>
+</table>
+
+<h2><span class="no">2.2</span>Admin console — <code>apps/admin</code></h2>
+<div class="grid2">
+  <div class="card"><h4>Framework</h4><p>Next.js 15 App Router · React 19 · TypeScript 5.6 strict · Tailwind CSS 3.4 with dark mode. Server components fetch data in parallel batches; middleware validates auth once per navigation.</p></div>
+  <div class="card"><h4>Auth &amp; security</h4><p><code>@supabase/ssr</code> cookie sessions · custom CSP, HSTS (2 y), X-Frame-Options DENY · optional Sentry error monitoring.</p></div>
+  <div class="card"><h4>UI libraries</h4><p><code>lucide-react</code> icons (tree-shaken registry) · <code>recharts</code> dashboards · <code>qrcode.react</code> printable checkpoint labels · <code>react-leaflet</code> live guard map (lazy-loaded).</p></div>
+  <div class="card"><h4>Intelligence</h4><p><code>tesseract.js</code> client-side OCR pulls text out of photographed handwritten notes straight into the log-occurrence form. Minimal i18n: English, Afrikaans, isiZulu, isiXhosa.</p></div>
+</div>
+
+<h2><span class="no">2.3</span>Mobile app — <code>apps/mobile</code></h2>
+<div class="grid2">
+  <div class="card"><h4>Framework</h4><p>Expo SDK 52 (managed) · React Native 0.76 new architecture · <code>expo-router</code> 4 file-based navigation.</p></div>
+  <div class="card"><h4>Sensors &amp; capture</h4><p><code>expo-camera</code> QR scanning + photos · <code>expo-location</code> GPS scans + live position reporting · <code>expo-av</code> voice notes · <code>react-native-nfc-manager</code> NFC tag reads (dev build).</p></div>
+  <div class="card"><h4>Resilience</h4><p><code>expo-secure-store</code> + AsyncStorage session persistence · offline occurrence queue with auto-flush and poison-row protection · <code>@react-native-community/netinfo</code> connectivity watching.</p></div>
+  <div class="card"><h4>Notifications &amp; drawing</h4><p><code>expo-notifications</code> push registration and tap deep-linking · <code>react-native-svg</code> signature canvas for handovers and charts.</p></div>
+</div>
+
+<h2><span class="no">2.4</span>Shared package &amp; tooling</h2>
+<p><b><code>packages/shared</code> (@digilog/shared)</b> keeps both apps honest: database types generated from Postgres, Zod validation schemas, SLA helpers, role &amp; capability constants and predicates, URL filter serialisers, and the i18n dictionaries. A change to a status colour or an SLA rule lands in one file and both apps pick it up.</p>
+<ul class="plain">
+  <li><b>Monorepo:</b> npm workspaces (admin + shared); mobile sits outside the workspace to avoid React dual-version conflicts.</li>
+  <li><b>CI:</b> GitHub Actions — typecheck of shared, admin and mobile plus an admin build smoke test on every pull request.</li>
+  <li><b>Performance:</b> shared First-Load JS held at ~104 kB; heavy libraries (recharts, leaflet, tesseract) are route-scoped and lazy-loaded. Composite DB indexes match every hot query path.</li>
+</ul>
+
+<!-- ================= CH 3 ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="03">
+  <div class="part">Part I · The Platform</div>
+  <h1>System Architecture</h1>
+  <p>Three clients, one Postgres brain. Row-level security is the floor; edge functions hold the only privileged key; realtime replication keeps every screen live.</p>
+</div>
+
+<svg viewBox="0 0 760 470" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; margin: 2mm 0 4mm;">
+  <defs>
+    <linearGradient id="gsup" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e1b4b"/><stop offset="1" stop-color="#4c1d95"/>
+    </linearGradient>
+    <linearGradient id="gcli" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#667eea"/><stop offset="1" stop-color="#764ba2"/>
+    </linearGradient>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#764ba2"/>
+    </marker>
+  </defs>
+
+  <!-- Supabase box -->
+  <rect x="40" y="20" width="680" height="190" rx="14" fill="url(#gsup)"/>
+  <text x="380" y="48" text-anchor="middle" fill="#c7d2fe" font-size="13" font-weight="700" letter-spacing="3">SUPABASE — POSTGRES 15</text>
+  <!-- inner groups -->
+  <g font-size="10.5" fill="#e0e7ff">
+    <rect x="60" y="62" width="200" height="130" rx="8" fill="rgba(255,255,255,.07)" stroke="rgba(255,255,255,.2)"/>
+    <text x="160" y="80" text-anchor="middle" font-weight="700" fill="#fff">Domain tables (org-scoped)</text>
+    <text x="160" y="98" text-anchor="middle">occurrences · patrols · shifts</text>
+    <text x="160" y="113" text-anchor="middle">visitors · keys · tasks · users</text>
+    <text x="160" y="128" text-anchor="middle">checkpoints · notifications</text>
+    <text x="160" y="143" text-anchor="middle">acknowledgements · audit_log</text>
+    <text x="160" y="163" text-anchor="middle" font-weight="700" fill="#a5b4fc">RLS on every table</text>
+    <text x="160" y="178" text-anchor="middle" fill="#a5b4fc">org_id = current_org_id()</text>
+
+    <rect x="280" y="62" width="200" height="130" rx="8" fill="rgba(255,255,255,.07)" stroke="rgba(255,255,255,.2)"/>
+    <text x="380" y="80" text-anchor="middle" font-weight="700" fill="#fff">Logic in the database</text>
+    <text x="380" y="98" text-anchor="middle">Triggers: OB numbering, SLA</text>
+    <text x="380" y="113" text-anchor="middle">stamps, audit, role sync</text>
+    <text x="380" y="128" text-anchor="middle">Views: occurrences_live,</text>
+    <text x="380" y="143" text-anchor="middle">my_capabilities, positions</text>
+    <text x="380" y="163" text-anchor="middle" font-weight="700" fill="#a5b4fc">pg_cron → monitors</text>
+    <text x="380" y="178" text-anchor="middle" fill="#a5b4fc">every 5 minutes</text>
+
+    <rect x="500" y="62" width="200" height="130" rx="8" fill="rgba(255,255,255,.07)" stroke="rgba(255,255,255,.2)"/>
+    <text x="600" y="80" text-anchor="middle" font-weight="700" fill="#fff">Storage &amp; Realtime</text>
+    <text x="600" y="98" text-anchor="middle">occurrence-images (private)</text>
+    <text x="600" y="113" text-anchor="middle">voice-notes (private)</text>
+    <text x="600" y="128" text-anchor="middle">org-branding (public)</text>
+    <text x="600" y="148" text-anchor="middle" font-weight="700" fill="#a5b4fc">Replication → WebSockets</text>
+    <text x="600" y="163" text-anchor="middle" fill="#a5b4fc">live boards · bells · maps</text>
+  </g>
+
+  <!-- arrows down -->
+  <line x1="150" y1="215" x2="150" y2="285" stroke="#764ba2" stroke-width="2.5" marker-end="url(#arr)" marker-start="url(#arr)"/>
+  <line x1="380" y1="215" x2="380" y2="285" stroke="#764ba2" stroke-width="2.5" marker-end="url(#arr)" marker-start="url(#arr)"/>
+  <line x1="610" y1="215" x2="610" y2="285" stroke="#764ba2" stroke-width="2.5" marker-end="url(#arr)" marker-start="url(#arr)"/>
+  <text x="150" y="250" text-anchor="middle" font-size="9" fill="#64748b">anon key · RLS enforced</text>
+  <text x="380" y="243" text-anchor="middle" font-size="9" fill="#64748b">service-role key</text>
+  <text x="380" y="255" text-anchor="middle" font-size="9" fill="#64748b">(edge functions only)</text>
+  <text x="610" y="250" text-anchor="middle" font-size="9" fill="#64748b">anon key · realtime</text>
+
+  <!-- Clients -->
+  <rect x="40" y="290" width="220" height="120" rx="12" fill="url(#gcli)"/>
+  <text x="150" y="315" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">ADMIN CONSOLE</text>
+  <text x="150" y="332" text-anchor="middle" fill="#e0e7ff" font-size="10">Next.js 15 · @supabase/ssr</text>
+  <text x="150" y="350" text-anchor="middle" fill="#e0e7ff" font-size="10">super_user · admin · manager</text>
+  <text x="150" y="365" text-anchor="middle" fill="#e0e7ff" font-size="10">control_room · supervisor</text>
+  <text x="150" y="388" text-anchor="middle" fill="#c7d2fe" font-size="9.5">Password + optional TOTP 2FA</text>
+
+  <rect x="280" y="290" width="200" height="120" rx="12" fill="#0f172a"/>
+  <text x="380" y="315" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">EDGE FUNCTIONS</text>
+  <text x="380" y="332" text-anchor="middle" fill="#cbd5e1" font-size="10">pin-login · pin-set · admin-*</text>
+  <text x="380" y="347" text-anchor="middle" fill="#cbd5e1" font-size="10">send-email · webhook-deliver</text>
+  <text x="380" y="362" text-anchor="middle" fill="#cbd5e1" font-size="10">sla-monitor · patrol-watcher</text>
+  <text x="380" y="377" text-anchor="middle" fill="#cbd5e1" font-size="10">transcribe-audio · health-check</text>
+  <text x="380" y="396" text-anchor="middle" fill="#94a3b8" font-size="9.5">Deno · the only privileged key</text>
+
+  <rect x="500" y="290" width="220" height="120" rx="12" fill="url(#gcli)"/>
+  <text x="610" y="315" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">MOBILE APP</text>
+  <text x="610" y="332" text-anchor="middle" fill="#e0e7ff" font-size="10">Expo / React Native</text>
+  <text x="610" y="350" text-anchor="middle" fill="#e0e7ff" font-size="10">guard · supervisor</text>
+  <text x="610" y="368" text-anchor="middle" fill="#e0e7ff" font-size="10">PIN-only · offline queue</text>
+  <text x="610" y="388" text-anchor="middle" fill="#c7d2fe" font-size="9.5">Push notifications deep-link</text>
+
+  <!-- outbound -->
+  <line x1="380" y1="415" x2="380" y2="440" stroke="#764ba2" stroke-width="2.5" marker-end="url(#arr)"/>
+  <text x="380" y="458" text-anchor="middle" font-size="10" fill="#334155" font-weight="600">Outbound: Resend email · Expo push · signed webhooks (Slack, ticketing, monitoring) · OpenAI Whisper</text>
+</svg>
+
+<h2><span class="no">3.1</span>How a request flows</h2>
+<ul class="plain">
+  <li><b>Apps talk to Postgres directly</b> with the public anon key. They can only ever see what row-level security allows — the guard's phone physically cannot query another organisation's rows.</li>
+  <li><b>Privileged work goes through edge functions.</b> Creating users, minting API tokens, verifying PINs, sending email: only these Deno functions hold the service-role key, and each one re-checks the caller's role before acting.</li>
+  <li><b>Realtime is push, not poll.</b> Postgres replicates changes on key tables (occurrences, comments, notifications, tasks, scans…) to WebSocket subscribers. The admin's <code>&lt;RealtimeRefresh&gt;</code> component debounce-refreshes any server-rendered table when its tables change.</li>
+  <li><b>Cron closes the loop.</b> Every 5 minutes, <code>sla-monitor</code> hunts for breached or update-due occurrences and <code>patrol-watcher</code> hunts for missed patrol slots — then notify inbox, push and email.</li>
+</ul>
+
+<div class="callout note"><b class="cap">Note — why this is safe</b>The capability matrix (Chapter 5) hides UI, but security never depends on it: even a modified client with a stolen anon key hits RLS, which re-evaluates the caller's org and roles on every single query. Storage is protected the same way — file paths must begin with the caller's own <code>&lt;org_slug&gt;/</code> prefix.</div>
+
+<!-- ================= CH 4 ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="04">
+  <div class="part">Part I · The Platform</div>
+  <h1>Core Concepts</h1>
+  <p>Organisations, sites, OB numbers, the occurrence lifecycle, severities and SLAs, and the audit trail — the vocabulary of everything that follows.</p>
+</div>
+
+<h2><span class="no">4.1</span>Organisations &amp; multi-tenancy</h2>
+<p>An <b>organisation</b> is a tenant — typically one client security company. Every row of domain data carries an <code>org_id</code>, and row-level security guarantees users only ever see their own organisation's data. The only exception is the <span class="role-chip r-super">super_user</span>, who sees across all tenants. Each organisation gets its own branding, SLA matrix, occurrence-type taxonomy, capability grants, webhooks and API tokens.</p>
+
+<h2><span class="no">4.2</span>Sites</h2>
+<p>A <b>site</b> is a physical location an organisation guards (e.g. Sandton, Cape Town, Boksburg, HQ Central in the demo tenant). Guards and supervisors are anchored to a primary site; users can additionally be assigned to multiple sites (<code>site_ids[]</code>). Occurrences, patrols, shifts, visitors and keys all belong to a site, and dashboards can filter by site.</p>
+
+<h2><span class="no">4.3</span>Occurrences &amp; OB numbers</h2>
+<p>An <b>occurrence</b> is the core record: any incident or notable event. On insert, a database trigger assigns the next sequential <b>OB number</b> for the year (e.g. <code>OB-2026-04180</code>) — collision-proof even past 9999 entries, with a self-healing sequence guard after bulk imports. Each occurrence carries a type, severity, site, description, the logger, timestamps, and optionally: photos, voice notes, comments, an assigned reviewer, a report, and a manager acknowledgement.</p>
+
+<h2><span class="no">4.4</span>The occurrence lifecycle</h2>
+<div class="flow">
+  <div class="n"><b><span class="b open">Open</span></b><span>Just logged; SLA clock starts</span></div>
+  <div class="n"><b><span class="b ack">Acknowledged</span></b><span>Someone has taken note</span></div>
+  <div class="n"><b><span class="b prog">In&nbsp;Progress</span></b><span>Actively being worked</span></div>
+  <div class="n"><b><span class="b pat">On&nbsp;Patrol</span></b><span>Being attended in the field</span></div>
+  <div class="n good"><b><span class="b res">Resolved</span></b><span>Dealt with; SLA stops</span></div>
+  <div class="n good"><b><span class="b closed">Closed</span></b><span>Final; signed off</span></div>
+</div>
+<p><span class="b res">Resolved</span> and <span class="b closed">Closed</span> are terminal — reaching either stamps <code>closed_at</code> and stops the SLA countdown. Status changes are made from the web occurrence detail, the live board, or the mobile status sheet, and every change lands in the occurrence's update timeline.</p>
+
+<h2><span class="no">4.5</span>Severity &amp; the SLA matrix</h2>
+<table>
+  <tr><th>Severity</th><th>Resolve within</th><th>Update every</th><th>Typical use</th></tr>
+  <tr><td><span class="b crit">Critical</span></td><td>1 hour</td><td>30 min</td><td>Armed incident, fire, medical emergency</td></tr>
+  <tr><td><span class="b high">High</span></td><td>4 hours</td><td>60 min</td><td>Break-in, serious damage, assault</td></tr>
+  <tr><td><span class="b med">Medium</span></td><td>24 hours</td><td>6 hours</td><td>Theft report, suspicious activity</td></tr>
+  <tr><td><span class="b low">Low</span></td><td>168 hours (7 days)</td><td>24 hours</td><td>Maintenance issue, routine note</td></tr>
+</table>
+<p>These are the platform defaults; each organisation can override any row from <span class="path">Sidebar → Administration → SLA Matrix</span>. Chapter 16 covers how the countdown, the live board and the automatic alerts work.</p>
+
+<h2><span class="no">4.6</span>Capabilities</h2>
+<p>Roles decide what you <i>may</i> do (the security floor, enforced in the database). <b>Capabilities</b> decide what you <i>see</i> — several dozen keys like <code>occurrences.log</code> or <code>patrols.scan</code> gate every nav item, button and mobile tab. The super user edits the role × capability grid per organisation, live, with no redeploy. Details in Chapter 5.</p>
+
+<h2><span class="no">4.7</span>The audit trail</h2>
+<p>Every sensitive action — sign-ins, PIN attempts, user and role changes, org changes, capability edits, manager decisions — is written to an immutable <b>audit log</b> with actor, role, target, IP and timestamp. Admins view it at <span class="path">Sidebar → Administration → Audit Log</span> (capability <code>audit.view</code>). Historical activity can be reconstructed after a legacy import; reconstructed rows stay tagged <code>backfilled</code> so they are never confused with live capture.</p>
+
+<div class="callout warn"><b class="cap">Warning</b>Nothing in DigiLog is silently deleted. Profiles, sites, occurrences and organisations are <b>soft-deleted</b> (hidden but recoverable by engineers). The only true deletions are the super user's organisation teardown and user deletion — both deliberately loud, confirmed actions.</div>
+
+<!-- ================= CH 5 ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="05">
+  <div class="part">Part I · The Platform</div>
+  <h1>Roles, Permissions &amp; the Capability Matrix</h1>
+  <p>Six ranked roles form the security floor. A per-organisation capability grid — edited live by the super user — shapes exactly what each role sees.</p>
+</div>
+
+<h2><span class="no">5.1</span>The six roles</h2>
+<table>
+  <tr><th>Rank</th><th>Role</th><th>Scope</th><th>Primary surface</th><th>In one sentence</th></tr>
+  <tr><td>100</td><td><span class="role-chip r-super">super_user</span></td><td>All organisations</td><td>Admin web</td><td>Runs the platform: creates tenants, edits permissions, sees everything.</td></tr>
+  <tr><td>80</td><td><span class="role-chip r-admin">admin</span></td><td>One organisation</td><td>Admin web</td><td>Full control of their org: users, sites, branding, SLA, types, integrations.</td></tr>
+  <tr><td>60</td><td><span class="role-chip r-manager">manager</span></td><td>One organisation</td><td>Admin web</td><td>Reviews every occurrence: acknowledge, escalate or reject, plus staff reporting.</td></tr>
+  <tr><td>50</td><td><span class="role-chip r-control">control_room</span></td><td>Site or org</td><td>Admin web</td><td>Watches the live SLA board, logs and updates occurrences, runs reports.</td></tr>
+  <tr><td>40</td><td><span class="role-chip r-supervisor">supervisor</span></td><td>One site</td><td>Web + mobile</td><td>Runs the site's guards: live board, team view, patrol oversight, approvals.</td></tr>
+  <tr><td>20</td><td><span class="role-chip r-guard">guard</span></td><td>One site</td><td>Mobile only</td><td>Logs occurrences, runs patrols, staffs the gate house, works shifts.</td></tr>
+</table>
+
+<h2><span class="no">5.2</span>Multi-role users</h2>
+<p>A user can hold <b>any combination</b> of roles — the profile stores the full set, and a database trigger keeps the "primary" role in sync for display and default landing. Common combinations:</p>
+<div class="grid3">
+  <div class="card"><h4>control_room + manager</h4><p>An operator who also reviews and signs off incidents.</p></div>
+  <div class="card"><h4>admin + supervisor</h4><p>An org admin who covers site shifts as a supervisor.</p></div>
+  <div class="card"><h4>guard + supervisor</h4><p>A field officer who also runs other guards.</p></div>
+</div>
+<p>Effective permissions are the <b>union</b> of all held roles, everywhere — RLS, capabilities, and navigation.</p>
+
+<h2><span class="no">5.3</span>Capability areas</h2>
+<p>Every feature maps to a capability key. The main areas (excerpt of the registry):</p>
+<table class="compact">
+  <tr><th>Area</th><th>Example keys</th></tr>
+  <tr><td>Dashboard</td><td><code>dashboard.view</code> · <code>dashboard.cross_org</code></td></tr>
+  <tr><td>Occurrences</td><td><code>occurrences.view_all</code> · <code>occurrences.log</code> · <code>occurrences.update_status</code> · <code>occurrences.assign</code> · <code>occurrences.bulk_actions</code> · <code>occurrences.comment</code> · <code>occurrences.export_csv</code></td></tr>
+  <tr><td>Reports</td><td><code>reports.view</code> · <code>reports.create</code> · <code>reports.export_pdf</code></td></tr>
+  <tr><td>Manager</td><td><code>manager.acknowledge</code> · <code>manager.escalate</code> · <code>manager.reviewed_logs</code></td></tr>
+  <tr><td>Patrols</td><td><code>patrols.view</code> · <code>patrols.run</code> · <code>patrols.scan</code> · <code>patrols.end_remote</code> · <code>patrols.schedule_manage</code> · <code>checkpoints.manage</code></td></tr>
+  <tr><td>Field ops</td><td><code>team.view</code> · <code>visitors.manage</code> · <code>keys.manage</code> · <code>shifts.view_all</code> · <code>shifts.clock</code> · <code>guards.map_view</code></td></tr>
+  <tr><td>Users &amp; sites</td><td><code>users.view</code> · <code>users.create</code> · <code>users.edit</code> · <code>users.reset_pin</code> · <code>sites.manage</code></td></tr>
+  <tr><td>Settings</td><td><code>org.edit_branding</code> · <code>org.edit_sla</code> · <code>org.edit_types</code> · <code>webhooks.manage</code> · <code>api_tokens.manage</code> · <code>audit.view</code></td></tr>
+  <tr><td>Personal</td><td><code>notifications.view_own</code> · <code>preferences.manage</code> · <code>security.manage_2fa</code></td></tr>
+  <tr><td>Mobile layout</td><td>Per-role tab-bar keys, home-card container keys, on/off-duty key</td></tr>
+  <tr><td>Super user</td><td><code>super.orgs_manage</code> · <code>super.users_cross_org</code> · <code>super.platform_health</code> · <code>super.permissions_manage</code></td></tr>
+</table>
+
+<h2><span class="no">5.4</span>How the two layers work together</h2>
+<div class="flow">
+  <div class="n dark"><b>User opens app</b><span>Web shell or mobile boot</span></div>
+  <div class="n"><b>Load capabilities</b><span>Reads the <code>my_capabilities</code> view; super users get "everything"</span></div>
+  <div class="n"><b>UI filters itself</b><span>Nav items, tabs, buttons check <code>hasCapability()</code></span></div>
+  <div class="n"><b>Every query hits RLS</b><span>Postgres re-checks org + role on each read/write</span></div>
+  <div class="n good"><b>Fail-safe</b><span>Revoking a capability hides UI; RLS still blocks a bypass</span></div>
+</div>
+
+<div class="callout note"><b class="cap">Note — privilege-escalation guard</b>Database triggers block anyone but a super user from granting <code>super_user</code>, moving users between organisations, or removing a user's last role. Org admins cannot delete super users or themselves.</div>
+
+<h2><span class="no">5.5</span>Auditing your own access — My Access</h2>
+<p>Any signed-in user can open <span class="path">Sidebar → My Access</span> to see: the roles they hold (primary highlighted), every capability currently granted with <i>via {role}</i> provenance, and the list of pages they can actually open. If someone reports "I can't see the Patrols menu," their My Access page is the first place to look.</p>
+
+<!-- ================= PART II DIVIDER ================= -->
+<div class="pagebreak"></div>
+<div class="part-divider">
+  <div class="kicker">Part II</div>
+  <h1>Getting Started</h1>
+  <p>Signing in on each surface — including the mobile PIN flow and its lockout protection — and a guided tour of the admin console sidebar and the mobile app's tabs.</p>
+  <ul>
+    <li><b>Chapter 6</b> — Signing In: Web Password &amp; Mobile PIN</li>
+    <li><b>Chapter 7</b> — Finding Your Way Around</li>
+  </ul>
+</div>
+
+<!-- ================= CH 6 ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="06">
+  <div class="part">Part II · Getting Started</div>
+  <h1>Signing In</h1>
+  <p>Web users sign in with email and password (plus optional 2FA). Mobile users never touch a password — organisation, employee number and a 4-digit PIN.</p>
+</div>
+
+<h2><span class="no">6.1</span>Web — Admin Console</h2>
+<div class="task">
+  <div class="task-head"><h4>Sign in to the admin console</h4><div class="where">Browser → your DigiLog URL</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open the admin console URL in any modern browser. You land on the <b>login page</b>.</li>
+      <li>Enter your <b>email address</b> and <b>password</b>, then select <b>Sign in</b>.</li>
+      <li>If your account has <b>2FA enabled</b>, enter the 6-digit code from your authenticator app.</li>
+      <li>You arrive on your default landing page (usually the <b>Dashboard</b>). Your sidebar shows only what your roles and capabilities allow.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Who: all web roles · Sessions are HttpOnly cookies; closing the tab does not sign you out. Use the avatar menu → Sign out on shared machines.</div>
+</div>
+
+<div class="task">
+  <div class="task-head"><h4>Enable two-factor authentication (recommended)</h4><div class="where">Sidebar → Settings → Security (2FA)</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <span class="path">Security (2FA)</span> from the sidebar's personal section.</li>
+      <li>Select <b>Enrol</b>. A QR code appears.</li>
+      <li>Scan it with any authenticator app (Google Authenticator, Authy, 1Password…).</li>
+      <li>Type the current 6-digit code to confirm. From now on, sign-in asks for a code.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">security.manage_2fa</span> · Self-service for any web user.</div>
+</div>
+
+<h2><span class="no">6.2</span>Mobile — PIN-only sign-in</h2>
+<p>The guard app deliberately has <b>no password</b>. Identity is <b>organisation slug + employee number</b>, proven with a 4-digit PIN.</p>
+
+<div class="task">
+  <div class="task-head"><h4>First sign-in on a phone</h4><div class="where">Mobile app → Login screen</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open the app. On first launch, tap <b>Switch account</b>.</li>
+      <li>Enter your <b>organisation code</b> (e.g. <code>digilog-demo</code>) and your <b>employee number</b> (e.g. <code>GRD001</code>). The app remembers both — you only do this once per phone.</li>
+      <li>Type your <b>4-digit PIN</b> on the keypad.</li>
+      <li>You land on <b>Home</b>, showing your name, site and quick actions.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Who: guard · supervisor (mobile roles). Your PIN is set by an admin when your account is created; you can change it in Settings.</div>
+</div>
+
+<h3>What happens behind the keypad</h3>
+<div class="flow">
+  <div class="n dark"><b>PIN entered</b><span>App sends org + employee # + PIN to the <code>pin-login</code> function</span></div>
+  <div class="n"><b>Lockout check</b><span>Locked accounts are refused with the unlock time</span></div>
+  <div class="n"><b>Verify</b><span>bcrypt compare; every attempt recorded for forensics</span></div>
+  <div class="n bad"><b>5 fails / 15 min</b><span>Account locks for 15 minutes; audit-logged</span></div>
+  <div class="n good"><b>Success</b><span>One-time magic-link token → real session on the phone</span></div>
+</div>
+
+<div class="callout tip"><b class="cap">Tip — locked out?</b>Wait 15 minutes and try again, or ask any admin to reset your PIN (<span class="path">Users → ⋮ → Reset PIN</span>). Admin resets take effect immediately.</div>
+<div class="callout note"><b class="cap">Note</b>PINs are stored only as bcrypt hashes and are never saved on the phone. Responses are timing-normalised so attackers can't probe which employee numbers exist.</div>
+
+<div class="task">
+  <div class="task-head"><h4>Change your PIN</h4><div class="where">Mobile → Settings → Change PIN</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Settings</b> (gear icon from Home) and choose <b>Change PIN</b>.</li>
+      <li>Enter your <b>current PIN</b>, then the <b>new PIN</b> twice. Mismatches highlight live; use the show/hide toggle if unsure.</li>
+      <li>Confirm. The change is immediate and audit-logged.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Forgot your PIN entirely? Only an admin can reset it — the app has no self-service recovery by design.</div>
+</div>
+
+<!-- ================= CH 7 ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="07">
+  <div class="part">Part II · Getting Started</div>
+  <h1>Finding Your Way Around</h1>
+  <p>The admin console sidebar, section by section — and the mobile app's tabs, screens and quick actions.</p>
+</div>
+
+<h2><span class="no">7.1</span>Admin console layout</h2>
+<p>The console is a two-pane shell: a collapsible <b>sidebar</b> grouped into sections, and the content area. The header carries the <b>site context indicator</b>, the live <b>notification bell</b>, the <b>theme toggle</b> (light/dark, remembered per browser) and your <b>avatar menu</b> with sign-out. Sections and items appear only if your roles and capabilities allow them.</p>
+
+<table class="compact">
+  <tr><th>Section</th><th>Item</th><th>What it is</th><th>Capability</th></tr>
+  <tr><td rowspan="3"><b>Overview</b></td><td>Dashboard</td><td>KPI cards, trends, breakdowns; filterable by site</td><td><code>dashboard.view</code></td></tr>
+  <tr><td>Live Occurrences</td><td>Realtime board of open OBs with SLA badges</td><td>—</td></tr>
+  <tr><td>Notifications</td><td>In-app inbox</td><td><code>notifications.view_own</code></td></tr>
+  <tr><td rowspan="7"><b>Occurrences</b></td><td>All Occurrences</td><td>Paginated, filterable explorer + saved views + bulk actions</td><td><code>occurrences.view_all</code></td></tr>
+  <tr><td>Log New Occurrence</td><td>The web log-incident form (with OCR)</td><td><code>occurrences.log</code></td></tr>
+  <tr><td>Reports</td><td>Report list + one-click PDF print</td><td><code>reports.view</code></td></tr>
+  <tr><td>History</td><td>Closed occurrences + completed patrols</td><td><code>occurrences.view_all</code></td></tr>
+  <tr><td>Evidence Photos</td><td>Browse every photo across all occurrences</td><td><code>reports.view</code></td></tr>
+  <tr><td>Assigned to Me</td><td>Your personal review queue</td><td><code>occurrences.view_assigned</code></td></tr>
+  <tr><td>Tasks</td><td>To-do board, linkable to OBs</td><td>—</td></tr>
+  <tr><td rowspan="8"><b>Field Operations</b></td><td>Patrols</td><td>Active + recent patrols with route progress</td><td><code>patrols.view</code></td></tr>
+  <tr><td>Checkpoints</td><td>QR/NFC/GPS checkpoint CRUD + printable labels</td><td><code>checkpoints.manage</code></td></tr>
+  <tr><td>Team Status</td><td>Who's available / on patrol</td><td><code>team.view</code></td></tr>
+  <tr><td>Visitor Log</td><td>On-site now + visit history</td><td><code>visitors.manage</code></td></tr>
+  <tr><td>Key Register</td><td>Held vs available keys</td><td><code>keys.manage</code></td></tr>
+  <tr><td>Shifts</td><td>Clock-in/out roll-up + KPIs</td><td><code>shifts.view_all</code></td></tr>
+  <tr><td>Patrol Schedules</td><td>Recurring patrol expectations</td><td><code>patrols.schedule_manage</code></td></tr>
+  <tr><td>Guard Map</td><td>Live map of on-patrol guards</td><td><code>guards.map_view</code></td></tr>
+  <tr><td rowspan="4"><b>Manager</b></td><td>Acknowledgements</td><td>Queue of occurrences awaiting a manager decision</td><td><code>manager.acknowledge</code></td></tr>
+  <tr><td>Reviewed Logs</td><td>Historical decisions</td><td><code>manager.reviewed_logs</code></td></tr>
+  <tr><td>Performance Dashboard</td><td>Per-person / per-role activity roll-up</td><td>—</td></tr>
+  <tr><td>Audit Log</td><td>Immutable action trail</td><td><code>audit.view</code></td></tr>
+  <tr><td rowspan="5"><b>Administration</b></td><td>Users</td><td>User CRUD, roles, sites, PIN reset</td><td><code>users.view</code></td></tr>
+  <tr><td>Sites</td><td>Site CRUD</td><td><code>sites.manage</code></td></tr>
+  <tr><td>Organisation</td><td>Branding + contact details</td><td><code>org.edit_branding</code></td></tr>
+  <tr><td>SLA Matrix</td><td>Per-severity SLA overrides</td><td><code>org.edit_sla</code></td></tr>
+  <tr><td>Occurrence Types</td><td>Custom incident types + taxonomy</td><td><code>org.edit_types</code></td></tr>
+  <tr><td rowspan="5"><b>Personal</b></td><td>My Access</td><td>Your roles, capabilities and reachable pages</td><td>—</td></tr>
+  <tr><td>My Preferences</td><td>Push / email notification toggles</td><td><code>preferences.manage</code></td></tr>
+  <tr><td>Security (2FA)</td><td>TOTP enrolment</td><td><code>security.manage_2fa</code></td></tr>
+  <tr><td>Webhooks</td><td>Outbound integrations</td><td><code>webhooks.manage</code></td></tr>
+  <tr><td>API Tokens</td><td>Org-scoped access tokens</td><td><code>api_tokens.manage</code></td></tr>
+  <tr><td rowspan="4"><b>Super User</b></td><td>Organisations / All Users</td><td>Tenant + cross-org user management</td><td><code>super.orgs_manage</code> · <code>super.users_cross_org</code></td></tr>
+  <tr><td>Permissions</td><td>Role × capability matrix editor</td><td><code>super.permissions_manage</code></td></tr>
+  <tr><td>Branding · Form Builder · Mobile Layout</td><td>Per-org customisation</td><td>—</td></tr>
+  <tr><td>Taxonomy · Assignees · Mgmt Reports · Health</td><td>Platform-wide controls</td><td><code>super.platform_health</code></td></tr>
+</table>
+
+<h2><span class="no">7.2</span>Mobile app layout</h2>
+<div class="grid2">
+  <div class="card tint">
+    <span class="tag">Tab bar</span>
+    <h4>Four tabs (configurable per role)</h4>
+    <p><b>Home</b> — greeting, shift card, KPIs, quick actions, supervisor section.<br>
+    <b>Patrol</b> — route picker, active patrol status, checkpoint list.<br>
+    <b>Log</b> — the log-occurrence form (also reachable via the floating "+").<br>
+    <b>My Logs</b> — everything you've logged, searchable and live-updating.</p>
+  </div>
+  <div class="card tint">
+    <span class="tag">Screens</span>
+    <h4>Beyond the tabs</h4>
+    <p><b>Scan</b> (QR/NFC/GPS) · <b>Duty</b> (one-tap on/off patrol) · <b>Shift</b> (clock in/out) · <b>Handovers</b> · <b>Inbox</b> · <b>Settings</b> · <b>Tasks</b> · <b>Gate house:</b> Visitors &amp; Keys · <b>Supervisor:</b> Site Board &amp; Team · <b>Occurrence detail</b> (deep-linked from notifications).</p>
+  </div>
+</div>
+
+<div class="callout note"><b class="cap">Note — your tabs may differ</b>The super user configures the mobile tab bar and home cards per role from <span class="path">Super User → Mobile Layout</span>. If a tab described in this manual is missing on your phone, it has been switched off for your role — not broken.</div>
+
+<div class="callout tip"><b class="cap">Tip — the pending-sync banner</b>If your phone shows a "<b>N pending sync</b>" banner on Home or the Log tab, you have occurrences saved offline that haven't reached the server yet. They flush automatically the moment signal returns — don't re-log them.</div>
+
+<!-- ================= PART III DIVIDER ================= -->
+<div class="pagebreak"></div>
+<div class="part-divider">
+  <div class="kicker">Part III</div>
+  <h1>Role Playbooks</h1>
+  <p>Task-by-task instructions for every role. Each task card shows where to find the feature, the numbered steps, who can do it, and the capability key that gates it.</p>
+  <ul>
+    <li><b>Chapter 8</b> — Guard (Mobile)</li>
+    <li><b>Chapter 9</b> — Supervisor (Mobile + Web)</li>
+    <li><b>Chapter 10</b> — Control Room (Web)</li>
+    <li><b>Chapter 11</b> — Manager (Web)</li>
+    <li><b>Chapter 12</b> — Administrator (Web)</li>
+    <li><b>Chapter 13</b> — Super User (Web)</li>
+  </ul>
+</div>
+
+<!-- ================= CH 8 GUARD ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="08">
+  <div class="part">Part III · Role Playbooks</div>
+  <h1>Guard <span style="font-size:11pt; font-weight:600; opacity:.8">— Mobile</span></h1>
+  <p>Your whole working day lives on the phone: clock in, patrol, log what happens, staff the gate, hand over, clock out.</p>
+</div>
+
+<h2><span class="no">8.1</span>Start and end your shift</h2>
+<div class="task">
+  <div class="task-head"><h4>Clock in</h4><div class="where">Home → Shift card · or Quick actions → My shift</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>On <b>Home</b>, tap the <b>Shift card</b> (it shows "Off shift" when you're clocked out).</li>
+      <li>Tap <b>Clock In</b>. The card flips to a <b>live elapsed counter</b> (hours + minutes, ticking).</li>
+      <li>Work normally — the shift stays open in the background all day.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">shifts.clock</span> · Only one shift can be open at a time; the system prevents double clock-ins.</div>
+</div>
+<div class="task">
+  <div class="task-head"><h4>Clock out</h4><div class="where">Home → Shift card → My shift</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open your shift from the Home shift card.</li>
+      <li>Optionally type <b>closing notes</b> (anything the next shift should know).</li>
+      <li>Tap <b>Clock Out</b> and confirm. Your shift, its duration and notes appear in your recent-shifts list — and on the web Shifts roll-up.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Consider writing a <b>handover</b> (§8.6) before clocking out if there are open issues.</div>
+</div>
+
+<h2><span class="no">8.2</span>Go on patrol</h2>
+<div class="task">
+  <div class="task-head"><h4>Start a route patrol &amp; scan checkpoints</h4><div class="where">Patrol tab</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open the <b>Patrol</b> tab. Pick a <b>route</b> (or choose ad-hoc if no route applies) and tap <b>Start</b>.</li>
+      <li>The live status card shows elapsed time and <b>checkpoints scanned / total</b>. While on patrol your phone reports its position every 30 seconds — the control room sees you on the Guard Map.</li>
+      <li>At each checkpoint tap <b>Scan checkpoint</b> and use the right mode:
+        <b>QR</b> — point the camera at the checkpoint label ·
+        <b>NFC</b> — hold the phone against the tag ·
+        <b>GPS</b> — tap when standing at the point; the app verifies you're inside the geofence.</li>
+      <li>The route list ticks each checkpoint off as done. Missed ones stay visibly open.</li>
+      <li>When the route is complete tap <b>End patrol</b>. Duration, scans and completion are saved and visible to your supervisor instantly.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capabilities: <span class="cap-key">patrols.run</span> · <span class="cap-key">patrols.scan</span> · Full scanning detail in Chapter 17.</div>
+</div>
+<div class="task">
+  <div class="task-head"><h4>Quick on-duty / off-duty toggle</h4><div class="where">Duty screen (Home quick action)</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Duty</b> from Home. One big switch: <b>On Patrol / Off Patrol</b>.</li>
+      <li>Tap to go on duty — this starts an <b>ad-hoc patrol</b> (no route, no checkpoints) with a live elapsed timer, and begins location reporting.</li>
+      <li>Tap again to go off duty and end the patrol.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Use Duty for gate posts and static guarding; use the Patrol tab when you must prove checkpoint coverage.</div>
+</div>
+
+<h2><span class="no">8.3</span>Log an occurrence (incident)</h2>
+<div class="task">
+  <div class="task-head"><h4>Log an incident from your phone</h4><div class="where">Log tab · or the floating “+” on Home</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Tap the <b>“+” button</b> (or the Log tab).</li>
+      <li>Pick the <b>type</b> from the chips — your organisation's custom types come first (e.g. Intrusion, Theft, Medical, Maintenance).</li>
+      <li>Pick the <b>severity</b>: <span class="b crit">Critical</span> <span class="b high">High</span> <span class="b med">Medium</span> <span class="b low">Low</span>. This sets the response clock — when in doubt, go one level higher.</li>
+      <li>Write the <b>description</b>: what, where exactly, who was involved, what you did.</li>
+      <li>Add <b>photos</b> — camera or gallery, up to 6. Evidence photos massively strengthen the record.</li>
+      <li>Optionally record a <b>voice note</b> — it is transcribed automatically and attached to the occurrence.</li>
+      <li>Tap <b>Submit</b>. You get a toast with the new <b>OB number</b> and land on the occurrence detail.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">occurrences.log</span> · The SLA clock starts the moment you submit. The control room sees it in realtime.</div>
+</div>
+
+<div class="callout tip"><b class="cap">Tip — no signal? Log anyway.</b>If the phone is offline (or the upload fails), the occurrence and its photos are saved to the device queue and submitted automatically when signal returns. The "N pending sync" banner on Home tracks this. Never wait for signal to log — the timestamp of your entry is what matters.</div>
+
+<h2><span class="no">8.4</span>Track your logs</h2>
+<div class="task">
+  <div class="task-head"><h4>Check the status of something you logged</h4><div class="where">My Logs tab</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>My Logs</b>. Every occurrence you've logged is listed, newest first.</li>
+      <li>Use the <b>search box</b> or the <b>All / Open / Closed</b> filter to find an entry.</li>
+      <li>Tap it to open the detail: status badge, description, photos, the comment thread and the full update timeline. Status changes made by the control room appear live while you watch.</li>
+    </ol>
+  </div>
+  <div class="task-foot">You'll also get a push notification if an occurrence is assigned to you or its status changes in ways that affect you.</div>
+</div>
+
+<h2><span class="no">8.5</span>Gate-house duty — visitors &amp; keys</h2>
+<div class="task">
+  <div class="task-head"><h4>Sign a visitor in (with licence scanning)</h4><div class="where">Home → Quick actions → Visitors → “+”</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Visitors</b>. The screen shows everyone currently on site. Tap the <b>“+” FAB</b> to sign someone in.</li>
+      <li>Fastest way — scan: tap <b>Scan licence disk</b> (vehicle) or <b>Scan driver's licence</b> (person). Point the camera at the barcode; name, ID number and vehicle registration fill themselves in.</li>
+      <li>Or type the details: <b>full name, ID number, company, vehicle registration, who they're visiting</b>.</li>
+      <li>Tap <b>Sign In</b>. The visitor appears in the on-site list — and on the web Visitor Log.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">visitors.manage</span> · Poor light? Use the torch toggle in the scanner, or pick a photo of the licence from the gallery.</div>
+</div>
+<div class="task">
+  <div class="task-head"><h4>Sign a visitor out</h4><div class="where">Visitors → On site list</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li><b>One tap:</b> find the visitor in the on-site list and tap <b>Sign out</b>.</li>
+      <li><b>Or scan out:</b> tap <b>Scan out</b> at the top, scan the vehicle's licence disk as it leaves — the matching visitor is signed out automatically.</li>
+      <li>The visitor moves to <b>Recently signed out</b> with their exit time.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Scan-out is ideal at a busy vehicle gate: no scrolling, no typing, no wrong-person mistakes.</div>
+</div>
+<div class="task">
+  <div class="task-head"><h4>Hand out and take back keys</h4><div class="where">Home → Quick actions → Keys</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Keys</b>. Keys are grouped <b>Held</b> (out) vs <b>Available</b>.</li>
+      <li>To issue: tap an available key → <b>Hand over</b> → capture the <b>recipient's name and ID number</b> → confirm.</li>
+      <li>To take back: tap the held key → <b>Return</b>. The register updates instantly, with the full hand-over history kept per key.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">keys.manage</span> · The web Key Register mirrors this in realtime for the control room.</div>
+</div>
+
+<h2><span class="no">8.6</span>Shift handovers</h2>
+<div class="task">
+  <div class="task-head"><h4>Write a handover for the next shift</h4><div class="where">Home → Handovers → New</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Handovers</b> and tap <b>New handover</b>.</li>
+      <li>Write the <b>summary</b> of your shift and list any <b>open issues</b> (pending OBs, expected visitors, keys still out).</li>
+      <li><b>Sign</b> in the signature box with your finger.</li>
+      <li>Submit. The incoming guard sees a <b>handover prompt</b> on their Home screen and must acknowledge it.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Receiving one? Home shows "Handover waiting" — open it, read it, tap <b>Acknowledge</b>. Acknowledgement is timestamped.</div>
+</div>
+
+<h2><span class="no">8.7</span>Stay informed</h2>
+<ul class="plain">
+  <li><b>Inbox</b> (bell icon) — assignment notices, SLA alerts, patrol reminders, handover prompts. Mark read, mark all, or delete.</li>
+  <li><b>Push notifications</b> — tapping one takes you straight to the right screen (an assigned OB opens its detail; a late-patrol alert opens the board).</li>
+  <li><b>Tasks</b> — if a task is assigned to you it appears in the Tasks screen with its own update thread.</li>
+</ul>
+
+<!-- ================= CH 9 SUPERVISOR ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="09">
+  <div class="part">Part III · Role Playbooks</div>
+  <h1>Supervisor <span style="font-size:11pt; font-weight:600; opacity:.8">— Mobile + Web</span></h1>
+  <p>Everything a guard can do, plus live oversight of the site: the SLA board, the team view, remote patrol control and status approvals.</p>
+</div>
+
+<p class="lead">Supervisors inherit the full Guard playbook (Chapter 8) — clocking, patrols, logging, gate house, handovers. This chapter covers what's added on top. On mobile, a <b>Supervisor section</b> appears on Home with two extra surfaces; supervisors can also sign in to the web console.</p>
+
+<h2><span class="no">9.1</span>Run the site from the Site Board</h2>
+<div class="task">
+  <div class="task-head"><h4>Monitor the live SLA board</h4><div class="where">Mobile → Home → Supervisor → Site Board</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Site Board</b>. Every open occurrence at your site is bucketed into three columns: <b style="color:#dc2626">Breached</b> · <b style="color:#d97706">Update Due</b> · <b style="color:#16a34a">On Track</b>.</li>
+      <li>The board is <b>realtime</b> — new OBs and status changes appear without refreshing. Work the Breached column first, then Update Due.</li>
+      <li>Tap any card to open the <b>action sheet</b>: full details plus a status chip grid.</li>
+    </ol>
+  </div>
+  <div class="task-foot">The same buckets drive the control room's web board — you are both looking at the same truth.</div>
+</div>
+<div class="task">
+  <div class="task-head"><h4>Update an occurrence's status from the field</h4><div class="where">Site Board → tap a card · or any occurrence detail</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Tap the occurrence. The bottom sheet shows the <b>status chip grid</b>: Open · Acknowledged · In Progress · On Patrol · Resolved · Closed.</li>
+      <li>Pick the new status and add <b>notes</b> (what changed, what you found, what you did).</li>
+      <li>Tap <b>Post</b>. The update lands in the occurrence timeline; the SLA update-timer resets; every open screen refreshes live.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">occurrences.update_status</span> · Posting regular updates is what keeps occurrences out of the "Update Due" bucket.</div>
+</div>
+
+<h2><span class="no">9.2</span>Manage the team</h2>
+<div class="task">
+  <div class="task-head"><h4>See who's on and manage patrols remotely</h4><div class="where">Mobile → Home → Supervisor → Team</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Team</b>. Each member shows a live state: <b>on patrol</b> (with progress), <b>on shift</b>, or <b>off</b>.</li>
+      <li>Need to reach someone? <b>Tap to call</b> directly from their row.</li>
+      <li>A guard forgot to end a patrol? Tap their patrol → <b>End patrol remotely</b>. The patrol closes cleanly with its real metrics.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capabilities: <span class="cap-key">team.view</span> · <span class="cap-key">patrols.end_remote</span></div>
+</div>
+
+<h2><span class="no">9.3</span>Late patrols &amp; alerts</h2>
+<p>When a scheduled patrol slot passes unsatisfied, the <b>patrol watcher</b> sends site supervisors a push notification (<i>patrol.late</i>) and an inbox entry. Tapping it opens the Site Board. Investigate: is the guard delayed, or is the schedule wrong? Adjust from the web (<span class="path">Field Operations → Patrol Schedules</span>) if the expectation itself needs to change.</p>
+
+<h2><span class="no">9.4</span>Supervisors on the web console</h2>
+<p>Signing in to the web console with a supervisor account shows the operational sections scoped to <b>your site</b>: Dashboard, Live Occurrences, All Occurrences, Patrols, Team Status, Visitor Log, Key Register, Shifts and the Guard Map. Use it for the big-screen view in the guard house; use mobile in the field. The workflows match Chapter 10 (Control Room), only site-scoped.</p>
+
+<div class="callout tip"><b class="cap">Tip — end of day</b>A supervisor's closing routine: Site Board empty of Breached → Team all clocked out or handed over → visitor log empty of stragglers → keys back → your own handover written. Five screens, two minutes.</div>
+
+<!-- ================= CH 10 CONTROL ROOM ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="10">
+  <div class="part">Part III · Role Playbooks</div>
+  <h1>Control Room <span style="font-size:11pt; font-weight:600; opacity:.8">— Web</span></h1>
+  <p>The nerve centre: watch the live board, keep every occurrence inside its SLA, log incidents phoned in, assign reviewers, and produce the reports.</p>
+</div>
+
+<h2><span class="no">10.1</span>Watch the live board</h2>
+<div class="task">
+  <div class="task-head"><h4>Monitor open occurrences in realtime</h4><div class="where">Sidebar → Overview → Live Occurrences</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Keep <b>Live Occurrences</b> open on the control-room screen. Every open OB shows as a card with type, site, severity and a <b>live SLA badge</b>.</li>
+      <li>A <b>flash banner</b> announces each new OB as guards log them — no refreshing, ever.</li>
+      <li>SLA badges animate as deadlines approach and turn red on breach. Work red first.</li>
+      <li>Use each card's <b>Update</b> action to post a status change, or <b>Add Report</b> to write the formal report.</li>
+    </ol>
+  </div>
+  <div class="task-foot">The Dashboard (<span class="cap-key">dashboard.view</span>) gives the manager-level view: KPIs, monthly trend, type and severity breakdowns, top sites — filterable by site chips.</div>
+</div>
+
+<h2><span class="no">10.2</span>Log an occurrence from the control room</h2>
+<div class="task">
+  <div class="task-head"><h4>Log a phoned-in or radioed-in incident</h4><div class="where">Sidebar → Occurrences → Log New Occurrence</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Log New Occurrence</b>.</li>
+      <li>Choose the <b>type</b> (category → sub-category → type, as configured for your org), the <b>severity</b>, the <b>site</b>, and the <b>time of the incident</b> (backdate if it happened earlier).</li>
+      <li>Write the <b>description</b>. Took the report on paper first? Drag a photo of the handwritten note into the <b>OCR drop-zone</b> — the text is extracted straight into the description for you to tidy.</li>
+      <li>Optionally <b>assign</b> a reviewer immediately (see §10.4) and complete any custom fields your org has added.</li>
+      <li>Select <b>Submit</b>. The OB number is issued, the SLA clock starts, and the occurrence appears on every live surface.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">occurrences.log</span> · Which sections appear on this form is configured per-org by the super user's Form Builder.</div>
+</div>
+
+<h2><span class="no">10.3</span>Find anything — the All Occurrences explorer</h2>
+<div class="task">
+  <div class="task-head"><h4>Search, filter and export the occurrence book</h4><div class="where">Sidebar → Occurrences → All Occurrences</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>All Occurrences</b> — the full, paginated occurrence book.</li>
+      <li>Combine filters: <b>free-text search</b> (matches OB number, type, description and logger — typo-tolerant), <b>status</b>, <b>severity</b>, <b>site</b>, <b>type</b>, <b>date range</b>, and a <b>patrol-only</b> toggle.</li>
+      <li>Every filter lives in the URL — <b>copy the address bar</b> to share the exact view with a colleague.</li>
+      <li>Use <b>Saved views</b> to name a filter set (e.g. "Sandton criticals this month"), pin it, and re-apply it in one click. Admins can share saved views org-wide.</li>
+      <li><b>Export CSV</b> downloads the visible page for spreadsheets or client packs.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capabilities: <span class="cap-key">occurrences.view_all</span> · <span class="cap-key">occurrences.export_csv</span> · Closed history and completed patrols live under <span class="path">Occurrences → History</span>; every photo across all OBs is browsable under <span class="path">Occurrences → Evidence Photos</span>.</div>
+</div>
+
+<div class="task">
+  <div class="task-head"><h4>Bulk actions on multiple occurrences</h4><div class="where">All Occurrences → select checkboxes</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Tick the checkbox on two or more rows. The <b>bulk actions bar</b> appears.</li>
+      <li>Choose <b>Acknowledge</b>, <b>Close</b> (adds your note to each timeline), or <b>Assign</b> (pick one reviewer for all selected).</li>
+      <li>Confirm. Each occurrence gets its own timeline entry; nothing is merged or lost.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">occurrences.bulk_actions</span> · Ideal for clearing a backlog of low-severity routine entries.</div>
+</div>
+
+<h2><span class="no">10.4</span>Work a single occurrence</h2>
+<div class="task">
+  <div class="task-head"><h4>Update, assign, comment and report on an OB</h4><div class="where">Any occurrence → detail page</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open the occurrence. The detail shows severity and status badges, the details grid, description, <b>photo gallery</b>, report card, comments and the update timeline.</li>
+      <li><b>Change status:</b> use the status control, add notes, save. The timeline and SLA timers update instantly.</li>
+      <li><b>Assign a reviewer:</b> in the assignment card pick a person (the list is the org's assignment allow-list). They are notified in-app and by push, and it appears in their <b>Assigned to Me</b> queue.</li>
+      <li><b>Discuss:</b> the comment thread is realtime — mobile and web users converse live. You can edit or delete your own comments.</li>
+      <li><b>Report:</b> add or complete the formal report; it becomes the PDF (Chapter 21).</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capabilities: <span class="cap-key">occurrences.update_status</span> · <span class="cap-key">occurrences.assign</span> · <span class="cap-key">occurrences.comment</span> · <span class="cap-key">reports.create</span></div>
+</div>
+
+<h2><span class="no">10.5</span>Oversee the field</h2>
+<ul class="plain">
+  <li><b>Guard Map</b> (<span class="path">Field Operations → Guard Map</span>, <code>guards.map_view</code>) — live map with a marker per on-patrol guard, updating as positions arrive every 30 s, with GPS-accuracy circles.</li>
+  <li><b>Patrols</b> — active patrols with checkpoint progress; recent patrols with duration and completion.</li>
+  <li><b>Team Status</b> — who is available, on shift, on patrol right now.</li>
+  <li><b>Shifts</b> — the clock-in/out roll-up with KPIs; <b>Visitor Log</b> and <b>Key Register</b> — the web mirror of the gate house, live.</li>
+</ul>
+
+<div class="callout tip"><b class="cap">Tip — your personal queue</b><span class="path">Occurrences → Assigned to Me</span> is your own work list: everything currently assigned to you, live-updating. Clear it before end of shift.</div>
+
+<!-- ================= CH 11 MANAGER ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="11">
+  <div class="part">Part III · Role Playbooks</div>
+  <h1>Manager <span style="font-size:11pt; font-weight:600; opacity:.8">— Web</span></h1>
+  <p>Every occurrence passes across the manager's desk: acknowledge it, escalate it, or reject it — with a complete reviewed history and staff performance reporting.</p>
+</div>
+
+<h2><span class="no">11.1</span>The review pipeline</h2>
+<div class="flow">
+  <div class="n dark"><b>Occurrence logged</b><span>By guard or control room</span></div>
+  <div class="n"><b>Appears in queue</b><span>Manager → Acknowledgements</span></div>
+  <div class="n"><b>Manager decides</b><span>Acknowledge · Escalate · Reject + notes</span></div>
+  <div class="n"><b>Recorded</b><span>Decision stored; status mirrored; timeline updated</span></div>
+  <div class="n good"><b>Reviewed Logs</b><span>Permanent, searchable decision history</span></div>
+</div>
+
+<div class="task">
+  <div class="task-head"><h4>Review and sign off occurrences</h4><div class="where">Sidebar → Manager → Acknowledgements</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Acknowledgements</b> — the queue of every occurrence not yet reviewed by a manager.</li>
+      <li>Open an entry to read the full record: description, photos, updates, comments.</li>
+      <li>Select your decision:
+        <b>Acknowledge</b> — reviewed, handled appropriately ·
+        <b>Escalate</b> — needs further action or senior attention ·
+        <b>Reject</b> — incorrectly logged or invalid.</li>
+      <li>Add your <b>notes</b> (mandatory context for escalations and rejections) and confirm.</li>
+      <li>The decision is stored with your name and timestamp, mirrored onto the occurrence status, dropped into its timeline, and audit-logged.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capabilities: <span class="cap-key">manager.acknowledge</span> · <span class="cap-key">manager.escalate</span> · Bulk sign-off: select multiple routine entries and acknowledge them in one action — they collapse into a single grouped entry in Reviewed Logs.</div>
+</div>
+
+<h2><span class="no">11.2</span>The reviewed history</h2>
+<div class="task">
+  <div class="task-head"><h4>Look up past decisions</h4><div class="where">Sidebar → Manager → Reviewed Logs</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Reviewed Logs</b> — every historical decision, newest first.</li>
+      <li>Each entry shows the OB, the decision (<span class="b ghost">Acknowledged</span> / <span class="b high">Escalated</span> / <span class="b crit">Rejected</span>), the deciding manager, notes and timestamp.</li>
+      <li>Bulk sign-offs appear as one grouped entry — expand to see the individual OBs.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">manager.reviewed_logs</span> · This is the record you'll reach for in client meetings and disputes.</div>
+</div>
+
+<h2><span class="no">11.3</span>Staff performance</h2>
+<div class="task">
+  <div class="task-head"><h4>Run the performance dashboard</h4><div class="where">Sidebar → Manager → Performance Dashboard</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open the <b>Performance Dashboard</b> (staff reports).</li>
+      <li>Review activity rolled up <b>per person and per role</b>: occurrences logged, updates posted, patrols completed, decisions made.</li>
+      <li><b>Export CSV</b> for payroll queries, disciplinary records or client SLAs.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Combine with the <b>Audit Log</b> (<span class="cap-key">audit.view</span>) when you need the exact who-did-what-when trail behind a number.</div>
+</div>
+
+<div class="callout note"><b class="cap">Note — managers and SLA alerts</b>Managers receive breach notifications (inbox, push and email summaries, according to their preferences under <span class="path">Settings → My Preferences</span>). A breached critical at 02:00 will find you — that is by design.</div>
+
+<!-- ================= CH 12 ADMIN ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="12">
+  <div class="part">Part III · Role Playbooks</div>
+  <h1>Administrator <span style="font-size:11pt; font-weight:600; opacity:.8">— Web</span></h1>
+  <p>Full control of one organisation: people, sites, branding, SLAs, incident types, notification preferences and integrations.</p>
+</div>
+
+<h2><span class="no">12.1</span>Manage people</h2>
+<div class="task">
+  <div class="task-head"><h4>Create a user</h4><div class="where">Sidebar → Administration → Users → New user</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Users</b> and select <b>New user</b>.</li>
+      <li>Enter <b>full name</b> and <b>email</b> (email is the web sign-in identity and must be unique platform-wide).</li>
+      <li>Tick the <b>roles</b> in the checkbox grid — any combination up to your own rank. Set the <b>job title</b> for display.</li>
+      <li>Assign the <b>primary site</b> and, if needed, additional sites (multi-site assignment).</li>
+      <li>For mobile users (guard / supervisor): set the <b>employee number</b> (unique in your org) and an initial <b>4-digit PIN</b>.</li>
+      <li>For web users: set the initial <b>password</b>.</li>
+      <li>Save. The account is live immediately; tell the user their credentials out-of-band.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capabilities: <span class="cap-key">users.create</span> · <span class="cap-key">users.edit</span> · Org admins cannot grant <b>super_user</b> or move users to another organisation — those are super-user actions.</div>
+</div>
+
+<div class="task">
+  <div class="task-head"><h4>Edit roles, reset a PIN, deactivate or delete</h4><div class="where">Users → row actions</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li><b>Edit:</b> open the user, adjust roles / sites / job title / employee number, save. Changes apply on their next page load.</li>
+      <li><b>Reset PIN:</b> choose <b>Reset PIN</b>, enter a new 4-digit PIN, confirm. Use this when a guard is locked out or forgot theirs.</li>
+      <li><b>Deactivate:</b> soft-disable the account (kept for history, cannot sign in).</li>
+      <li><b>Delete:</b> permanently removes the account and profile. You cannot delete yourself, and org admins cannot delete super users. Type-to-confirm.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capabilities: <span class="cap-key">users.reset_pin</span> · <span class="cap-key">users.deactivate</span> · Every one of these actions is audit-logged. Users list exports to CSV.</div>
+</div>
+
+<h2><span class="no">12.2</span>Manage sites</h2>
+<div class="task">
+  <div class="task-head"><h4>Add or edit a site</h4><div class="where">Sidebar → Administration → Sites</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Sites</b> and select <b>New site</b> (or edit an existing row).</li>
+      <li>Enter the name, address and contact details. Save.</li>
+      <li>Assign users to the site from the <b>Users</b> page; create its <b>checkpoints</b> and <b>patrol routes</b> from Field Operations (Chapter 17).</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">sites.manage</span> · Sites are soft-deleted — history at a closed site stays intact.</div>
+</div>
+
+<h2><span class="no">12.3</span>Shape the platform for your organisation</h2>
+<div class="task">
+  <div class="task-head"><h4>Tune the SLA matrix</h4><div class="where">Sidebar → Administration → SLA Matrix</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>SLA Matrix</b>. Each severity row shows the current <b>resolve-within</b> and <b>update-every</b> targets.</li>
+      <li>Edit a row (e.g. Critical: resolve 45 min, update 15 min for a high-risk client) and save.</li>
+      <li>New occurrences pick the new targets up immediately; each row has <b>reset to default</b>.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">org.edit_sla</span> · Defaults: Critical 1 h/30 m · High 4 h/60 m · Medium 24 h/6 h · Low 7 d/24 h.</div>
+</div>
+
+<div class="task">
+  <div class="task-head"><h4>Manage occurrence types &amp; custom fields</h4><div class="where">Sidebar → Administration → Occurrence Types</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Occurrence Types</b>. Types are organised as <b>Category → Sub-category → Type</b>.</li>
+      <li>Add a type: pick its category, name it, set a <b>default severity</b>, and optionally define <b>custom fields</b> (extra inputs that appear on the log form for this type).</li>
+      <li>Disable types you no longer want offered — history keeps them for old records.</li>
+      <li>Custom types appear <b>first</b> in the mobile app's type chips and the web form's pickers.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">org.edit_types</span> · Renames update historical records too, so reports stay grouped.</div>
+</div>
+
+<div class="task">
+  <div class="task-head"><h4>Branding &amp; organisation details</h4><div class="where">Sidebar → Administration → Organisation</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Organisation</b>. Update the display name, contact details and <b>logo</b> (uploaded to the branding bucket; appears on the console and PDF reports).</li>
+      <li>Save. The plan field is read-only for org admins.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">org.edit_branding</span></div>
+</div>
+
+<h2><span class="no">12.4</span>Watch the audit log</h2>
+<p><span class="path">Administration → Audit Log</span> (<code>audit.view</code>) shows every sensitive action: colour-coded action chips, actor name and role, the affected record, IP address and timestamp. Filter by action or actor when investigating. Rows reconstructed from legacy imports are tagged <i>backfilled</i>.</p>
+
+<h2><span class="no">12.5</span>Integrations (summary)</h2>
+<p>Admins also own <b>Webhooks</b> (<code>webhooks.manage</code>) and <b>API Tokens</b> (<code>api_tokens.manage</code>) — pushing DigiLog events into Slack/ticketing/monitoring and letting client systems query the API. Full instructions in Chapter 23.</p>
+
+<div class="callout warn"><b class="cap">Warning — least privilege</b>Resist granting admin to solve a visibility problem. If a manager can't see a page, the fix is almost always a <b>capability grant</b> (ask the super user), not a role upgrade. Check the user's My Access page first.</div>
+
+<!-- ================= CH 13 SUPER USER ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="13">
+  <div class="part">Part III · Role Playbooks</div>
+  <h1>Super User <span style="font-size:11pt; font-weight:600; opacity:.8">— Web</span></h1>
+  <p>The platform operator: create and delete whole organisations, manage users across all tenants, edit every org's permission grid, and customise each org's forms, branding and mobile layout.</p>
+</div>
+
+<h2><span class="no">13.1</span>Tenant management</h2>
+<div class="task">
+  <div class="task-head"><h4>Onboard a new client organisation</h4><div class="where">Sidebar → Super User → Organisations → New</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Organisations</b>. Each tenant shows live counts (users, sites, occurrences).</li>
+      <li>Select <b>New organisation</b>. Enter the name and a <b>slug</b> (short code, e.g. <code>acme-security</code> — it becomes part of mobile sign-in and storage paths; choose carefully, it's permanent).</li>
+      <li>Optionally bootstrap the <b>first admin</b> — name, email, password — in the same step.</li>
+      <li>Create. Default role × capability grants are seeded automatically; the org is ready for its admin to add sites and users.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">super.orgs_manage</span> · Follow-up: check the new org's Permissions grid, Form Builder and Mobile Layout so its roles see exactly what the client bought.</div>
+</div>
+
+<div class="task">
+  <div class="task-head"><h4>Delete an organisation</h4><div class="where">Organisations → row → Delete</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Select <b>Delete</b> on the tenant row.</li>
+      <li><b>Type the organisation's name</b> to confirm — this is deliberate friction.</li>
+      <li>Confirm. Every row of the org's data is cascade-deleted and all of its sign-in accounts are removed. No orphans remain.</li>
+    </ol>
+  </div>
+  <div class="task-foot"><b>This is irreversible</b> and is the platform's only true mass deletion. You cannot delete the organisation you belong to. Export anything the client is owed first.</div>
+</div>
+
+<h2><span class="no">13.2</span>Cross-org users</h2>
+<div class="task">
+  <div class="task-head"><h4>Create or manage a user in any organisation</h4><div class="where">Sidebar → Super User → All Users</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>All Users</b> — every account across every tenant, with an org column.</li>
+      <li>To create: select <b>New user</b>, <b>pick the organisation first</b> (the site list then filters to that org), then proceed as a normal user creation (roles, sites, PIN or password).</li>
+      <li>Edit, reset PINs, or delete any user — including granting <b>super_user</b>, which only you can do.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">super.users_cross_org</span> · Org membership is set explicitly per user — it is never inferred from the site.</div>
+</div>
+
+<h2><span class="no">13.3</span>The permission grid</h2>
+<div class="task">
+  <div class="task-head"><h4>Edit what each role can see, per organisation</h4><div class="where">Sidebar → Super User → Permissions</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Permissions</b> and pick the <b>organisation</b>.</li>
+      <li>The grid shows every <b>capability key</b> (rows, grouped by area) against the six <b>roles</b> (columns).</li>
+      <li>Toggle cells to grant or revoke. Changes take effect on the users' next page load — no redeploy, no restart.</li>
+      <li>Add <b>custom capability keys</b> if you need new gates for future features; built-in keys cannot be removed.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">super.permissions_manage</span> · Remember: this shapes the UI. The database's RLS floor cannot be widened from here — a guard can never be granted cross-org reads.</div>
+</div>
+
+<h2><span class="no">13.4</span>Per-org customisation</h2>
+<div class="grid2">
+  <div class="card">
+    <h4>Form Builder</h4>
+    <p><span class="path">Super User → Form Builder</span> — toggle which sections of the Log-Occurrence form each org sees (photos, voice notes, custom fields, assignment…). Keeps small clients' forms simple.</p>
+  </div>
+  <div class="card">
+    <h4>Mobile Layout</h4>
+    <p><span class="path">Super User → Mobile Layout</span> — configure the mobile tab bar and Home cards per role per org. Backed by capability keys, applied live to phones without an app update.</p>
+  </div>
+  <div class="card">
+    <h4>Branding</h4>
+    <p><span class="path">Super User → Branding</span> — toggle the parent-company (Netstream) logo per organisation, alongside each org's own logo settings.</p>
+  </div>
+  <div class="card">
+    <h4>Incident Taxonomy</h4>
+    <p><span class="path">Super User → Incident Taxonomy</span> — maintain the Category → Sub-category → Type dropdown lists used across the app. Renames update historical records so reporting stays grouped.</p>
+  </div>
+  <div class="card">
+    <h4>Assignment Allow-list</h4>
+    <p><span class="path">Super User → Assignment Allow-list</span> — choose exactly which profiles appear in the "Assign to" dropdowns. Keeps assignment lists short and correct.</p>
+  </div>
+  <div class="card">
+    <h4>Management Reports Access</h4>
+    <p><span class="path">Super User → Management Reports Access</span> — grant specific users the management-report capability (<code>occurrences.log_management_report</code>).</p>
+  </div>
+</div>
+
+<h2><span class="no">13.5</span>Platform health</h2>
+<p><span class="path">Super User → Platform Health</span> (<code>super.platform_health</code>) aggregates KPIs and recent activity across every tenant — your first stop each morning and your dashboard during incidents. Pair it with the public <code>health-check</code> endpoint wired into external uptime monitoring (Chapter 24).</p>
+
+<div class="callout note"><b class="cap">Note — the super user's golden rule</b>Work as super_user only for platform tasks. For day-to-day operational work inside a tenant, use a normal admin account in that org — it keeps the audit log honest and prevents accidental cross-tenant changes.</div>
+
+<!-- ================= PART IV DIVIDER ================= -->
+<div class="pagebreak"></div>
+<div class="part-divider">
+  <div class="kicker">Part IV</div>
+  <h1>Feature Deep Dives</h1>
+  <p>The complete mechanics behind each feature — how an incident travels from a guard's phone to a signed-off PDF, how the SLA engine decides who gets woken up, and how every scan, visitor and key is verified and recorded.</p>
+  <ul>
+    <li><b>Chapter 14</b> — The Incident Lifecycle, End to End</li>
+    <li><b>Chapter 15</b> — Logging an Occurrence: Every Method</li>
+    <li><b>Chapter 16</b> — The SLA Engine &amp; Alerts</li>
+    <li><b>Chapter 17</b> — Patrols &amp; Checkpoint Scanning</li>
+    <li><b>Chapter 18</b> — Gate-House: Visitors &amp; Keys</li>
+    <li><b>Chapter 19</b> — Shifts &amp; Handovers · <b>20</b> — Tasks · <b>21</b> — Reports · <b>22</b> — Notifications</li>
+  </ul>
+</div>
+
+<!-- ================= CH 14 LIFECYCLE ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="14">
+  <div class="part">Part IV · Feature Deep Dives</div>
+  <h1>The Incident Lifecycle, End to End</h1>
+  <p>One incident, five hands, zero paper: the full journey from the moment something happens on site to the archived PDF report.</p>
+</div>
+
+<svg viewBox="0 0 760 560" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; margin:2mm 0 4mm;">
+  <defs>
+    <linearGradient id="lg1" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#667eea"/><stop offset="1" stop-color="#764ba2"/>
+    </linearGradient>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#764ba2"/>
+    </marker>
+  </defs>
+
+  <!-- Lane labels -->
+  <g font-size="10" font-weight="700">
+    <rect x="0" y="20" width="110" height="88" rx="8" fill="#f1f5f9"/><text x="55" y="60" text-anchor="middle" fill="#475569">FIELD</text><text x="55" y="74" text-anchor="middle" fill="#94a3b8" font-weight="400" font-size="9">Guard · mobile</text>
+    <rect x="0" y="130" width="110" height="88" rx="8" fill="#f1f5f9"/><text x="55" y="170" text-anchor="middle" fill="#475569">SYSTEM</text><text x="55" y="184" text-anchor="middle" fill="#94a3b8" font-weight="400" font-size="9">Automatic</text>
+    <rect x="0" y="240" width="110" height="88" rx="8" fill="#f1f5f9"/><text x="55" y="280" text-anchor="middle" fill="#475569">CONTROL</text><text x="55" y="294" text-anchor="middle" fill="#94a3b8" font-weight="400" font-size="9">Control room · web</text>
+    <rect x="0" y="350" width="110" height="88" rx="8" fill="#f1f5f9"/><text x="55" y="390" text-anchor="middle" fill="#475569">REVIEW</text><text x="55" y="404" text-anchor="middle" fill="#94a3b8" font-weight="400" font-size="9">Manager · web</text>
+    <rect x="0" y="460" width="110" height="80" rx="8" fill="#f1f5f9"/><text x="55" y="496" text-anchor="middle" fill="#475569">ARCHIVE</text><text x="55" y="510" text-anchor="middle" fill="#94a3b8" font-weight="400" font-size="9">Permanent record</text>
+  </g>
+
+  <!-- Row 1: Field -->
+  <rect x="130" y="20" width="185" height="88" rx="10" fill="url(#lg1)"/>
+  <text x="222" y="48" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">1 · Incident happens</text>
+  <text x="222" y="66" text-anchor="middle" fill="#e0e7ff" font-size="9.5">Guard taps “+” → type, severity,</text>
+  <text x="222" y="80" text-anchor="middle" fill="#e0e7ff" font-size="9.5">description, photos, voice note</text>
+  <text x="222" y="97" text-anchor="middle" fill="#c7d2fe" font-size="9">Works offline — queued &amp; synced</text>
+
+  <rect x="345" y="20" width="185" height="88" rx="10" fill="#fff" stroke="#c7d2fe" stroke-width="1.5"/>
+  <text x="437" y="48" text-anchor="middle" fill="#312e81" font-size="11" font-weight="700">2 · Submitted</text>
+  <text x="437" y="66" text-anchor="middle" fill="#64748b" font-size="9.5">Occurrence row inserted,</text>
+  <text x="437" y="80" text-anchor="middle" fill="#64748b" font-size="9.5">org &amp; site scoped by RLS</text>
+
+  <line x1="315" y1="64" x2="343" y2="64" stroke="#764ba2" stroke-width="2.5" marker-end="url(#a2)"/>
+  <path d="M 530 64 C 600 64 620 130 560 160" stroke="#764ba2" stroke-width="2.5" fill="none" marker-end="url(#a2)"/>
+
+  <!-- Row 2: System -->
+  <rect x="345" y="140" width="215" height="78" rx="10" fill="#0f172a"/>
+  <text x="452" y="164" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">3 · Database triggers fire</text>
+  <text x="452" y="181" text-anchor="middle" fill="#cbd5e1" font-size="9.5">OB number issued · SLA due-time</text>
+  <text x="452" y="195" text-anchor="middle" fill="#cbd5e1" font-size="9.5">stamped · report shell created</text>
+  <text x="452" y="209" text-anchor="middle" fill="#94a3b8" font-size="9">e.g. OB-2026-04181 · due in 4 h</text>
+
+  <rect x="130" y="140" width="185" height="78" rx="10" fill="#fff" stroke="#c7d2fe" stroke-width="1.5"/>
+  <text x="222" y="164" text-anchor="middle" fill="#312e81" font-size="11" font-weight="700">4 · Realtime fan-out</text>
+  <text x="222" y="181" text-anchor="middle" fill="#64748b" font-size="9.5">Live board flashes the new OB;</text>
+  <text x="222" y="195" text-anchor="middle" fill="#64748b" font-size="9.5">supervisor board updates; bell rings</text>
+
+  <line x1="343" y1="179" x2="317" y2="179" stroke="#764ba2" stroke-width="2.5" marker-end="url(#a2)"/>
+  <path d="M 222 218 C 222 240 250 255 280 262" stroke="#764ba2" stroke-width="2.5" fill="none" marker-end="url(#a2)"/>
+
+  <!-- Row 3: Control -->
+  <rect x="290" y="250" width="205" height="88" rx="10" fill="url(#lg1)"/>
+  <text x="392" y="274" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">5 · Control room works it</text>
+  <text x="392" y="291" text-anchor="middle" fill="#e0e7ff" font-size="9.5">Status updates · assignment to a</text>
+  <text x="392" y="305" text-anchor="middle" fill="#e0e7ff" font-size="9.5">reviewer · comments · report text</text>
+  <text x="392" y="322" text-anchor="middle" fill="#c7d2fe" font-size="9">SLA monitor alerts if updates lapse</text>
+
+  <rect x="525" y="250" width="195" height="88" rx="10" fill="#fff" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="622" y="274" text-anchor="middle" fill="#7f1d1d" font-size="11" font-weight="700">⚠ If SLA breaches</text>
+  <text x="622" y="291" text-anchor="middle" fill="#64748b" font-size="9.5">Push + email + inbox alerts to</text>
+  <text x="622" y="305" text-anchor="middle" fill="#64748b" font-size="9.5">control room, supervisor,</text>
+  <text x="622" y="319" text-anchor="middle" fill="#64748b" font-size="9.5">manager &amp; admin at the site</text>
+
+  <line x1="497" y1="294" x2="523" y2="294" stroke="#dc2626" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#a2)"/>
+  <path d="M 392 338 C 392 358 370 372 340 380" stroke="#764ba2" stroke-width="2.5" fill="none" marker-end="url(#a2)"/>
+
+  <!-- Row 4: Review -->
+  <rect x="130" y="360" width="220" height="78" rx="10" fill="url(#lg1)"/>
+  <text x="240" y="384" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">6 · Manager decision</text>
+  <text x="240" y="401" text-anchor="middle" fill="#e0e7ff" font-size="9.5">Acknowledge · Escalate · Reject</text>
+  <text x="240" y="415" text-anchor="middle" fill="#e0e7ff" font-size="9.5">+ notes — mirrored to the OB status</text>
+  <text x="240" y="429" text-anchor="middle" fill="#c7d2fe" font-size="9">Audit-logged, joins Reviewed Logs</text>
+
+  <rect x="380" y="360" width="200" height="78" rx="10" fill="#fff" stroke="#86efac" stroke-width="1.5"/>
+  <text x="480" y="384" text-anchor="middle" fill="#14532d" font-size="11" font-weight="700">7 · Resolved / Closed</text>
+  <text x="480" y="401" text-anchor="middle" fill="#64748b" font-size="9.5">Terminal status stamps closed_at;</text>
+  <text x="480" y="415" text-anchor="middle" fill="#64748b" font-size="9.5">SLA clock stops; leaves live board</text>
+
+  <line x1="350" y1="399" x2="378" y2="399" stroke="#764ba2" stroke-width="2.5" marker-end="url(#a2)"/>
+  <path d="M 480 438 C 480 458 440 470 400 476" stroke="#764ba2" stroke-width="2.5" fill="none" marker-end="url(#a2)"/>
+
+  <!-- Row 5: Archive -->
+  <rect x="130" y="465" width="255 " height="72" rx="10" fill="#0f172a"/>
+  <text x="257" y="489" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">8 · Permanent record</text>
+  <text x="257" y="506" text-anchor="middle" fill="#cbd5e1" font-size="9.5">PDF report printable any time · photos &amp; voice</text>
+  <text x="257" y="520" text-anchor="middle" fill="#cbd5e1" font-size="9.5">notes in tenant-isolated storage · full timeline</text>
+
+  <rect x="415" y="465" width="305" height="72" rx="10" fill="#fff" stroke="#c7d2fe" stroke-width="1.5"/>
+  <text x="567" y="489" text-anchor="middle" fill="#312e81" font-size="11" font-weight="700">9 · Downstream</text>
+  <text x="567" y="506" text-anchor="middle" fill="#64748b" font-size="9.5">Dashboards &amp; staff reports aggregate it · webhooks push it</text>
+  <text x="567" y="520" text-anchor="middle" fill="#64748b" font-size="9.5">to Slack / ticketing · History &amp; CSV exports include it</text>
+</svg>
+
+<h2><span class="no">14.1</span>Who touches what, when</h2>
+<table>
+  <tr><th>Stage</th><th>Actor</th><th>Surface</th><th>Typical time</th></tr>
+  <tr><td>Log</td><td>Guard (or control room)</td><td>Mobile Log tab / web form</td><td>Under 2 minutes, at the scene</td></tr>
+  <tr><td>Triage</td><td>Control room</td><td>Live Occurrences board</td><td>Within minutes — the board flashes</td></tr>
+  <tr><td>Work &amp; update</td><td>Control room · supervisor · assignee</td><td>Detail page / mobile status sheet</td><td>Until resolved, updating per the SLA cadence</td></tr>
+  <tr><td>Review</td><td>Manager</td><td>Acknowledgements queue</td><td>Same or next business day</td></tr>
+  <tr><td>Report</td><td>Control room / manager</td><td>Reports → PDF</td><td>On demand, forever</td></tr>
+</table>
+
+<div class="callout note"><b class="cap">Note — nothing is lost in between</b>Every hop above is a database write with an audit trace, an update-timeline entry, or both. If a dispute arises months later, the occurrence detail replays the entire story: who logged it, every status change with notes, every comment, the manager's decision, and when it closed.</div>
+
+<!-- ================= CH 15 LOGGING ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="15">
+  <div class="part">Part IV · Feature Deep Dives</div>
+  <h1>Logging an Occurrence — Every Method</h1>
+  <p>Five ways evidence gets into the book: mobile form, offline queue, web form, OCR of handwritten notes, and transcribed voice notes.</p>
+</div>
+
+<h2><span class="no">15.1</span>Choosing severity honestly</h2>
+<p>Severity is the single most important field — it sets the response clock and decides who gets alerted. Use the table in §4.5. Two rules of thumb: <b>if people are at risk, it's Critical</b>; if you hesitate between two levels, pick the higher one. Control room and managers can adjust severity later (the SLA recalculates automatically), but the first minutes run on your call.</p>
+
+<h2><span class="no">15.2</span>The mobile path (primary)</h2>
+<p>Chapter 8.3 has the step-by-step. What the app does with your submission:</p>
+<div class="flow">
+  <div class="n dark"><b>Submit</b><span>Type + severity + description + up to 6 photos + voice note</span></div>
+  <div class="n"><b>Online?</b><span>Straight insert; photos upload to tenant-isolated storage</span></div>
+  <div class="n bad"><b>Offline?</b><span>Saved to the device queue with photos as base64</span></div>
+  <div class="n"><b>Auto-flush</b><span>On reconnect, queued items submit; up to 8 retries each</span></div>
+  <div class="n good"><b>OB issued</b><span>Toast + navigate to the new occurrence detail</span></div>
+</div>
+<div class="callout warn"><b class="cap">Warning</b>The pending-sync banner means entries are still on the phone. Don't clear the app's storage, don't uninstall, and get the phone online before end of shift — the queue survives app restarts but not a wipe.</div>
+
+<h2><span class="no">15.3</span>The web path</h2>
+<p>Chapter 10.2 has the step-by-step. Web extras worth knowing:</p>
+<ul class="plain">
+  <li><b>OCR drop-zone</b> — drop a photo of a handwritten pocket-book note; Tesseract reads it into the description field, in the browser (nothing leaves your machine for OCR).</li>
+  <li><b>Backdating</b> — the "incident at" time is editable, so phoned-in reports carry the true incident time, while the log time is recorded separately.</li>
+  <li><b>Custom fields &amp; form sections</b> — what appears is configured per organisation (admin's custom fields per type + super user's Form Builder).</li>
+  <li><b>Immediate assignment</b> — assign a reviewer as you log; they're notified before you've put the phone down.</li>
+</ul>
+
+<h2><span class="no">15.4</span>Voice notes &amp; transcription</h2>
+<div class="flow">
+  <div class="n dark"><b>Record</b><span>Guard records a voice note on the occurrence</span></div>
+  <div class="n"><b>Store</b><span>Audio saved privately under the org's storage path</span></div>
+  <div class="n"><b>Transcribe</b><span>Whisper converts speech to text server-side</span></div>
+  <div class="n good"><b>Attach</b><span>Transcript lands as a comment on the occurrence</span></div>
+</div>
+<p>Voice is the fastest capture under pressure — talk through what you see, and the words become searchable text on the record.</p>
+
+<!-- ================= CH 16 SLA ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="16">
+  <div class="part">Part IV · Feature Deep Dives</div>
+  <h1>The SLA Engine &amp; Alerts</h1>
+  <p>Two clocks per occurrence — resolve-by and update-every — computed in the database, watched every five minutes, and escalated automatically.</p>
+</div>
+
+<h2><span class="no">16.1</span>Two clocks</h2>
+<div class="grid2">
+  <div class="card tint"><h4>⏱ Resolve-by clock</h4><p>Set from severity at logging time (<code>sla_due_at</code>). If the occurrence isn't <span class="b res">Resolved</span>/<span class="b closed">Closed</span> by then, it is <b>breached</b> — red on every board, alert storm follows.</p></div>
+  <div class="card tint"><h4>🔄 Update-every clock</h4><p>Resets on every posted update. If no one has touched the occurrence within its update interval, it becomes <b>update due</b> — amber on the boards, gentler notifications.</p></div>
+</div>
+
+<h2><span class="no">16.2</span>How the countdown works</h2>
+<ul class="plain">
+  <li>A database trigger stamps the SLA on every insert and recomputes it if <b>severity changes</b> (upgrade a Medium to Critical and the due time tightens instantly).</li>
+  <li>Per-organisation overrides (<span class="path">Administration → SLA Matrix</span>) take precedence over the platform defaults.</li>
+  <li>The live view exposes <code>is_sla_breached</code>, <code>is_sla_update_due</code> and a friendly <code>minutes_remaining</code> — every board, badge and bucket reads from this one source of truth.</li>
+  <li>Terminal statuses stop the clocks and stamp <code>closed_at</code>.</li>
+</ul>
+
+<h2><span class="no">16.3</span>The five-minute watchdog</h2>
+<div class="flow">
+  <div class="n dark"><b>Every 5 min</b><span>pg_cron runs the sla-monitor function</span></div>
+  <div class="n"><b>Scan</b><span>Bucket open OBs into breached / update-due per site</span></div>
+  <div class="n"><b>Resolve recipients</b><span>Control room, supervisor, manager, admin at that site</span></div>
+  <div class="n"><b>Notify</b><span>Inbox rows + Expo push (per-user opt-outs respected)</span></div>
+  <div class="n bad"><b>Breach extra</b><span>Email summaries via Resend for breach events</span></div>
+</div>
+<div class="callout tip"><b class="cap">Tip — stop the amber tide</b>Update-due warnings are cheap to prevent: a one-line status note ("still with SAPS, awaiting case number") resets the update clock. Teach the habit; the boards stay green.</div>
+
+<!-- ================= CH 17 PATROLS ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="17">
+  <div class="part">Part IV · Feature Deep Dives</div>
+  <h1>Patrols &amp; Checkpoint Scanning</h1>
+  <p>Provable presence: QR, NFC and GPS-verified checkpoint scans, recurring schedules with late alerts, and a live map of everyone on patrol.</p>
+</div>
+
+<h2><span class="no">17.1</span>Building blocks (admin setup)</h2>
+<div class="task">
+  <div class="task-head"><h4>Create checkpoints and routes</h4><div class="where">Sidebar → Field Operations → Checkpoints</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Create a <b>checkpoint</b> per physical point (gate, generator, roof door…). Each gets an auto-generated <b>QR token</b>; optionally add an <b>NFC tag ID</b> and/or <b>GPS coordinates with a geofence radius</b> in metres.</li>
+      <li><b>Print the QR labels</b> straight from the page and mount them at the points.</li>
+      <li>Group checkpoints into <b>patrol routes</b> in walking order.</li>
+      <li>Optionally add <b>patrol schedules</b> (<span class="path">Field Operations → Patrol Schedules</span>): "Route A every 2 hours, 18:00–06:00". The system then expects patrols and alerts when one is missed.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capabilities: <span class="cap-key">checkpoints.manage</span> · <span class="cap-key">patrols.schedule_manage</span></div>
+</div>
+
+<h2><span class="no">17.2</span>The three scan methods</h2>
+<table>
+  <tr><th>Method</th><th>Guard does</th><th>System verifies</th><th>Best for</th></tr>
+  <tr><td><b>QR</b></td><td>Points camera at the label</td><td>Decodes the <code>DIGILOG-CP:</code> token → checkpoint match</td><td>Default everywhere; cheap labels</td></tr>
+  <tr><td><b>NFC</b></td><td>Holds phone on the tag</td><td>Tag ID matched (case- and colon-insensitive)</td><td>Dark or weather-exposed points; needs the dev build (not Expo Go)</td></tr>
+  <tr><td><b>GPS</b></td><td>Taps "scan" standing at the point</td><td>Haversine distance to the nearest checkpoint ≤ its geofence radius → <b>verified</b> flag</td><td>Open areas, vehicle patrols, no hardware at all</td></tr>
+</table>
+<p>Every scan writes the method, coordinates, distance and verified flag. A patrol's progress counter climbs with each scan and is visible live on the web Patrols page and the supervisor's Team view.</p>
+
+<h2><span class="no">17.3</span>Late-patrol alerts</h2>
+<div class="flow">
+  <div class="n dark"><b>Schedule</b><span>Expected patrol slots are generated 6 h ahead</span></div>
+  <div class="n"><b>Watcher (5 min)</b><span>Finds slots past due with no qualifying patrol</span></div>
+  <div class="n bad"><b>Alert</b><span>patrol.late push + inbox to site supervisors</span></div>
+  <div class="n"><b>Once only</b><span>Slot marked alerted — no re-spam</span></div>
+  <div class="n good"><b>Resolve</b><span>Supervisor chases it up from the Team view</span></div>
+</div>
+
+<h2><span class="no">17.4</span>The live guard map</h2>
+<p><span class="path">Field Operations → Guard Map</span> (<code>guards.map_view</code>) plots every on-patrol guard on an OpenStreetMap view. Positions arrive every 30 seconds while a patrol is active (and only then — off patrol, phones report nothing). Markers animate as new positions land; each shows the guard's name, site and GPS accuracy circle.</p>
+<div class="callout note"><b class="cap">Note — privacy by design</b>Location reporting is tied strictly to an active patrol. Clocking in to a shift does not report location; only going on patrol does, and it stops the moment the patrol ends.</div>
+
+<!-- ================= CH 18 GATE ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="18">
+  <div class="part">Part IV · Feature Deep Dives</div>
+  <h1>Gate-House: Visitors &amp; Keys</h1>
+  <p>A digital visitor register with SA licence scanning and scan-to-sign-out, and a key register with named, ID-verified hand-overs.</p>
+</div>
+
+<h2><span class="no">18.1</span>Visitor register</h2>
+<p>The mobile <b>Visitors</b> screen (guard/supervisor, capability <code>visitors.manage</code>) is the gate house's front door; the web <span class="path">Field Operations → Visitor Log</span> mirrors it live for the control room. Step-by-steps are in §8.5 — here's the machinery:</p>
+<div class="grid2">
+  <div class="card">
+    <h4>Licence scanning</h4>
+    <p>The sign-in sheet scans two South African documents with the phone camera: the <b>vehicle licence disk</b> (windscreen barcode → registration, make, colour) and the <b>driver's licence</b> (PDF417 barcode → full name, ID number). Both fill the form automatically — typo-free identity capture in seconds, with a torch toggle and a gallery fallback for damaged barcodes.</p>
+  </div>
+  <div class="card">
+    <h4>Scan-to-sign-out</h4>
+    <p>At exit, the guard taps <b>Scan out</b> and scans the leaving vehicle's licence disk. The platform matches the registration against the on-site list and signs out the right visitor — no scrolling, no mistaken identity at a busy gate.</p>
+  </div>
+  <div class="card">
+    <h4>What's recorded</h4>
+    <p>Full name, ID number, company, vehicle registration, person visited, sign-in and sign-out timestamps, and the signing guard. "Currently on site" is always accurate to the second.</p>
+  </div>
+  <div class="card">
+    <h4>Evacuation roll call</h4>
+    <p>The on-site list <i>is</i> the roll call. During an evacuation, the supervisor opens Visitors (mobile or web) and reads out exactly who should be at the muster point.</p>
+  </div>
+</div>
+
+<h2><span class="no">18.2</span>Key register</h2>
+<ul class="plain">
+  <li>Keys are registered per site by the admin; each shows <b>Held</b> (with holder) or <b>Available</b>.</li>
+  <li>Every hand-over captures the <b>recipient's name and ID number</b> — accountability is personal, not "someone took it".</li>
+  <li>Returns close the loop; the complete hand-over history is kept per key.</li>
+  <li>Web mirror at <span class="path">Field Operations → Key Register</span> (<code>keys.manage</code>) — the control room sees at a glance which keys are out overnight.</li>
+</ul>
+
+<!-- ================= CH 19 SHIFTS ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="19">
+  <div class="part">Part IV · Feature Deep Dives</div>
+  <h1>Shifts &amp; Handovers</h1>
+  <p>Clock-ins with live counters and one-open-shift enforcement, plus signed, acknowledged shift handovers.</p>
+</div>
+
+<h2><span class="no">19.1</span>Shifts</h2>
+<ul class="plain">
+  <li><b>Mobile:</b> the Home shift card clocks in/out (§8.1); the Shift screen shows the live elapsed counter, closing notes and recent shifts with computed durations.</li>
+  <li><b>One open shift per user</b> is enforced by the database — a forgotten clock-out can't double up.</li>
+  <li><b>Web:</b> <span class="path">Field Operations → Shifts</span> (<code>shifts.view_all</code>) rolls up everyone's shifts with a KPI strip — who's on now, hours this week, per site.</li>
+</ul>
+
+<h2><span class="no">19.2</span>Handovers</h2>
+<div class="flow">
+  <div class="n dark"><b>Outgoing guard</b><span>Summary + open issues + finger-drawn signature</span></div>
+  <div class="n"><b>Waiting</b><span>Incoming guard's Home shows a handover prompt</span></div>
+  <div class="n"><b>Acknowledge</b><span>Read + tap Acknowledge; timestamped</span></div>
+  <div class="n good"><b>History</b><span>Full handover archive per site</span></div>
+</div>
+<p>Handover discipline is what stops the 06:00/18:00 information gap. The signature and acknowledgement make it a two-party record: one person handed over, one person accepted — provable later.</p>
+
+<!-- ================= CH 20 TASKS ================= -->
+<div class="chapter" data-num="20" style="margin-top:8mm">
+  <div class="part">Part IV · Feature Deep Dives</div>
+  <h1>Tasks</h1>
+  <p>A lightweight to-do tracker that keeps follow-up work attached to the occurrence that caused it.</p>
+</div>
+
+<div class="task">
+  <div class="task-head"><h4>Create and track a task</h4><div class="where">Web: Sidebar → Occurrences → Tasks · Mobile: Tasks screen</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Tasks</b> and select <b>New task</b>.</li>
+      <li>Title and describe it; optionally <b>link an OB number</b> (e.g. "Replace beam sensor — OB-2026-04181") and <b>assign</b> it to a user.</li>
+      <li>The assignee gets a realtime toast and inbox entry; the board self-updates for everyone.</li>
+      <li>Progress is tracked through the task's own <b>update thread</b>; close it when done.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Tasks stop "we'll fix it tomorrow" from evaporating: the occurrence closes, the follow-up survives with its own owner and trail.</div>
+</div>
+
+<!-- ================= CH 21 REPORTS ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="21">
+  <div class="part">Part IV · Feature Deep Dives</div>
+  <h1>Reports &amp; PDF Export</h1>
+  <p>Every occurrence can carry a formal report, rendered to a clean A4 PDF on demand — plus CSV exports wherever there's a table.</p>
+</div>
+
+<div class="task">
+  <div class="task-head"><h4>Write and print an occurrence report</h4><div class="where">Occurrence detail → Report · or Sidebar → Occurrences → Reports</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>A <b>report shell</b> is auto-created when an occurrence is logged. Open the occurrence (or the Reports list) and complete the report text — the formal narrative, actions taken, outcome.</li>
+      <li>From the <b>Reports</b> list, select the print action for the OB.</li>
+      <li>A print-styled A4 page opens (org branding included) and triggers the browser's print dialog automatically — <b>Save as PDF</b> or print to paper.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capabilities: <span class="cap-key">reports.view</span> · <span class="cap-key">reports.create</span> · <span class="cap-key">reports.export_pdf</span> · Management-report logging is separately gated (<span class="cap-key">occurrences.log_management_report</span>) and granted per user by the super user.</div>
+</div>
+
+<h3>CSV exports</h3>
+<p>All Occurrences (visible page), Users, and the manager's staff reports all export CSV for spreadsheets and client packs. For scheduled/automated exports, use an API token (Chapter 23) instead of manual CSV pulls.</p>
+
+<!-- ================= CH 22 NOTIFICATIONS ================= -->
+<div class="chapter" data-num="22" style="margin-top:8mm">
+  <div class="part">Part IV · Feature Deep Dives</div>
+  <h1>Notifications &amp; Deep Links</h1>
+  <p>Three channels — in-app inbox, push, email — all respecting per-user preferences, with push taps landing exactly where the work is.</p>
+</div>
+
+<table>
+  <tr><th>Channel</th><th>Driven by</th><th>User control</th></tr>
+  <tr><td><b>In-app inbox</b> (web bell + mobile inbox)</td><td>SLA monitor, patrol watcher, assignments, manager decisions, handovers, system notices</td><td>Mark read / mark all / delete</td></tr>
+  <tr><td><b>Push</b> (mobile)</td><td>Same events, sent via Expo Push</td><td><span class="path">Settings → My Preferences</span> — push toggle</td></tr>
+  <tr><td><b>Email</b></td><td>SLA breach summaries (Resend)</td><td>My Preferences — email toggle</td></tr>
+</table>
+
+<h3>Where a tapped push takes you</h3>
+<table class="compact">
+  <tr><th>Notification</th><th>Opens</th></tr>
+  <tr><td>Anything with an occurrence (assignment, SLA, manager decision)</td><td>That occurrence's detail screen</td></tr>
+  <tr><td>Late patrol</td><td>Supervisor Site Board</td></tr>
+  <tr><td>Handover waiting</td><td>Handovers screen</td></tr>
+  <tr><td>Site-level SLA alert</td><td>Supervisor Site Board</td></tr>
+  <tr><td>Everything else</td><td>Inbox</td></tr>
+</table>
+<p>Deep links work from cold start too — if the app was closed, it boots straight into the right screen after PIN entry.</p>
+
+<!-- ================= PART V DIVIDER ================= -->
+<div class="pagebreak"></div>
+<div class="part-divider">
+  <div class="kicker">Part V</div>
+  <h1>Administration &amp; Operations</h1>
+  <p>For the people who run the platform itself: connecting external systems, deploying and operating the stack, the security model in depth, and reference material.</p>
+  <ul>
+    <li><b>Chapter 23</b> — Integrations: Webhooks, API Tokens, Edge Functions</li>
+    <li><b>Chapter 24</b> — Deployment &amp; Operations Runbook</li>
+    <li><b>Chapter 25</b> — Security Posture</li>
+    <li><b>Chapter 26</b> — Appendix: Accounts, Glossary, Data Model</li>
+  </ul>
+</div>
+
+<!-- ================= CH 23 INTEGRATIONS ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="23">
+  <div class="part">Part V · Administration &amp; Operations</div>
+  <h1>Integrations</h1>
+  <p>Signed outbound webhooks, org-scoped API tokens, and the fifteen edge functions that do the platform's privileged work.</p>
+</div>
+
+<h2><span class="no">23.1</span>Outbound webhooks</h2>
+<div class="task">
+  <div class="task-head"><h4>Push DigiLog events to Slack, ticketing or monitoring</h4><div class="where">Sidebar → Settings → Webhooks</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>Webhooks</b> and select <b>New webhook</b>.</li>
+      <li>Enter the destination <b>URL</b>, choose the <b>events</b> to subscribe to, and set a <b>secret</b>.</li>
+      <li>Save. Deliveries begin immediately. Each carries an <code>X-DigiLog-Signature</code> header — an HMAC-SHA256 of the payload with your secret — so the receiver can verify authenticity.</li>
+      <li>Watch the <b>last-status badge</b> per webhook and the delivery history to catch failing endpoints.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">webhooks.manage</span> · Receivers should reject any payload whose signature doesn't verify.</div>
+</div>
+
+<h2><span class="no">23.2</span>API tokens</h2>
+<div class="task">
+  <div class="task-head"><h4>Mint a token for a client system</h4><div class="where">Sidebar → Settings → API Tokens</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Open <b>API Tokens</b> → <b>New token</b>. Name it after the consuming system and pick its scopes.</li>
+      <li>The plaintext token is shown <b>exactly once</b> — copy it into the client system's secret store now.</li>
+      <li>Only a SHA-256 hash is kept at rest. Lost the plaintext? Revoke and mint a fresh one.</li>
+      <li><b>Revoke</b> immediately when an integration is retired or a leak is suspected.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Capability: <span class="cap-key">api_tokens.manage</span> · Tokens are org-scoped — they can never read another tenant's data.</div>
+</div>
+
+<h2><span class="no">23.3</span>Edge functions reference</h2>
+<table class="compact">
+  <tr><th>Function</th><th>Purpose</th><th>Who may call</th></tr>
+  <tr><td><code>pin-login</code></td><td>Verify PIN, mint session, enforce lockout</td><td>Public POST</td></tr>
+  <tr><td><code>pin-set</code></td><td>Set / reset a PIN (self or admin)</td><td>Signed-in</td></tr>
+  <tr><td><code>admin-create-user</code> / <code>admin-update-user</code> / <code>admin-delete-user</code></td><td>User provisioning &amp; mutation</td><td>admin · super_user</td></tr>
+  <tr><td><code>admin-create-org</code> / <code>admin-delete-org</code></td><td>Tenant provisioning &amp; teardown</td><td>super_user</td></tr>
+  <tr><td><code>admin-api-token</code></td><td>Mint / revoke API tokens</td><td>admin · super_user</td></tr>
+  <tr><td><code>admin-role-capability</code></td><td>Grant/revoke capability matrix cells</td><td>super_user</td></tr>
+  <tr><td><code>send-email</code></td><td>Resend wrapper (logs to console if unconfigured)</td><td>Internal · admin</td></tr>
+  <tr><td><code>webhook-deliver</code></td><td>Fan out signed events, record deliveries</td><td>Internal · admin</td></tr>
+  <tr><td><code>sla-monitor</code> / <code>patrol-watcher</code></td><td>The five-minute watchdogs (Chapter 16, 17)</td><td>Cron</td></tr>
+  <tr><td><code>transcribe-audio</code></td><td>Whisper transcription of voice notes</td><td>Signed-in</td></tr>
+  <tr><td><code>health-check</code></td><td>Public uptime probe (DB connectivity + counts)</td><td>Anyone</td></tr>
+</table>
+
+<!-- ================= CH 24 OPS ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="24">
+  <div class="part">Part V · Administration &amp; Operations</div>
+  <h1>Deployment &amp; Operations Runbook</h1>
+  <p>From an empty Supabase project to a running platform — and the routines that keep it healthy. The full runbook lives in <code>PRODUCTION.md</code>; this is the map.</p>
+</div>
+
+<h2><span class="no">24.1</span>First deployment</h2>
+<div class="task">
+  <div class="task-head"><h4>Stand the platform up</h4><div class="where">Repo root, PowerShell</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li><b>Provision Supabase</b> — create a project; note the URL, anon key and service-role key.</li>
+      <li><b>Configure env files</b> — <code>.env</code> (service role, for scripts), <code>apps/admin/.env.local</code> and <code>apps/mobile/.env</code> (URL + anon key each).</li>
+      <li><b>Apply migrations</b> — <code>npx supabase db push</code> (or paste <code>supabase/_deploy_all.sql</code> into the SQL editor). All 45+ migrations are idempotent and safe to re-run.</li>
+      <li><b>Regenerate types</b> — <code>npm run db:types</code>.</li>
+      <li><b>Deploy the 15 edge functions</b> — <code>npx supabase functions deploy …</code> (list in README §Quick Start).</li>
+      <li><b>Schedule cron</b> — SLA monitor and patrol watcher every 5 minutes (<code>supabase/schedule_sla_monitor.sql</code> is the template).</li>
+      <li><b>Seed</b> — <code>node --env-file=.env scripts/seed-accounts.mjs</code> creates the demo org, the full role line-up and a cross-org super user.</li>
+      <li><b>Host</b> — admin console to Vercel (root <code>apps/admin</code>); mobile via Expo EAS builds for iOS + Android.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Verify: sign in as each demo role, log a test occurrence on mobile, watch it appear on the web live board, and hit <code>/functions/v1/health-check</code>.</div>
+</div>
+
+<h2><span class="no">24.2</span>Routine operations</h2>
+<table>
+  <tr><th>Cadence</th><th>Task</th></tr>
+  <tr><td>Daily</td><td>Glance at Platform Health (super user) and your uptime monitor on <code>health-check</code></td></tr>
+  <tr><td>Weekly</td><td>Review webhook delivery failures; check the audit log for anomalies (PIN lockouts, off-hours admin actions)</td></tr>
+  <tr><td>Quarterly</td><td>Rotate <code>SUPABASE_SERVICE_ROLE_KEY</code> (90 d); review user lists per org — deactivate leavers, reset their PINs</td></tr>
+  <tr><td>Twice yearly</td><td>Rotate anon key, <code>RESEND_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>INTERNAL_FN_KEY</code> (180 d)</td></tr>
+  <tr><td>On staff exit</td><td>Deactivate the account and reset/park its PIN the same day</td></tr>
+</table>
+
+<h2><span class="no">24.3</span>Data import &amp; maintenance scripts</h2>
+<table class="compact">
+  <tr><th>Script (<code>scripts/…</code>)</th><th>Use</th></tr>
+  <tr><td><code>seed-accounts.mjs</code></td><td>Bootstrap super user + demo org + role line-up</td></tr>
+  <tr><td><code>import-occurrences.mjs</code> · <code>import-legacy-csv.mjs</code> · <code>import-legacy-azure.mjs</code></td><td>Bring historical occurrences in from CSV or directly from a legacy Azure SQL BACPAC</td></tr>
+  <tr><td><code>fix-ob-sequence.mjs</code></td><td>Repair the OB-number sequence after a bulk import</td></tr>
+  <tr><td><code>backfill-audit.mjs</code></td><td>Reconstruct audit history from real record timestamps (dry-run by default; rows tagged <i>backfilled</i>)</td></tr>
+  <tr><td><code>verify-db-state.mjs</code> · <code>check-state.mjs</code> · <code>probe-rls-funcs.mjs</code></td><td>Diagnostics: schema state, RLS helper behaviour</td></tr>
+</table>
+<p>All scripts run with <code>node --env-file=.env scripts/&lt;name&gt;.mjs</code> and are the only code outside edge functions that touches the service-role key.</p>
+
+<!-- ================= CH 25 SECURITY ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="25">
+  <div class="part">Part V · Administration &amp; Operations</div>
+  <h1>Security Posture</h1>
+  <p>Defence in layers: the database enforces tenancy and roles on every query, the clients add hardening on top, and everything sensitive leaves a trace.</p>
+</div>
+
+<div class="grid2">
+  <div class="card"><h4>🏰 Database floor</h4><p>RLS on every table and on storage paths (<code>&lt;org_slug&gt;/…</code>). Privilege-escalation triggers on profiles. Soft deletes. Capability checks are UI-only sugar above this floor — never the security boundary.</p></div>
+  <div class="card"><h4>🔑 Credentials</h4><p>Web: passwords + optional TOTP 2FA, HttpOnly cookie sessions. Mobile: bcrypt-hashed 4-digit PINs, 5-fails/15-min lockout, timing-normalised responses, every attempt recorded. API tokens hashed at rest, plaintext shown once.</p></div>
+  <div class="card"><h4>🛡 Web hardening</h4><p>Strict CSP (only Supabase + map tiles), HSTS 2 years with subdomains, X-Frame-Options DENY, COOP same-origin, restrictive Permissions-Policy. CSRF neutralised by HttpOnly JWT cookies.</p></div>
+  <div class="card"><h4>🔬 Traceability</h4><p>Audit log on sign-ins, PIN attempts, user/role/org changes, capability edits and manager decisions — actor, role, target, IP, timestamp. Webhook deliveries recorded. Sentry error monitoring opt-in.</p></div>
+  <div class="card"><h4>🗄 Key custody</h4><p>The service-role key exists only inside edge functions and ops scripts — never in a browser or phone. Apps use the anon key and live entirely under RLS.</p></div>
+  <div class="card"><h4>⚖ Known trade-offs</h4><p>Auth emails are unique platform-wide (Supabase constraint) — accepted; mobile identity is org + employee number anyway. NFC needs the dev build, not Expo Go.</p></div>
+</div>
+
+<div class="callout warn"><b class="cap">Warning — the two real keys to guard</b>A leaked <b>service-role key</b> bypasses RLS entirely, and a leaked <b>org admin password</b> owns that tenant. Rotate the first on schedule; protect the second with 2FA. Everything else has a blast radius designed to be small.</div>
+
+<!-- ================= CH 26 APPENDIX ================= -->
+<div class="pagebreak"></div>
+<div class="chapter" data-num="26">
+  <div class="part">Part V · Administration &amp; Operations</div>
+  <h1>Appendix</h1>
+  <p>Demo accounts, a glossary of platform terms, and the core data model at a glance.</p>
+</div>
+
+<h2><span class="no">A.1</span>Demo accounts (rotate before production)</h2>
+<table class="compact">
+  <tr><th>Surface</th><th>Identity</th><th>Credential</th><th>Role</th></tr>
+  <tr><td>Web</td><td><code>super@digilog360.com</code></td><td><code>Super123!</code></td><td>super_user</td></tr>
+  <tr><td>Web</td><td><code>admin@digilog360.com</code></td><td><code>Admin123!</code></td><td>admin</td></tr>
+  <tr><td>Web</td><td><code>manager@digilog360.com</code></td><td><code>Manager123!</code></td><td>manager</td></tr>
+  <tr><td>Web</td><td><code>control@digilog360.com</code></td><td><code>Control123!</code></td><td>control_room</td></tr>
+  <tr><td>Web</td><td><code>supervisor@digilog360.com</code></td><td><code>Supervisor123!</code></td><td>supervisor</td></tr>
+  <tr><td>Mobile</td><td>org <code>digilog-demo</code> · emp <code>GRD001</code> / <code>GRD002</code></td><td>PIN (seeded)</td><td>guard</td></tr>
+  <tr><td>Mobile</td><td>org <code>digilog-demo</code> · emp <code>SUP001</code></td><td>PIN (seeded)</td><td>supervisor</td></tr>
+</table>
+
+<h2><span class="no">A.2</span>Glossary</h2>
+<table class="compact">
+  <tr><th>Term</th><th>Meaning</th></tr>
+  <tr><td><b>Occurrence / OB</b></td><td>A logged incident; OB is its sequential Occurrence Book number (e.g. OB-2026-04181)</td></tr>
+  <tr><td><b>Organisation (org)</b></td><td>A tenant — one client company with fully isolated data</td></tr>
+  <tr><td><b>Site</b></td><td>A physical guarded location within an org</td></tr>
+  <tr><td><b>SLA</b></td><td>Service-level agreement: the resolve-by and update-every clocks per severity</td></tr>
+  <tr><td><b>Breach / Update due</b></td><td>Past resolve deadline / past update interval — red and amber on the boards</td></tr>
+  <tr><td><b>Capability</b></td><td>A feature key (e.g. <code>patrols.scan</code>) granted per role per org in the permissions grid</td></tr>
+  <tr><td><b>RLS</b></td><td>Row-level security — the database rules that hard-enforce org and role isolation</td></tr>
+  <tr><td><b>Checkpoint</b></td><td>A physical scan point with a QR label, NFC tag and/or GPS geofence</td></tr>
+  <tr><td><b>Acknowledgement</b></td><td>A manager's recorded decision on an occurrence: acknowledged, escalated or rejected</td></tr>
+  <tr><td><b>Handover</b></td><td>A signed shift-change summary the incoming guard must acknowledge</td></tr>
+  <tr><td><b>Edge function</b></td><td>A serverless backend function holding the privileged key for admin operations</td></tr>
+  <tr><td><b>Offline queue</b></td><td>On-device store of occurrences logged without signal, auto-synced later</td></tr>
+</table>
+
+<h2><span class="no">A.3</span>Core data model</h2>
+<table class="compact">
+  <tr><th>Cluster</th><th>Tables</th></tr>
+  <tr><td>Tenancy &amp; people</td><td><code>organizations</code> · <code>sites</code> · <code>profiles</code> · <code>capabilities</code> · <code>role_capabilities</code></td></tr>
+  <tr><td>Occurrences</td><td><code>occurrences</code> · <code>occurrence_updates</code> · <code>occurrence_reports</code> · <code>occurrence_images</code> · <code>occurrence_comments</code> · <code>manager_acknowledgements</code></td></tr>
+  <tr><td>Patrols</td><td><code>patrol_routes</code> · <code>checkpoints</code> · <code>route_checkpoints</code> · <code>patrols</code> · <code>checkpoint_scans</code> · <code>patrol_schedules</code> · <code>expected_patrols</code> · <code>guard_positions</code></td></tr>
+  <tr><td>Field ops</td><td><code>shifts</code> · <code>shift_handovers</code> · <code>visitors</code> · <code>keys</code> · <code>key_handovers</code> · <code>tasks</code> · <code>task_updates</code></td></tr>
+  <tr><td>Platform</td><td><code>notifications</code> · <code>saved_views</code> · <code>audit_log</code> · <code>pin_attempts</code> · <code>org_sla_overrides</code> · <code>org_occurrence_types</code> · <code>org_webhooks</code> · <code>webhook_deliveries</code> · <code>api_tokens</code></td></tr>
+</table>
+
+<div class="footer-note">
+  <span>DigiLog 360 — Platform Wiki &amp; Operations Manual · Edition 1.0 · August 2026</span>
+  <span>© 2026 Kruz Naidoo · Netstream Intergrated Solutions · Proprietary &amp; Confidential</span>
+</div>
+
+</body>
+</html>
