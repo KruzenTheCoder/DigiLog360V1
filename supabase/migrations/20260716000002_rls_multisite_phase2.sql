@@ -213,7 +213,7 @@ begin
           org_id = (select public.current_org_id())
           and (
             (select public.has_any_role(array['admin','manager','control_room','supervisor']::public.app_role[]))
-            or guard_id = (select auth.uid())
+            or user_id = (select auth.uid())
             or site_id in (select unnest(public.current_site_ids()))
           )
         )
