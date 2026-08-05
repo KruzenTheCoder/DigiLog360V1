@@ -38,7 +38,7 @@ npx supabase functions deploy `
   admin-delete-org admin-delete-user `
   admin-api-token admin-role-capability `
   send-email webhook-deliver `
-  patrol-watcher sla-monitor `
+  patrol-watcher sla-monitor task-alerts `
   transcribe-audio health-check
 
 # 3. Seed a demo tenant + super user
@@ -367,8 +367,8 @@ NewDigiLog/
 │                               schemas, sla, filters, capabilities, i18n
 │
 ├── supabase/
-│   ├── migrations/             45 incremental migrations (see §6)
-│   ├── functions/              15 edge functions (see §10)
+│   ├── migrations/             54 incremental migrations (see §6)
+│   ├── functions/              16 edge functions (see §10)
 │   ├── _deploy_all.sql         Single-file bundle for SQL editor paste
 │   ├── seed.sql                Demo sites + sample patrol route
 │   ├── schedule_sla_monitor.sql Sample pg_cron schedule for the SLA monitor
@@ -449,6 +449,15 @@ the bundled `_deploy_all.sql` can be re-run safely.
 | 43 | `20260626000009_mobile_duty_capability.sql` | Mobile on/off-duty capability |
 | 44 | `20260626000010_mobile_tab_capabilities.sql` | Per-role mobile tab-bar capability keys |
 | 45 | `20260626000010_occurrence_reports_all_areas_secure.sql` | Occurrence-report RLS hardening across all areas |
+| 46 | `20260713000001_management_report_per_user.sql` | Management-report access granted per user |
+| 47 | `20260713000002_seed_management_report_holders.sql` | Seeds the initial management-report holders |
+| 48 | `20260713000003_occurrence_voice_notes.sql` | `occurrence_voice_notes` table |
+| 49 | `20260715000001_taxonomy_editable.sql` | Editable Category → Sub-category → Type taxonomy |
+| 50 | `20260716000001_rls_perf_occurrences.sql` | RLS performance rewrite on occurrence tables |
+| 51 | `20260716000002_rls_multisite_phase2.sql` | Multi-site RLS phase 2 (patrols, shifts, gate-house) |
+| 52 | `20260729000001_visitor_scan_gallery_pick.sql` | Visitor licence scan — gallery pick support |
+| 53 | `20260731000001_ob_number_beyond_9999.sql` | OB numbers stay collision-free past 9999 |
+| 54 | `20260805000001_task_email_alerts.sql` | Task email alerts: `org_email_settings`, `email_outbox`, enqueue triggers, `tasks.breach_alerted_at` |
 
 > Migrations are forward-only and idempotent; `supabase/_deploy_all.sql` bundles
 > them for a single SQL-editor paste.
@@ -616,6 +625,7 @@ Scheduled by `pg_cron` every 5 minutes. For each affected site:
 | `webhook-deliver` | Fan out an event to org_webhooks with HMAC-SHA256 signature, records `webhook_deliveries` | Internal key OR admin |
 | `patrol-watcher` | Seeds expected_patrols + alerts overdue ones | Cron (service role) |
 | `sla-monitor` | Inbox + push + email for SLA events | Cron (service role) |
+| `task-alerts` | Drains the task `email_outbox` through Resend (assigned / updated / completed emails), scans for overdue tasks and sends breach alerts; per-org config from `org_email_settings`; `mode:'test'` sends a sample to the caller | Signed-in (flush) · Cron (service role) · super_user (test) |
 | `transcribe-audio` | OpenAI Whisper proxy; attaches transcript as a comment on the occurrence | Bearer (signed-in) |
 | `health-check` | Public uptime probe (DB connectivity + counts) | None |
 
@@ -760,6 +770,7 @@ detail page lives at `/tasks/[id]`.
 - **Mobile Layout** — control the mobile tab bar and home cards shown per role
 - **Platform Health** — aggregate KPIs and recent activity across all tenants
 - **Permissions** — role × capability matrix editor (the entire point of the capability layer)
+- **Email Alerts** — per-org configuration of the Resend-powered task emails (assigned / updated / completed / overdue): master switch, per-event toggles + subject/intro templates with `{{variables}}`, sender name, reply-to, accent colour, footer note, copy-admins-on-breach — with a live pixel-identical preview and a send-test-to-me button
 
 ### My Access
 
@@ -1061,12 +1072,14 @@ npx supabase functions deploy `
   admin-delete-org admin-delete-user `
   admin-api-token admin-role-capability `
   send-email webhook-deliver `
-  patrol-watcher sla-monitor `
+  patrol-watcher sla-monitor task-alerts `
   transcribe-audio health-check
 
-# 6. Schedule cron jobs (in SQL editor, see supabase/schedule_sla_monitor.sql)
+# 6. Schedule cron jobs (in SQL editor, see supabase/schedule_sla_monitor.sql
+#    and supabase/schedule_task_alerts.sql)
 #    SLA monitor:     */5 * * * *
 #    Patrol watcher:  */5 * * * *
+#    Task alerts:     * * * * *   (outbox sweep + overdue scan)
 
 # 7. Seed demo accounts
 node --env-file=.env scripts/seed-accounts.mjs

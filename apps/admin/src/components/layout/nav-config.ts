@@ -91,6 +91,7 @@ export const NAV: NavSection[] = [
       { label: 'Management Reports Access', href: '/super/management-reports', icon: 'FileText', roles: ['super_user'] },
       { label: 'Incident Taxonomy', href: '/super/taxonomy', icon: 'ListTree', roles: ['super_user'] },
       { label: 'Form Builder', href: '/super/form-builder', icon: 'LayoutTemplate', roles: ['super_user'] },
+      { label: 'Email Alerts', href: '/super/email-alerts', icon: 'Mail', roles: ['super_user'] },
     ],
   },
 ];

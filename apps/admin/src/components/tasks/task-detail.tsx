@@ -63,6 +63,10 @@ export function TaskDetail({
     setBusy(false);
     if (upErr) { setError(upErr.message); return; }
 
+    // Fire-and-forget: flush the email outbox so update/completion emails
+    // reach the assigner immediately (cron would catch it anyway).
+    void supabase.functions.invoke('task-alerts', { body: {} }).catch(() => {});
+
     setTask(updated as Task);
     setUpdates((prev) => [
       {

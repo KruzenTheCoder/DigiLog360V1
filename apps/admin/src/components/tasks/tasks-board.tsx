@@ -257,6 +257,9 @@ function NewTaskDialog({
     });
     setBusy(false);
     if (insErr) { setError(insErr.message); return; }
+    // Fire-and-forget: flush the email outbox so the assignee's
+    // "new task" email goes out immediately (cron would catch it anyway).
+    void supabase.functions.invoke('task-alerts', { body: {} }).catch(() => {});
     setTitle(''); setDescription(''); setAssignedTo(''); setPriority('normal'); setDueAt(''); setObNumber('');
     onCreated();
   }

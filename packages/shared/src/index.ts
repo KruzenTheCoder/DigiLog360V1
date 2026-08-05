@@ -10,3 +10,4 @@ export * from './filters';
 export * from './i18n';
 export * from './capabilities';
 export * from './formConfig';
+export * from './emailAlerts';

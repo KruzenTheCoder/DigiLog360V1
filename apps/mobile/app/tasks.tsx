@@ -174,6 +174,9 @@ function UpdateSheet({
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any).from('tasks').update(patch).eq('id', target.id);
+      // Fire-and-forget: flush the email outbox so the assigner's update /
+      // completion email goes out immediately (cron catches it otherwise).
+      void supabase.functions.invoke('task-alerts', { body: {} }).catch(() => {});
     }
 
     setBusy(false);
