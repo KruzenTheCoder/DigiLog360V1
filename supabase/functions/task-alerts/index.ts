@@ -365,8 +365,12 @@ Deno.serve(async (req) => {
     if (internal || !caller || !isSuperUser(caller.profile)) {
       return json({ error: 'Test sends are super-user only' }, 403);
     }
-    const to = caller.profile?.email ?? caller.user?.email;
-    if (!to) return json({ error: 'Your profile has no email address' }, 400);
+    // Optional explicit test recipient; falls back to the caller's own email.
+    const toOverride = typeof body.to === 'string'
+      && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.to.trim())
+      ? body.to.trim() : null;
+    const to = toOverride ?? caller.profile?.email ?? caller.user?.email;
+    if (!to) return json({ error: 'No recipient — provide "to" or set an email on your profile' }, 400);
 
     const event = String(body.event ?? 'task.assigned') as TaskEmailEvent;
     if (!TASK_EMAIL_EVENTS.includes(event)) return json({ error: 'Unknown event' }, 400);

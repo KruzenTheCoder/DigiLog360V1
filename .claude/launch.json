@@ -8,6 +8,12 @@
       "port": 3000
     },
     {
+      "name": "admin-alt",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--workspace=@digilog/admin", "--", "-p", "3005"],
+      "port": 3005
+    },
+    {
       "name": "diag",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "diag:tmp"],

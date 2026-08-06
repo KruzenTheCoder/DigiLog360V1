@@ -9,7 +9,7 @@
 // pixel-identical to what recipients receive. A test-send button delivers a
 // sample email (with the org's live config) to the signed-in super user.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle, Building2, Check, Loader2, Mail, RotateCcw, Save, SendHorizonal,
 } from 'lucide-react';
@@ -59,8 +59,14 @@ export function EmailAlertsManager({
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [testBusy, setTestBusy] = useState(false);
+  const [testTo, setTestTo] = useState('');
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [previewEvent, setPreviewEvent] = useState<TaskEmailEvent>('task.assigned');
+  // The sample data contains "now"-relative timestamps, so the rendered
+  // preview differs between server and client passes — render it only after
+  // mount to avoid a hydration mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const org = orgs.find((o) => o.id === orgId);
 
@@ -113,7 +119,10 @@ export function EmailAlertsManager({
     setMessage(null);
     const supabase = createClient();
     const { data, error } = await supabase.functions.invoke('task-alerts', {
-      body: { mode: 'test', org_id: orgId, event: previewEvent },
+      body: {
+        mode: 'test', org_id: orgId, event: previewEvent,
+        ...(testTo.trim() ? { to: testTo.trim() } : {}),
+      },
     });
     setTestBusy(false);
     const d = data as { ok?: boolean; to?: string; dev?: boolean; error?: string } | null;
@@ -124,7 +133,7 @@ export function EmailAlertsManager({
         kind: 'ok',
         text: d.dev
           ? `Dev mode (no RESEND_API_KEY configured) — the email was logged by the function instead of sent.`
-          : `Test email sent to ${d.to}. Check your inbox.`,
+          : `Test email sent to ${d.to} — check that inbox.`,
       });
     }
   }
@@ -178,6 +187,41 @@ export function EmailAlertsManager({
       <div className="grid gap-5 xl:grid-cols-2">
         {/* ── Left column: configuration ── */}
         <div className="space-y-5">
+          {/* Who receives what */}
+          <Card>
+            <CardContent className="py-5">
+              <h2 className="mb-1 font-semibold">Who receives each email</h2>
+              <p className="mb-3 text-xs text-[hsl(var(--muted))]">
+                Emails go to the task&apos;s two parties — the person who assigned it and the person
+                it&apos;s assigned to. Whoever performed the action is skipped (nobody is emailed
+                about their own change).
+              </p>
+              <ul className="divide-y rounded-xl border text-sm">
+                {([
+                  ['task.assigned', 'The assignee — “you have a new task”. The assigner made the change, so they are not emailed.'],
+                  ['task.updated', 'Assigner + assignee, excluding whoever posted the update (e.g. the assignee updates → the assigner is emailed).'],
+                  ['task.completed', 'Assigner + assignee, excluding whoever completed it — so the person who handed the task out always hears it is done.'],
+                  ['task.overdue', 'Assignee + assigner, plus every org admin if “copy org admins” is on below.'],
+                ] as Array<[TaskEmailEvent, string]>).map(([event, who]) => (
+                  <li key={event} className="flex items-start gap-3 px-4 py-2.5">
+                    <span
+                      className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ background: TASK_EMAIL_EVENT_META[event].color }}
+                    />
+                    <div>
+                      <span className="font-medium">{TASK_EMAIL_EVENT_META[event].label}</span>
+                      <span className="text-[hsl(var(--muted))]"> — {who}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[11px] text-[hsl(var(--muted))]">
+                Recipients must have an email on their profile, and individual users can opt out under
+                Settings → My Preferences (assignment emails additionally respect the “notify on assignment” preference).
+              </p>
+            </CardContent>
+          </Card>
+
           {/* Sender & branding */}
           <Card>
             <CardContent className="space-y-4 py-5">
@@ -330,11 +374,18 @@ export function EmailAlertsManager({
         <div className="space-y-3 xl:sticky xl:top-4 xl:self-start">
           <Card>
             <CardContent className="space-y-3 py-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="font-semibold">Live preview</h2>
+              <h2 className="font-semibold">Live preview</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="email"
+                  value={testTo}
+                  onChange={(e) => setTestTo(e.target.value)}
+                  placeholder="Test recipient — blank sends to your account email"
+                  className="min-w-56 flex-1"
+                />
                 <Button size="sm" variant="secondary" onClick={sendTest} disabled={testBusy}>
                   {testBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-4 w-4" />}
-                  Send test to me
+                  Send test
                 </Button>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -355,14 +406,16 @@ export function EmailAlertsManager({
               </div>
               <div className="rounded-lg border bg-slate-50 px-3 py-2 text-sm dark:bg-slate-900/40">
                 <span className="mr-2 text-[11px] font-bold uppercase tracking-wider text-[hsl(var(--muted))]">Subject</span>
-                {preview.subject}
+                {mounted ? preview.subject : '…'}
               </div>
-              <iframe
-                title="Email preview"
-                sandbox=""
-                srcDoc={preview.html}
-                className="h-[640px] w-full rounded-xl border bg-white"
-              />
+              {mounted && (
+                <iframe
+                  title="Email preview"
+                  sandbox=""
+                  srcDoc={preview.html}
+                  className="h-[640px] w-full rounded-xl border bg-white"
+                />
+              )}
               <p className="text-[11px] text-[hsl(var(--muted))]">
                 Rendered by the same template module the edge function uses — what you see is what recipients get.
                 Sample data is shown; real emails substitute the actual task, people and organisation.
