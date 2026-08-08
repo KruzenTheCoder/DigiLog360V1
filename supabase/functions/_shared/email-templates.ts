@@ -8,6 +8,7 @@
 
 export const TASK_EMAIL_EVENTS = [
   'task.assigned',
+  'occurrence.assigned',
   'task.updated',
   'task.completed',
   'task.overdue',
@@ -54,9 +55,15 @@ export const TASK_EMAIL_EVENT_META: Record<
 > = {
   'task.assigned': {
     label: 'Task assigned',
-    description: 'Sent to the assignee the moment a task is created for them or reassigned to them.',
+    description: 'Sent to the assignee the moment a task is created for them or reassigned to them — including tasks they assign to themselves.',
     pill: 'NEW ASSIGNMENT',
     color: '#667eea',
+  },
+  'occurrence.assigned': {
+    label: 'Occurrence assigned',
+    description: 'Sent to the reviewer whenever an occurrence (OB) is assigned to them — from the log form, the occurrence detail page, or a bulk action.',
+    pill: 'OCCURRENCE ASSIGNED',
+    color: '#7c3aed',
   },
   'task.updated': {
     label: 'Task updated',
@@ -80,6 +87,7 @@ export const TASK_EMAIL_EVENT_META: Record<
 
 export const DEFAULT_EMAIL_SUBJECTS: Record<TaskEmailEvent, string> = {
   'task.assigned': 'New task for you: {{task_title}}',
+  'occurrence.assigned': 'Occurrence assigned to you: {{ob_number}} — {{task_title}}',
   'task.updated': 'Task updated: {{task_title}}',
   'task.completed': 'Task completed: {{task_title}}',
   'task.overdue': 'Overdue task: {{task_title}}',
@@ -88,6 +96,8 @@ export const DEFAULT_EMAIL_SUBJECTS: Record<TaskEmailEvent, string> = {
 export const DEFAULT_EMAIL_INTROS: Record<TaskEmailEvent, string> = {
   'task.assigned':
     '{{assigned_by_name}} assigned a task to you in {{org_name}}. The details are below — open it in DigiLog to accept and track it.',
+  'occurrence.assigned':
+    '{{actor_name}} assigned occurrence {{ob_number}} to you for review in {{org_name}}. The details are below.',
   'task.updated':
     '{{actor_name}} posted an update on a task you are involved in. The latest state is below.',
   'task.completed':
@@ -128,6 +138,8 @@ export interface TaskEmailData {
   orgName: string;
   /** Base URL of the admin console (no trailing slash). */
   appUrl?: string | null;
+  /** Path segment for the CTA link: 'tasks' (default) or 'occurrences'. */
+  urlPath?: 'tasks' | 'occurrences';
   recipientName?: string | null;
   /** Human-friendly “overdue by 3 h” string (overdue event only). */
   overdueBy?: string | null;
@@ -135,19 +147,27 @@ export interface TaskEmailData {
 
 // ─── Self-contained label/colour maps (mirrors @digilog/shared constants) ───
 
+// Covers both task priorities and occurrence severities.
 const PRIORITY_LABELS: Record<string, string> = {
-  low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent',
+  low: 'Low', normal: 'Normal', medium: 'Medium', high: 'High',
+  urgent: 'Urgent', critical: 'Critical',
 };
 const PRIORITY_COLORS: Record<string, string> = {
-  low: '#64748b', normal: '#667eea', high: '#ea580c', urgent: '#dc2626',
+  low: '#64748b', normal: '#667eea', medium: '#d97706', high: '#ea580c',
+  urgent: '#dc2626', critical: '#dc2626',
 };
+// Covers both task statuses and occurrence statuses.
 const STATUS_LABELS: Record<string, string> = {
   open: 'Open', in_progress: 'In Progress', blocked: 'Blocked',
   done: 'Done', cancelled: 'Cancelled',
+  acknowledged: 'Acknowledged', on_patrol: 'On Patrol',
+  resolved: 'Resolved', closed: 'Closed',
 };
 const STATUS_COLORS: Record<string, string> = {
   open: '#3b82f6', in_progress: '#0ea5e9', blocked: '#d97706',
   done: '#16a34a', cancelled: '#64748b',
+  acknowledged: '#7c3aed', on_patrol: '#0891b2',
+  resolved: '#16a34a', closed: '#475569',
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -243,13 +263,14 @@ export function renderTaskEmail(
 
   const headline: Record<TaskEmailEvent, string> = {
     'task.assigned': 'You have a new task',
+    'occurrence.assigned': 'An occurrence needs your review',
     'task.updated': 'A task was updated',
     'task.completed': 'Task completed',
     'task.overdue': 'This task is overdue',
   };
 
   const appUrl = (data.appUrl ?? '').replace(/\/+$/, '');
-  const taskUrl = appUrl ? `${appUrl}/tasks/${data.taskId}` : '';
+  const taskUrl = appUrl ? `${appUrl}/${data.urlPath ?? 'tasks'}/${data.taskId}` : '';
   const prefsUrl = appUrl ? `${appUrl}/settings/notifications` : '';
 
   const greeting = data.recipientName ? `Hi ${escapeHtml(data.recipientName)},` : 'Hi,';
@@ -283,7 +304,7 @@ export function renderTaskEmail(
         <tr><td style="border-radius:10px;background:${accent};background-image:linear-gradient(135deg,${accent},${BRAND_GRADIENT_TO});">
           <a href="${taskUrl}" target="_blank"
              style="display:inline-block;padding:13px 34px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">
-            Open task&nbsp;&rarr;
+            ${data.urlPath === 'occurrences' ? 'Open occurrence' : 'Open task'}&nbsp;&rarr;
           </a>
         </td></tr>
       </table>`
@@ -406,7 +427,7 @@ export function renderTaskEmail(
     data.obNumber ? `Linked OB: ${data.obNumber}` : '',
     data.assignedByName ? `Assigned by: ${data.assignedByName}` : '',
     note ? `Latest note: "${note}"` : '',
-    taskUrl ? `\nOpen the task: ${taskUrl}` : '',
+    taskUrl ? `\nOpen it: ${taskUrl}` : '',
     `\n— DigiLog 360 · ${data.orgName}`,
   ].filter((l) => l !== '');
 

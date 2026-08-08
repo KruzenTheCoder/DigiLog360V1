@@ -69,6 +69,9 @@ export function BulkActionsBar({ selectedIds, onClear, authorId, authorName, ass
         .update({ assigned_to: assignee || null })
         .in('id', slice);
     }
+    // Fire-and-forget: flush the email outbox so assignment emails go out
+    // immediately (cron catches it otherwise).
+    if (assignee) void supabase.functions.invoke('task-alerts', { body: {} }).catch(() => {});
     setBusy(false);
     setAction(null);
     onClear();

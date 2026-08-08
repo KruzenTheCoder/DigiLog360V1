@@ -294,6 +294,10 @@ export function LogIncidentForm({
         router.refresh();
         return;
       }
+
+      // Fire-and-forget: flush the email outbox so the assignee's email goes
+      // out immediately (cron catches it otherwise).
+      void supabase.functions.invoke('task-alerts', { body: {} }).catch(() => {});
     }
 
     setSaving(false);

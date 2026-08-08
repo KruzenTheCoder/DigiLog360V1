@@ -625,7 +625,7 @@ Scheduled by `pg_cron` every 5 minutes. For each affected site:
 | `webhook-deliver` | Fan out an event to org_webhooks with HMAC-SHA256 signature, records `webhook_deliveries` | Internal key OR admin |
 | `patrol-watcher` | Seeds expected_patrols + alerts overdue ones | Cron (service role) |
 | `sla-monitor` | Inbox + push + email for SLA events | Cron (service role) |
-| `task-alerts` | Drains the task `email_outbox` through Resend (assigned / updated / completed emails), scans for overdue tasks and sends breach alerts; per-org config from `org_email_settings`; `mode:'test'` sends a sample to the caller | Signed-in (flush) · Cron (service role) · super_user (test) |
+| `task-alerts` | Drains the `email_outbox` through Resend — task assigned / updated / completed, occurrence assigned, and overdue-task breach alerts; per-org config from `org_email_settings`; `mode:'test'` sends a sample to any address (super only). Cron is self-scheduling: call `admin_schedule_task_alerts(url, service_key)` once via RPC | Signed-in (flush) · Cron (service role) · super_user (test) |
 | `transcribe-audio` | OpenAI Whisper proxy; attaches transcript as a comment on the occurrence | Bearer (signed-in) |
 | `health-check` | Public uptime probe (DB connectivity + counts) | None |
 

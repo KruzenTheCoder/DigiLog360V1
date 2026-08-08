@@ -38,6 +38,10 @@ export function AssignmentCard({
       .eq('id', occurrenceId);
     setBusy(false);
     if (error) { alert(error.message); return; }
+    // Fire-and-forget: flush the email outbox so the new reviewer's
+    // "occurrence assigned" email goes out immediately (cron catches it
+    // otherwise).
+    if (newId) void supabase.functions.invoke('task-alerts', { body: {} }).catch(() => {});
     setPicking(false);
     router.refresh();
   }
