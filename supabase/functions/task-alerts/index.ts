@@ -31,9 +31,17 @@ const BATCH = 50;
 interface TaskRow {
   id: number; org_id: string; title: string; description: string | null;
   priority: string; status: string; due_at: string | null; ob_number: string | null;
+  occurrence_id: number | null;
   assigned_to: string | null; assigned_to_name: string | null;
   assigned_by: string | null; assigned_by_name: string | null;
   completion_notes: string | null;
+}
+
+interface OccurrenceRow {
+  id: number; org_id: string; ob_number: string | null; occurrence_type: string;
+  severity: string; status: string; description: string | null;
+  sla_due_at: string | null;
+  assigned_to: string | null; assigned_to_name: string | null;
 }
 
 interface ProfileRow {
@@ -43,6 +51,7 @@ interface ProfileRow {
 
 interface OutboxRow {
   id: number; org_id: string; event: string; task_id: number | null;
+  occurrence_id: number | null;
   payload: Record<string, unknown>; attempts: number;
 }
 
@@ -67,11 +76,11 @@ function fromHeader(orgFromName: string | null | undefined): string {
 async function sendViaResend(opts: {
   to: string; subject: string; html: string; text: string;
   fromName?: string | null; replyTo?: string | null;
-}): Promise<{ ok: boolean; dev?: boolean; error?: string }> {
+}): Promise<{ ok: boolean; dev?: boolean; error?: string; providerId?: string | null }> {
   const key = Deno.env.get('RESEND_API_KEY');
   if (!key) {
     console.log('[task-alerts DEV] to=%s subject=%s', opts.to, opts.subject);
-    return { ok: true, dev: true };
+    return { ok: true, dev: true, providerId: null };
   }
   const resp = await fetch(RESEND_URL, {
     method: 'POST',
@@ -89,7 +98,24 @@ async function sendViaResend(opts: {
     const body = await resp.text().catch(() => '');
     return { ok: false, error: `Resend ${resp.status}: ${body.slice(0, 300)}` };
   }
-  return { ok: true };
+  const body = await resp.json().catch(() => ({}));
+  return { ok: true, providerId: (body?.id as string | undefined) ?? null };
+}
+
+/** Append one row to the delivery ledger (best-effort — never blocks sends). */
+async function logDelivery(admin: Sb, entry: {
+  org_id: string; outbox_id?: number | null; event: string;
+  task_id?: number | null; occurrence_id?: number | null; ob_number?: string | null;
+  recipient_id?: string | null; recipient_name?: string | null; recipient_email: string;
+  subject: string; status: 'sent' | 'failed' | 'dev';
+  provider_id?: string | null; error?: string | null; is_test?: boolean;
+}) {
+  await admin.from('email_log').insert(entry).then(
+    (r: { error: { message: string } | null }) => {
+      if (r.error) console.error('email_log insert failed:', r.error.message);
+    },
+    (e: unknown) => console.error('email_log insert threw:', e),
+  );
 }
 
 // ─── Config / lookups (cached per invocation) ───────────────────────────────
@@ -173,7 +199,7 @@ async function processOutbox(admin: Sb) {
 
   const { data: pending } = await admin
     .from('email_outbox')
-    .select('id, org_id, event, task_id, payload, attempts')
+    .select('id, org_id, event, task_id, occurrence_id, payload, attempts')
     .eq('status', 'pending')
     .lt('attempts', MAX_ATTEMPTS)
     .order('created_at', { ascending: true })
@@ -209,8 +235,10 @@ async function processOutbox(admin: Sb) {
 
     try {
       const event = row.event as TaskEmailEvent;
-      if (!TASK_EMAIL_EVENTS.includes(event) || !row.task_id) {
-        await finish('skipped', 'Unknown event or missing task'); skipped++; continue;
+      const isOccurrenceEvent = event === 'occurrence.assigned';
+      if (!TASK_EMAIL_EVENTS.includes(event)
+          || (isOccurrenceEvent ? !row.occurrence_id : !row.task_id)) {
+        await finish('skipped', 'Unknown event or missing record'); skipped++; continue;
       }
 
       const { name: orgName, settings } = await loadOrg(admin, orgCache, row.org_id);
@@ -218,30 +246,42 @@ async function processOutbox(admin: Sb) {
         await finish('skipped', 'Disabled in org settings'); skipped++; continue;
       }
 
-      const { data: task } = await admin.from('tasks')
-        .select('id, org_id, title, description, priority, status, due_at, ob_number, assigned_to, assigned_to_name, assigned_by, assigned_by_name, completion_notes')
-        .eq('id', row.task_id).maybeSingle();
-      if (!task) { await finish('skipped', 'Task no longer exists'); skipped++; continue; }
-      const t = task as TaskRow;
+      let t: TaskRow | null = null;
+      let occ: OccurrenceRow | null = null;
+      if (isOccurrenceEvent) {
+        const { data } = await admin.from('occurrences')
+          .select('id, org_id, ob_number, occurrence_type, severity, status, description, sla_due_at, assigned_to, assigned_to_name')
+          .eq('id', row.occurrence_id).maybeSingle();
+        occ = (data as OccurrenceRow | null);
+        if (!occ) { await finish('skipped', 'Occurrence no longer exists'); skipped++; continue; }
+      } else {
+        const { data } = await admin.from('tasks')
+          .select('id, org_id, title, description, priority, status, due_at, ob_number, occurrence_id, assigned_to, assigned_to_name, assigned_by, assigned_by_name, completion_notes')
+          .eq('id', row.task_id).maybeSingle();
+        t = (data as TaskRow | null);
+        if (!t) { await finish('skipped', 'Task no longer exists'); skipped++; continue; }
+      }
 
-      // Resolve recipient ids per event.
+      // Resolve recipient ids per event. Assignment events ALWAYS include the
+      // assignee — even when they assigned it to themselves, the email is the
+      // record. Only updated/completed exclude the actor.
       const actorId = (row.payload?.actor_id as string | undefined) ?? null;
       const recipientIds = new Set<string>();
-      if (event === 'task.assigned') {
-        if (t.assigned_to) recipientIds.add(t.assigned_to);
+      if (isOccurrenceEvent) {
+        if (occ!.assigned_to) recipientIds.add(occ!.assigned_to);
+      } else if (event === 'task.assigned') {
+        if (t!.assigned_to) recipientIds.add(t!.assigned_to);
       } else {
-        if (t.assigned_to) recipientIds.add(t.assigned_to);
-        if (t.assigned_by) recipientIds.add(t.assigned_by);
+        if (t!.assigned_to) recipientIds.add(t!.assigned_to);
+        if (t!.assigned_by) recipientIds.add(t!.assigned_by);
         if (event === 'task.overdue' && settings?.notify_admins_on_breach) {
           const { data: admins } = await admin.from('profiles')
             .select('id').eq('org_id', row.org_id).eq('role', 'admin')
             .is('deleted_at', null);
           for (const a of (admins ?? []) as Array<{ id: string }>) recipientIds.add(a.id);
         }
+        if (actorId && event !== 'task.overdue') recipientIds.delete(actorId);
       }
-      // The person who made the change doesn't need to hear about it
-      // (except overdue, where the assignee always gets it).
-      if (actorId && event !== 'task.overdue') recipientIds.delete(actorId);
 
       if (recipientIds.size === 0) { await finish('skipped', 'No recipients'); skipped++; continue; }
 
@@ -257,7 +297,7 @@ async function processOutbox(admin: Sb) {
         actorName = (actor?.full_name as string | undefined) ?? null;
       }
 
-      const overdueBy = event === 'task.overdue' && t.due_at
+      const overdueBy = event === 'task.overdue' && t?.due_at
         ? humanizeMs(Date.now() - new Date(t.due_at).getTime())
         : null;
 
@@ -266,32 +306,71 @@ async function processOutbox(admin: Sb) {
       for (const p of (profiles ?? []) as ProfileRow[]) {
         if (!p.email) continue;
         if (p.email_notifications === false) continue;
-        if (event === 'task.assigned' && p.notify_on_assignment === false) continue;
-        const dedupeKey = `${row.task_id}:${event}:${p.id}`;
+        const isAssignment = event === 'task.assigned' || isOccurrenceEvent;
+        if (isAssignment && p.notify_on_assignment === false) continue;
+        // Cross-event dedupe: logging an occurrence with an assignee enqueues
+        // BOTH occurrence.assigned and task.assigned (for the auto-created
+        // "Investigate" task). Scope assignment emails to the occurrence so
+        // the reviewer gets exactly one.
+        const dedupeKey = isAssignment
+          ? `assigned:${p.id}:${isOccurrenceEvent ? `occ${occ!.id}` : (t!.occurrence_id ? `occ${t!.occurrence_id}` : `task${t!.id}`)}`
+          : `${row.task_id}:${event}:${p.id}`;
         if (delivered.has(dedupeKey)) continue;
 
-        const data: TaskEmailData = {
-          taskId: t.id,
-          title: t.title,
-          description: t.description,
-          priority: t.priority,
-          status: t.status,
-          dueAt: t.due_at,
-          obNumber: t.ob_number,
-          assigneeName: t.assigned_to_name,
-          assignedByName: t.assigned_by_name,
-          actorName,
-          notes: (row.payload?.notes as string | undefined) ?? null,
-          completionNotes: t.completion_notes,
-          orgName,
-          appUrl,
-          recipientName: p.full_name?.split(' ')[0] ?? null,
-          overdueBy,
-        };
+        const data: TaskEmailData = isOccurrenceEvent
+          ? {
+              taskId: occ!.id,
+              urlPath: 'occurrences',
+              title: occ!.occurrence_type,
+              description: occ!.description,
+              priority: occ!.severity,
+              status: occ!.status,
+              dueAt: occ!.sla_due_at,
+              obNumber: occ!.ob_number,
+              assigneeName: occ!.assigned_to_name,
+              assignedByName: actorName,
+              actorName,
+              orgName,
+              appUrl,
+              recipientName: p.full_name?.split(' ')[0] ?? null,
+            }
+          : {
+              taskId: t!.id,
+              title: t!.title,
+              description: t!.description,
+              priority: t!.priority,
+              status: t!.status,
+              dueAt: t!.due_at,
+              obNumber: t!.ob_number,
+              assigneeName: t!.assigned_to_name,
+              assignedByName: t!.assigned_by_name,
+              actorName,
+              notes: (row.payload?.notes as string | undefined) ?? null,
+              completionNotes: t!.completion_notes,
+              orgName,
+              appUrl,
+              recipientName: p.full_name?.split(' ')[0] ?? null,
+              overdueBy,
+            };
         const { subject, html, text } = renderTaskEmail(event, data, settings);
         const res = await sendViaResend({
           to: p.email, subject, html, text,
           fromName: settings?.from_name, replyTo: settings?.reply_to,
+        });
+        await logDelivery(admin, {
+          org_id: row.org_id,
+          outbox_id: row.id,
+          event,
+          task_id: t?.id ?? null,
+          occurrence_id: isOccurrenceEvent ? occ!.id : (t?.occurrence_id ?? null),
+          ob_number: (isOccurrenceEvent ? occ!.ob_number : t!.ob_number) ?? null,
+          recipient_id: p.id,
+          recipient_name: p.full_name,
+          recipient_email: p.email,
+          subject,
+          status: res.ok ? (res.dev ? 'dev' : 'sent') : 'failed',
+          provider_id: res.providerId ?? null,
+          error: res.ok ? null : (res.error ?? 'send failed'),
         });
         if (res.ok) { delivering++; delivered.add(dedupeKey); }
         else errors.push(res.error ?? 'send failed');
@@ -303,7 +382,7 @@ async function processOutbox(admin: Sb) {
         await finish(retryable ? 'pending' : 'failed', errors.join(' | '));
         failed++;
       } else if (delivering === 0) {
-        await finish('skipped', 'All recipients opted out or lack email'); skipped++;
+        await finish('skipped', 'All recipients deduplicated, opted out, or lack email'); skipped++;
       } else {
         await finish('sent', errors.length > 0 ? errors.join(' | ') : undefined); sent++;
       }
@@ -383,12 +462,33 @@ Deno.serve(async (req) => {
 
     const data = sampleTaskEmailData(orgName, Deno.env.get('PUBLIC_APP_URL'));
     data.recipientName = caller.profile?.full_name?.split(' ')[0] ?? null;
-    if (event === 'task.completed') { data.status = 'done'; }
+    if (event === 'task.completed') data.status = 'done';
+    if (event === 'occurrence.assigned') {
+      data.title = 'Perimeter Intrusion';
+      data.priority = 'critical';
+      data.status = 'open';
+      data.urlPath = 'occurrences';
+      data.notes = null;
+    }
     const { subject, html, text } = renderTaskEmail(event, data, settings);
     const res = await sendViaResend({
       to, subject: `[TEST] ${subject}`, html, text,
       fromName: settings?.from_name, replyTo: settings?.reply_to,
     });
+    if (orgId) {
+      await logDelivery(admin, {
+        org_id: orgId,
+        event,
+        recipient_id: caller.profile?.id ?? null,
+        recipient_name: caller.profile?.full_name ?? null,
+        recipient_email: to,
+        subject: `[TEST] ${subject}`,
+        status: res.ok ? (res.dev ? 'dev' : 'sent') : 'failed',
+        provider_id: res.providerId ?? null,
+        error: res.ok ? null : (res.error ?? 'send failed'),
+        is_test: true,
+      });
+    }
     if (!res.ok) return json({ error: res.error }, 502);
     return json({ ok: true, to, dev: res.dev ?? false });
   }

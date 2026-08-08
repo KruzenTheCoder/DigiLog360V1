@@ -9,15 +9,18 @@
 // pixel-identical to what recipients receive. A test-send button delivers a
 // sample email (with the org's live config) to the signed-in super user.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AlertCircle, Building2, Check, Loader2, Mail, RotateCcw, Save, SendHorizonal,
+  AlertCircle, Building2, Check, History, Loader2, Mail, RotateCcw, Save,
+  Search, SendHorizonal,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input, Label, Select, Textarea } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { formatDateTime } from '@/lib/utils';
 import {
   TASK_EMAIL_EVENTS, TASK_EMAIL_EVENT_META,
   DEFAULT_EMAIL_SUBJECTS, DEFAULT_EMAIL_INTROS, DEFAULT_EMAIL_SETTINGS,
@@ -26,6 +29,29 @@ import {
 } from '@digilog/shared';
 
 interface OrgRow { id: string; name: string; slug: string; is_active: boolean }
+
+/** Row of public.email_log — the per-recipient delivery ledger. */
+interface EmailLogRow {
+  id: number;
+  event: string;
+  task_id: number | null;
+  occurrence_id: number | null;
+  ob_number: string | null;
+  recipient_name: string | null;
+  recipient_email: string;
+  subject: string;
+  status: 'sent' | 'failed' | 'dev';
+  provider_id: string | null;
+  error: string | null;
+  is_test: boolean;
+  created_at: string;
+}
+
+const LOG_STATUS_META: Record<EmailLogRow['status'], { label: string; color: string }> = {
+  sent: { label: 'Sent', color: '#16a34a' },
+  failed: { label: 'Failed', color: '#dc2626' },
+  dev: { label: 'Dev (logged only)', color: '#64748b' },
+};
 
 type Draft = Omit<OrgEmailSettingsRow, 'org_id' | 'updated_at' | 'updated_by'>;
 
@@ -67,6 +93,46 @@ export function EmailAlertsManager({
   // mount to avoid a hydration mismatch.
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+
+  // ── Delivery history (email_log ledger) ──
+  const [logs, setLogs] = useState<EmailLogRow[]>([]);
+  const [logsBusy, setLogsBusy] = useState(false);
+  const [logFilter, setLogFilter] = useState<'all' | 'sent' | 'failed' | 'dev' | 'test'>('all');
+  const [logQ, setLogQ] = useState('');
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const loadLogs = useCallback(async (org: string) => {
+    if (!org) return;
+    setLogsBusy(true);
+    const supabase = createClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb: any = supabase;
+    const [logsRes, pendRes] = await Promise.all([
+      sb.from('email_log').select('*')
+        .eq('org_id', org).order('id', { ascending: false }).limit(200),
+      sb.from('email_outbox').select('id', { count: 'exact', head: true })
+        .eq('org_id', org).eq('status', 'pending'),
+    ]);
+    setLogs((logsRes.data ?? []) as EmailLogRow[]);
+    setPendingCount(pendRes.count ?? 0);
+    setLogsBusy(false);
+  }, []);
+
+  useEffect(() => { void loadLogs(orgId); }, [orgId, loadLogs]);
+
+  const visibleLogs = useMemo(() => logs.filter((l) => {
+    if (logFilter === 'test') {
+      if (!l.is_test) return false;
+    } else if (logFilter !== 'all' && l.status !== logFilter) {
+      return false;
+    }
+    const needle = logQ.trim().toLowerCase();
+    if (needle) {
+      const hay = `${l.recipient_email} ${l.recipient_name ?? ''} ${l.subject} ${l.ob_number ?? ''}`.toLowerCase();
+      if (!hay.includes(needle)) return false;
+    }
+    return true;
+  }), [logs, logFilter, logQ]);
 
   const org = orgs.find((o) => o.id === orgId);
 
@@ -135,6 +201,7 @@ export function EmailAlertsManager({
           ? `Dev mode (no RESEND_API_KEY configured) — the email was logged by the function instead of sent.`
           : `Test email sent to ${d.to} — check that inbox.`,
       });
+      void loadLogs(orgId);
     }
   }
 
@@ -142,6 +209,13 @@ export function EmailAlertsManager({
   const preview = useMemo(() => {
     const sample = sampleTaskEmailData(org?.name ?? 'DigiLog 360');
     if (previewEvent === 'task.completed') sample.status = 'done';
+    if (previewEvent === 'occurrence.assigned') {
+      sample.title = 'Perimeter Intrusion';
+      sample.priority = 'critical';
+      sample.status = 'open';
+      sample.urlPath = 'occurrences';
+      sample.notes = null;
+    }
     return renderTaskEmail(previewEvent, sample, { org_id: orgId, ...draft });
   }, [previewEvent, draft, org?.name, orgId]);
 
@@ -424,6 +498,113 @@ export function EmailAlertsManager({
           </Card>
         </div>
       </div>
+
+      {/* ── Delivery history — the full outgoing-mail audit ── */}
+      <Card>
+        <CardContent className="space-y-3 py-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 font-semibold">
+                <History className="h-4 w-4 text-brand" /> Delivery history
+              </h2>
+              <p className="text-xs text-[hsl(var(--muted))]">
+                Every email this organisation has sent (or tried to send) — one row per recipient,
+                with the Resend message ID as proof of hand-off. Latest 200 shown.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {pendingCount > 0 && (
+                <Badge color="#d97706">{pendingCount} queued — sends within a minute</Badge>
+              )}
+              <Button size="sm" variant="secondary" onClick={() => loadLogs(orgId)} disabled={logsBusy}>
+                {logsBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {([
+              ['all', 'All'], ['sent', 'Sent'], ['failed', 'Failed'], ['dev', 'Dev'], ['test', 'Tests'],
+            ] as Array<[typeof logFilter, string]>).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setLogFilter(key)}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                  logFilter === key
+                    ? 'bg-brand text-white'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+            <div className="relative ml-auto">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted))]" />
+              <Input
+                value={logQ}
+                onChange={(e) => setLogQ(e.target.value)}
+                placeholder="Search recipient, subject, OB…"
+                className="w-64 pl-9"
+              />
+            </div>
+          </div>
+
+          <Table>
+            <THead>
+              <TR>
+                <TH>Sent at</TH><TH>Event</TH><TH>Recipient</TH>
+                <TH>Subject</TH><TH>Ref</TH><TH>Status</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {visibleLogs.map((l) => {
+                const meta = TASK_EMAIL_EVENT_META[l.event as TaskEmailEvent];
+                const status = LOG_STATUS_META[l.status];
+                return (
+                  <TR key={l.id}>
+                    <TD className="whitespace-nowrap text-xs text-[hsl(var(--muted))]">
+                      {formatDateTime(l.created_at)}
+                    </TD>
+                    <TD>
+                      <span className="flex items-center gap-1.5">
+                        <Badge color={meta?.color ?? '#64748b'}>{meta?.label ?? l.event}</Badge>
+                        {l.is_test && <Badge color="#7c3aed">Test</Badge>}
+                      </span>
+                    </TD>
+                    <TD className="text-sm">
+                      <span className="font-medium">{l.recipient_name ?? '—'}</span>
+                      <span className="block text-xs text-[hsl(var(--muted))]">{l.recipient_email}</span>
+                    </TD>
+                    <TD className="max-w-[26rem] truncate text-sm" title={l.subject}>{l.subject}</TD>
+                    <TD className="whitespace-nowrap text-xs text-[hsl(var(--muted))]">
+                      {l.ob_number ?? (l.task_id ? `Task #${l.task_id}` : '—')}
+                    </TD>
+                    <TD>
+                      <Badge color={status.color}>{status.label}</Badge>
+                      {l.provider_id && (
+                        <span className="block max-w-[10rem] truncate font-mono text-[10px] text-[hsl(var(--muted))]" title={l.provider_id}>
+                          {l.provider_id}
+                        </span>
+                      )}
+                      {l.error && (
+                        <span className="block max-w-[16rem] truncate text-[10px] text-red-600" title={l.error}>
+                          {l.error}
+                        </span>
+                      )}
+                    </TD>
+                  </TR>
+                );
+              })}
+              {visibleLogs.length === 0 && (
+                <TR><TD colSpan={6} className="py-8 text-center text-[hsl(var(--muted))]">
+                  {logsBusy ? 'Loading…' : 'No deliveries recorded yet — the ledger starts with the next email sent.'}
+                </TD></TR>
+              )}
+            </TBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
