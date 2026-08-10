@@ -27,6 +27,11 @@ jobs:
       - name: Typecheck shared
         run: npx tsc -p packages/shared/tsconfig.json --noEmit
 
+      # The edge function's copy of the email templates must match the source
+      # module, or deployed emails silently drift from the console preview.
+      - name: Email templates in sync
+        run: npm run email:sync:check
+
       - name: Typecheck admin
         run: npx tsc -p apps/admin/tsconfig.json --noEmit
 

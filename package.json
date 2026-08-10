@@ -17,6 +17,8 @@
     "admin:build": "npm run build --workspace=@digilog/admin",
     "mobile": "cd apps/mobile && npm run start",
     "shared:build": "npm run build --workspace=@digilog/shared",
+    "email:sync": "node scripts/sync-email-templates.mjs",
+    "email:sync:check": "node scripts/sync-email-templates.mjs --check",
     "db:types": "supabase gen types typescript --linked > packages/shared/src/database.types.ts",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset",
