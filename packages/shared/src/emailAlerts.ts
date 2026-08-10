@@ -17,6 +17,7 @@ export const TASK_EMAIL_EVENTS = [
   'task.assigned',
   'occurrence.assigned',
   'task.updated',
+  'occurrence.updated',
   'task.completed',
   'task.overdue',
 ] as const;
@@ -78,6 +79,12 @@ export const TASK_EMAIL_EVENT_META: Record<
     pill: 'TASK UPDATED',
     color: '#0ea5e9',
   },
+  'occurrence.updated': {
+    label: 'Occurrence updated',
+    description: 'Sent to the assigned reviewer and the person who logged it whenever an assigned occurrence changes status or gets a new note — including when it is resolved or closed. Only assigned occurrences trigger this.',
+    pill: 'OCCURRENCE UPDATED',
+    color: '#0891b2',
+  },
   'task.completed': {
     label: 'Task completed',
     description: 'Sent to the assigner (and assignee, if someone else completed it) when a task is marked done.',
@@ -96,6 +103,7 @@ export const DEFAULT_EMAIL_SUBJECTS: Record<TaskEmailEvent, string> = {
   'task.assigned': 'New task for you: {{task_title}}',
   'occurrence.assigned': 'Occurrence assigned to you: {{ob_number}} — {{task_title}}',
   'task.updated': 'Task updated: {{task_title}}',
+  'occurrence.updated': '{{ob_number}} is now {{task_status}} — {{task_title}}',
   'task.completed': 'Task completed: {{task_title}}',
   'task.overdue': 'Overdue task: {{task_title}}',
 };
@@ -107,6 +115,8 @@ export const DEFAULT_EMAIL_INTROS: Record<TaskEmailEvent, string> = {
     '{{actor_name}} assigned occurrence {{ob_number}} to you for review in {{org_name}}. The details are below.',
   'task.updated':
     '{{actor_name}} posted an update on a task you are involved in. The latest state is below.',
+  'occurrence.updated':
+    '{{actor_name}} updated occurrence {{ob_number}}, which is assigned to {{assignee_name}}. It is now {{task_status}} — the latest state and notes are below.',
   'task.completed':
     'Good news — the task below has just been marked as {{task_status}} by {{actor_name}}.',
   'task.overdue':
@@ -147,6 +157,11 @@ export interface TaskEmailData {
   appUrl?: string | null;
   /** Path segment for the CTA link: 'tasks' (default) or 'occurrences'. */
   urlPath?: 'tasks' | 'occurrences';
+  /**
+   * Linked occurrence id. On task emails this adds a second link straight to
+   * the occurrence behind the task, so the OB is always one click away.
+   */
+  occurrenceId?: number | string | null;
   recipientName?: string | null;
   /** Human-friendly “overdue by 3 h” string (overdue event only). */
   overdueBy?: string | null;
@@ -268,16 +283,33 @@ export function renderTaskEmail(
     vars,
   );
 
-  const headline: Record<TaskEmailEvent, string> = {
+  const headlines: Record<TaskEmailEvent, string> = {
     'task.assigned': 'You have a new task',
     'occurrence.assigned': 'An occurrence needs your review',
     'task.updated': 'A task was updated',
+    'occurrence.updated': 'An occurrence was updated',
     'task.completed': 'Task completed',
     'task.overdue': 'This task is overdue',
   };
+  // Resolution is worth calling out in the headline rather than hiding it
+  // behind a generic "updated".
+  const isResolution = event === 'occurrence.updated'
+    && (data.status === 'resolved' || data.status === 'closed');
+  const headline: Record<TaskEmailEvent, string> = {
+    ...headlines,
+    'occurrence.updated': isResolution
+      ? `Occurrence ${(STATUS_LABELS[data.status] ?? data.status).toLowerCase()}`
+      : headlines['occurrence.updated'],
+  };
 
   const appUrl = (data.appUrl ?? '').replace(/\/+$/, '');
+  const isOccurrenceView = (data.urlPath ?? 'tasks') === 'occurrences';
   const taskUrl = appUrl ? `${appUrl}/${data.urlPath ?? 'tasks'}/${data.taskId}` : '';
+  // Task emails that belong to an OB also link straight to that occurrence.
+  const linkedOccurrenceUrl = appUrl && !isOccurrenceView && data.occurrenceId
+    ? `${appUrl}/occurrences/${data.occurrenceId}`
+    : '';
+  const obUrl = isOccurrenceView ? taskUrl : linkedOccurrenceUrl;
   const prefsUrl = appUrl ? `${appUrl}/settings/notifications` : '';
 
   const greeting = data.recipientName ? `Hi ${escapeHtml(data.recipientName)},` : 'Hi,';
@@ -300,21 +332,42 @@ export function renderTaskEmail(
     metaRow('Status', chip(STATUS_LABELS[data.status] ?? data.status, STATUS_COLORS[data.status] ?? '#64748b')),
     metaRow('Due', dueHtml),
     data.obNumber
-      ? metaRow('Linked OB', `<span style="font-weight:600;color:${accent};">${escapeHtml(data.obNumber)}</span>`)
+      ? metaRow(
+          isOccurrenceView ? 'OB number' : 'Linked OB',
+          obUrl
+            // The OB itself is clickable — the shortest path to the record.
+            ? `<a href="${obUrl}" target="_blank" style="font-weight:700;color:${accent};text-decoration:underline;">${escapeHtml(data.obNumber)}</a>`
+            : `<span style="font-weight:600;color:${accent};">${escapeHtml(data.obNumber)}</span>`,
+        )
       : '',
     data.assignedByName ? metaRow('Assigned by', escapeHtml(data.assignedByName)) : '',
     data.assigneeName ? metaRow('Assigned to', escapeHtml(data.assigneeName)) : '',
   ].filter(Boolean).join('');
 
+  const ctaLabel = isOccurrenceView
+    ? `Open ${data.obNumber ? escapeHtml(data.obNumber) : 'occurrence'}`
+    : 'Open task';
+
   const ctaHtml = taskUrl
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto 4px;">
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto 0;">
         <tr><td style="border-radius:10px;background:${accent};background-image:linear-gradient(135deg,${accent},${BRAND_GRADIENT_TO});">
           <a href="${taskUrl}" target="_blank"
              style="display:inline-block;padding:13px 34px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">
-            ${data.urlPath === 'occurrences' ? 'Open occurrence' : 'Open task'}&nbsp;&rarr;
+            ${ctaLabel}&nbsp;&rarr;
           </a>
         </td></tr>
-      </table>`
+      </table>
+      ${linkedOccurrenceUrl ? `
+      <p style="margin:14px 0 0;font-family:'Segoe UI',Arial,sans-serif;font-size:14px;">
+        <a href="${linkedOccurrenceUrl}" target="_blank" style="color:${accent};font-weight:600;text-decoration:underline;">
+          View occurrence ${data.obNumber ? escapeHtml(data.obNumber) : ''}&nbsp;&rarr;
+        </a>
+      </p>` : ''}
+      <!-- Plain URL fallback: some clients strip styled buttons. -->
+      <p style="margin:14px 0 0;font-family:'Segoe UI',Arial,sans-serif;font-size:11px;line-height:1.6;color:#94a3b8;word-break:break-all;">
+        Button not working? Copy this link:<br>
+        <a href="${taskUrl}" target="_blank" style="color:#94a3b8;text-decoration:underline;">${taskUrl}</a>
+      </p>`
     : '';
 
   const footerNote = (settings?.footer_note ?? '').trim();
@@ -434,7 +487,8 @@ export function renderTaskEmail(
     data.obNumber ? `Linked OB: ${data.obNumber}` : '',
     data.assignedByName ? `Assigned by: ${data.assignedByName}` : '',
     note ? `Latest note: "${note}"` : '',
-    taskUrl ? `\nOpen it: ${taskUrl}` : '',
+    taskUrl ? `\n${isOccurrenceView ? 'Open the occurrence' : 'Open the task'}: ${taskUrl}` : '',
+    linkedOccurrenceUrl ? `View occurrence ${data.obNumber ?? ''}: ${linkedOccurrenceUrl}` : '',
     `\n— DigiLog 360 · ${data.orgName}`,
   ].filter((l) => l !== '');
 
@@ -445,6 +499,7 @@ export function renderTaskEmail(
 export function sampleTaskEmailData(orgName: string, appUrl?: string | null): TaskEmailData {
   return {
     taskId: 482,
+    occurrenceId: 15481,
     title: 'Replace beam sensor — north perimeter',
     description:
       'The IR beam on the north fence line is intermittently faulting and raising false alarms. Swap the unit, realign, and confirm three clean test triggers with the control room.',

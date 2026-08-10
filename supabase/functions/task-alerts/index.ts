@@ -42,6 +42,7 @@ interface OccurrenceRow {
   severity: string; status: string; description: string | null;
   sla_due_at: string | null;
   assigned_to: string | null; assigned_to_name: string | null;
+  logged_by: string | null; logged_by_name: string | null;
 }
 
 interface ProfileRow {
@@ -235,7 +236,7 @@ async function processOutbox(admin: Sb) {
 
     try {
       const event = row.event as TaskEmailEvent;
-      const isOccurrenceEvent = event === 'occurrence.assigned';
+      const isOccurrenceEvent = event.startsWith('occurrence.');
       if (!TASK_EMAIL_EVENTS.includes(event)
           || (isOccurrenceEvent ? !row.occurrence_id : !row.task_id)) {
         await finish('skipped', 'Unknown event or missing record'); skipped++; continue;
@@ -250,7 +251,7 @@ async function processOutbox(admin: Sb) {
       let occ: OccurrenceRow | null = null;
       if (isOccurrenceEvent) {
         const { data } = await admin.from('occurrences')
-          .select('id, org_id, ob_number, occurrence_type, severity, status, description, sla_due_at, assigned_to, assigned_to_name')
+          .select('id, org_id, ob_number, occurrence_type, severity, status, description, sla_due_at, assigned_to, assigned_to_name, logged_by, logged_by_name')
           .eq('id', row.occurrence_id).maybeSingle();
         occ = (data as OccurrenceRow | null);
         if (!occ) { await finish('skipped', 'Occurrence no longer exists'); skipped++; continue; }
@@ -267,7 +268,13 @@ async function processOutbox(admin: Sb) {
       // record. Only updated/completed exclude the actor.
       const actorId = (row.payload?.actor_id as string | undefined) ?? null;
       const recipientIds = new Set<string>();
-      if (isOccurrenceEvent) {
+      if (event === 'occurrence.updated') {
+        // The reviewer it's assigned to, plus whoever logged it — minus the
+        // person who just made the change.
+        if (occ!.assigned_to) recipientIds.add(occ!.assigned_to);
+        if (occ!.logged_by) recipientIds.add(occ!.logged_by);
+        if (actorId) recipientIds.delete(actorId);
+      } else if (isOccurrenceEvent) {
         if (occ!.assigned_to) recipientIds.add(occ!.assigned_to);
       } else if (event === 'task.assigned') {
         if (t!.assigned_to) recipientIds.add(t!.assigned_to);
@@ -306,21 +313,25 @@ async function processOutbox(admin: Sb) {
       for (const p of (profiles ?? []) as ProfileRow[]) {
         if (!p.email) continue;
         if (p.email_notifications === false) continue;
-        const isAssignment = event === 'task.assigned' || isOccurrenceEvent;
+        const isAssignment = event === 'task.assigned' || event === 'occurrence.assigned';
         if (isAssignment && p.notify_on_assignment === false) continue;
         // Cross-event dedupe: logging an occurrence with an assignee enqueues
         // BOTH occurrence.assigned and task.assigned (for the auto-created
         // "Investigate" task). Scope assignment emails to the occurrence so
-        // the reviewer gets exactly one.
+        // the reviewer gets exactly one. Updates dedupe per record instead, so
+        // a status change and its note collapse into a single email.
         const dedupeKey = isAssignment
           ? `assigned:${p.id}:${isOccurrenceEvent ? `occ${occ!.id}` : (t!.occurrence_id ? `occ${t!.occurrence_id}` : `task${t!.id}`)}`
-          : `${row.task_id}:${event}:${p.id}`;
+          : isOccurrenceEvent
+            ? `occ${occ!.id}:${event}:${p.id}`
+            : `${row.task_id}:${event}:${p.id}`;
         if (delivered.has(dedupeKey)) continue;
 
         const data: TaskEmailData = isOccurrenceEvent
           ? {
               taskId: occ!.id,
               urlPath: 'occurrences',
+              occurrenceId: occ!.id,
               title: occ!.occurrence_type,
               description: occ!.description,
               priority: occ!.severity,
@@ -328,14 +339,18 @@ async function processOutbox(admin: Sb) {
               dueAt: occ!.sla_due_at,
               obNumber: occ!.ob_number,
               assigneeName: occ!.assigned_to_name,
-              assignedByName: actorName,
+              // On updates the "assigned by" row would mislabel the actor, and
+              // the intro already names them — omit it there.
+              assignedByName: event === 'occurrence.updated' ? null : actorName,
               actorName,
+              notes: (row.payload?.notes as string | undefined) ?? null,
               orgName,
               appUrl,
               recipientName: p.full_name?.split(' ')[0] ?? null,
             }
           : {
               taskId: t!.id,
+              occurrenceId: t!.occurrence_id,
               title: t!.title,
               description: t!.description,
               priority: t!.priority,
@@ -463,12 +478,18 @@ Deno.serve(async (req) => {
     const data = sampleTaskEmailData(orgName, Deno.env.get('PUBLIC_APP_URL'));
     data.recipientName = caller.profile?.full_name?.split(' ')[0] ?? null;
     if (event === 'task.completed') data.status = 'done';
-    if (event === 'occurrence.assigned') {
+    if (event.startsWith('occurrence.')) {
       data.title = 'Perimeter Intrusion';
       data.priority = 'critical';
-      data.status = 'open';
       data.urlPath = 'occurrences';
-      data.notes = null;
+      data.taskId = data.occurrenceId ?? data.taskId;
+      if (event === 'occurrence.assigned') {
+        data.status = 'open';
+        data.notes = null;
+      } else {
+        data.status = 'in_progress';
+        data.notes = 'Armed response on scene, perimeter secured. Awaiting SAPS case number.';
+      }
     }
     const { subject, html, text } = renderTaskEmail(event, data, settings);
     const res = await sendViaResend({

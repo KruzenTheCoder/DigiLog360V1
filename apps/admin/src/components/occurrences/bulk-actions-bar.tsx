@@ -39,10 +39,8 @@ export function BulkActionsBar({ selectedIds, onClear, authorId, authorName, ass
     // Update occurrences in chunks of 100 (Postgrest IN clause cap).
     for (let i = 0; i < selectedIds.length; i += 100) {
       const slice = selectedIds.slice(i, i + 100);
-      await supabase.from('occurrences')
-        .update({ status: targetStatus, last_sla_update_at: new Date().toISOString() })
-        .in('id', slice);
-      // Drop a timeline note on each.
+      // Timeline note first, then the status patch — same order as the single
+      // update dialog, so alert emails carry the note instead of firing twice.
       if (note.trim()) {
         await supabase.from('occurrence_updates').insert(
           slice.map((id) => ({
@@ -51,7 +49,13 @@ export function BulkActionsBar({ selectedIds, onClear, authorId, authorName, ass
           })),
         );
       }
+      await supabase.from('occurrences')
+        .update({ status: targetStatus, last_sla_update_at: new Date().toISOString() })
+        .in('id', slice);
     }
+    // Fire-and-forget: flush the email outbox so update emails for assigned
+    // occurrences go out immediately (cron catches it otherwise).
+    void supabase.functions.invoke('task-alerts', { body: {} }).catch(() => {});
     setBusy(false);
     setAction(null);
     setNote('');

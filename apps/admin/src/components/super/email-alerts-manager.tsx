@@ -209,12 +209,18 @@ export function EmailAlertsManager({
   const preview = useMemo(() => {
     const sample = sampleTaskEmailData(org?.name ?? 'DigiLog 360');
     if (previewEvent === 'task.completed') sample.status = 'done';
-    if (previewEvent === 'occurrence.assigned') {
+    if (previewEvent.startsWith('occurrence.')) {
       sample.title = 'Perimeter Intrusion';
       sample.priority = 'critical';
-      sample.status = 'open';
       sample.urlPath = 'occurrences';
-      sample.notes = null;
+      sample.taskId = sample.occurrenceId ?? sample.taskId;
+      if (previewEvent === 'occurrence.assigned') {
+        sample.status = 'open';
+        sample.notes = null;
+      } else {
+        sample.status = 'in_progress';
+        sample.notes = 'Armed response on scene, perimeter secured. Awaiting SAPS case number.';
+      }
     }
     return renderTaskEmail(previewEvent, sample, { org_id: orgId, ...draft });
   }, [previewEvent, draft, org?.name, orgId]);
@@ -273,7 +279,9 @@ export function EmailAlertsManager({
               <ul className="divide-y rounded-xl border text-sm">
                 {([
                   ['task.assigned', 'The assignee — “you have a new task”. The assigner made the change, so they are not emailed.'],
+                  ['occurrence.assigned', 'The reviewer it was assigned to — from the log form, the detail-page assignment card, or a bulk assign.'],
                   ['task.updated', 'Assigner + assignee, excluding whoever posted the update (e.g. the assignee updates → the assigner is emailed).'],
+                  ['occurrence.updated', 'The assigned reviewer + whoever logged it, excluding the person who made the change. Only assigned occurrences send these.'],
                   ['task.completed', 'Assigner + assignee, excluding whoever completed it — so the person who handed the task out always hears it is done.'],
                   ['task.overdue', 'Assignee + assigner, plus every org admin if “copy org admins” is on below.'],
                 ] as Array<[TaskEmailEvent, string]>).map(([event, who]) => (

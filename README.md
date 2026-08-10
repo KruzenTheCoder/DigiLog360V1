@@ -458,6 +458,9 @@ the bundled `_deploy_all.sql` can be re-run safely.
 | 52 | `20260729000001_visitor_scan_gallery_pick.sql` | Visitor licence scan — gallery pick support |
 | 53 | `20260731000001_ob_number_beyond_9999.sql` | OB numbers stay collision-free past 9999 |
 | 54 | `20260805000001_task_email_alerts.sql` | Task email alerts: `org_email_settings`, `email_outbox`, enqueue triggers, `tasks.breach_alerted_at` |
+| 55 | `20260806000001_occurrence_assignment_emails.sql` | `occurrence.assigned` emails + self-scheduling `admin_schedule_task_alerts` RPC |
+| 56 | `20260806000002_email_log.sql` | `email_log` — per-recipient delivery audit ledger |
+| 57 | `20260808000001_occurrence_update_emails.sql` | `occurrence.updated` emails for assigned occurrences (note + status triggers, deduped) |
 
 > Migrations are forward-only and idempotent; `supabase/_deploy_all.sql` bundles
 > them for a single SQL-editor paste.
@@ -625,7 +628,7 @@ Scheduled by `pg_cron` every 5 minutes. For each affected site:
 | `webhook-deliver` | Fan out an event to org_webhooks with HMAC-SHA256 signature, records `webhook_deliveries` | Internal key OR admin |
 | `patrol-watcher` | Seeds expected_patrols + alerts overdue ones | Cron (service role) |
 | `sla-monitor` | Inbox + push + email for SLA events | Cron (service role) |
-| `task-alerts` | Drains the `email_outbox` through Resend — task assigned / updated / completed, occurrence assigned, and overdue-task breach alerts; per-org config from `org_email_settings`; `mode:'test'` sends a sample to any address (super only). Cron is self-scheduling: call `admin_schedule_task_alerts(url, service_key)` once via RPC | Signed-in (flush) · Cron (service role) · super_user (test) |
+| `task-alerts` | Drains the `email_outbox` through Resend — task assigned / updated / completed, occurrence assigned / updated, and overdue-task breach alerts; per-org config from `org_email_settings`; writes the `email_log` delivery ledger; `mode:'test'` sends a sample to any address (super only). Cron is self-scheduling: call `admin_schedule_task_alerts(url, service_key)` once via RPC | Signed-in (flush) · Cron (service role) · super_user (test) |
 | `transcribe-audio` | OpenAI Whisper proxy; attaches transcript as a comment on the occurrence | Bearer (signed-in) |
 | `health-check` | Public uptime probe (DB connectivity + counts) | None |
 
@@ -770,7 +773,7 @@ detail page lives at `/tasks/[id]`.
 - **Mobile Layout** — control the mobile tab bar and home cards shown per role
 - **Platform Health** — aggregate KPIs and recent activity across all tenants
 - **Permissions** — role × capability matrix editor (the entire point of the capability layer)
-- **Email Alerts** — per-org configuration of the Resend-powered task emails (assigned / updated / completed / overdue): master switch, per-event toggles + subject/intro templates with `{{variables}}`, sender name, reply-to, accent colour, footer note, copy-admins-on-breach — with a live pixel-identical preview and a send-test-to-me button
+- **Email Alerts** — per-org configuration of the Resend-powered alert emails (task assigned / updated / completed / overdue, occurrence assigned / updated): master switch, per-event toggles + subject/intro templates with `{{variables}}`, sender name, reply-to, accent colour, footer note, copy-admins-on-breach — with a live pixel-identical preview, a test send to any address, and the **Delivery history** audit of every email sent (recipient, subject, status, Resend message id)
 
 ### My Access
 

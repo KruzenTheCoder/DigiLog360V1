@@ -353,6 +353,9 @@ function UpdateStatusSheet({
       await supabase.from('occurrences')
         .update({ status, last_sla_update_at: ts })
         .eq('id', occurrence.id);
+      // Fire-and-forget: flush the email outbox so the assigned reviewer's
+      // update email goes out immediately (cron catches it otherwise).
+      void supabase.functions.invoke('task-alerts', { body: {} }).catch(() => {});
     }
     setBusy(false);
     if (!uErr) onDone();

@@ -489,9 +489,8 @@ function DecisionDialog({
     const nextStatus = decision === 'acknowledged' ? 'acknowledged'
       : decision === 'escalated' ? 'in_progress'
       : 'open';
-    await supabase.from('occurrences')
-      .update({ status: nextStatus, last_sla_update_at: new Date().toISOString() })
-      .eq('id', target.id);
+    // Timeline note first, then the status patch — that order lets the alert
+    // email carry the manager's note instead of firing twice.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase as any).from('occurrence_updates').insert({
       org_id: orgId,
@@ -502,6 +501,12 @@ function DecisionDialog({
       updated_by: reviewerId,
       updated_by_name: reviewerName,
     });
+    await supabase.from('occurrences')
+      .update({ status: nextStatus, last_sla_update_at: new Date().toISOString() })
+      .eq('id', target.id);
+
+    // Fire-and-forget: flush the outbox so the reviewer's email is immediate.
+    void supabase.functions.invoke('task-alerts', { body: {} }).catch(() => {});
 
     setBusy(false);
     onClose();
@@ -665,10 +670,8 @@ function BulkActionDialog({
         const { error: ackErr } = await (supabase as any).from('manager_acknowledgements').insert(ackPayload);
         if (ackErr) throw ackErr;
 
-        await supabase.from('occurrences')
-          .update({ status: 'acknowledged', last_sla_update_at: nowIso })
-          .in('id', items.map((o) => o.id));
-
+        // Timeline notes first, then the status patch — that order lets the
+        // alert emails carry the note instead of firing twice.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error: updErr } = await (supabase as any).from('occurrence_updates').insert(items.map((o) => ({
           org_id: orgId,
@@ -680,6 +683,10 @@ function BulkActionDialog({
           updated_by_name: reviewerName,
         })));
         if (updErr) throw updErr;
+
+        await supabase.from('occurrences')
+          .update({ status: 'acknowledged', last_sla_update_at: nowIso })
+          .in('id', items.map((o) => o.id));
       } else {
         // action === 'close'
         // 1. Find which occurrences already have a report — only auto-generate
@@ -763,12 +770,8 @@ function BulkActionDialog({
         const { error: ackErr } = await (supabase as any).from('manager_acknowledgements').insert(ackPayload);
         if (ackErr) throw ackErr;
 
-        // 4. Flip statuses to closed.
-        await supabase.from('occurrences')
-          .update({ status: 'closed', closed_at: nowIso, last_sla_update_at: nowIso })
-          .in('id', ids);
-
-        // 5. Timeline entry.
+        // 4. Timeline entry — written before the status flip so the alert
+        //    emails carry the note instead of firing twice.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error: updErr } = await (supabase as any).from('occurrence_updates').insert(items.map((o) => ({
           org_id: orgId,
@@ -781,7 +784,15 @@ function BulkActionDialog({
           updated_by_name: reviewerName,
         })));
         if (updErr) throw updErr;
+
+        // 5. Flip statuses to closed.
+        await supabase.from('occurrences')
+          .update({ status: 'closed', closed_at: nowIso, last_sla_update_at: nowIso })
+          .in('id', ids);
       }
+
+      // Fire-and-forget: flush the outbox so reviewers' emails are immediate.
+      void supabase.functions.invoke('task-alerts', { body: {} }).catch(() => {});
 
       setBusy(false);
       setNotes('');

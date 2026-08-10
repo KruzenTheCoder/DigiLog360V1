@@ -76,6 +76,10 @@ export function UpdateOccurrenceDialog({
       .eq('id', occurrence.id);
     if (updErr) { setError(updErr.message); setSaving(false); return; }
 
+    // Fire-and-forget: flush the email outbox so the assigned reviewer's
+    // update email goes out immediately (cron catches it otherwise).
+    void supabase.functions.invoke('task-alerts', { body: {} }).catch(() => {});
+
     setSaving(false);
     setNotes('');
     onClose();
