@@ -229,11 +229,12 @@
       <b>Multi-Tenant</b>
       <b>Realtime SLA</b>
       <b>Offline-First Mobile</b>
+      <b>Email Alerts · Resend</b>
     </div>
   </div>
   <div class="cover-foot">
     <div><b>Netstream Intergrated Solutions</b>Proprietary &amp; Confidential — © 2026 Kruz Naidoo. All Rights Reserved.</div>
-    <div style="text-align:right"><b>Edition 1.0</b>August 2026</div>
+    <div style="text-align:right"><b>Edition 1.1</b>August 2026</div>
   </div>
 </div>
 
@@ -416,7 +417,7 @@
   <tr><td>Connectivity</td><td>Online only</td><td>Offline queue — guards log without signal; syncs automatically</td></tr>
   <tr><td>Permissions</td><td>Fixed roles</td><td>Six ranked roles, multi-role users, and a per-org capability matrix the super user edits live</td></tr>
   <tr><td>Evidence</td><td>Photos only</td><td>Photos, voice notes with Whisper transcription, OCR of handwritten notes, SA licence scanning</td></tr>
-  <tr><td>Integration</td><td>None</td><td>Signed outbound webhooks, org-scoped API tokens, public health check</td></tr>
+  <tr><td>Integration</td><td>None</td><td>Signed outbound webhooks, org-scoped API tokens, Resend email alerts with a per-recipient audit ledger, public health check</td></tr>
 </table>
 
 <h2><span class="no">1.3</span>The operational day at a glance</h2>
@@ -446,8 +447,9 @@
   <tr><td>Auth</td><td>Supabase Auth (JWT)</td><td>Web email/password sessions, optional TOTP 2FA, magic-link minting for the mobile PIN flow</td></tr>
   <tr><td>Storage</td><td>Supabase Storage</td><td>Private buckets for occurrence photos &amp; voice notes; public bucket for org branding</td></tr>
   <tr><td>Realtime</td><td>Postgres replication → WebSockets</td><td>Live boards, notification bells, guard map markers, comment threads</td></tr>
-  <tr><td>Serverless</td><td>Edge Functions (Deno / TypeScript)</td><td>15 functions: PIN login, user/org provisioning, email, webhooks, SLA monitor, patrol watcher, Whisper transcription, health check</td></tr>
-  <tr><td>Scheduling</td><td>pg_cron</td><td>Runs the SLA monitor and patrol watcher every 5 minutes</td></tr>
+  <tr><td>Serverless</td><td>Edge Functions (Deno / TypeScript)</td><td>16 functions: PIN login, user/org provisioning, task &amp; occurrence email alerts (Resend), webhooks, SLA monitor, patrol watcher, Whisper transcription, health check</td></tr>
+  <tr><td>Email</td><td>Resend</td><td>Task &amp; occurrence alert emails from a verified sending domain, with per-org branding and an immutable per-recipient delivery ledger</td></tr>
+  <tr><td>Scheduling</td><td>pg_cron</td><td>SLA monitor + patrol watcher every 5 minutes; the email-alert sweep every minute (self-scheduling — no manual setup)</td></tr>
 </table>
 
 <h2><span class="no">2.2</span>Admin console — <code>apps/admin</code></h2>
@@ -547,10 +549,10 @@
   <rect x="280" y="290" width="200" height="120" rx="12" fill="#0f172a"/>
   <text x="380" y="315" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">EDGE FUNCTIONS</text>
   <text x="380" y="332" text-anchor="middle" fill="#cbd5e1" font-size="10">pin-login · pin-set · admin-*</text>
-  <text x="380" y="347" text-anchor="middle" fill="#cbd5e1" font-size="10">send-email · webhook-deliver</text>
-  <text x="380" y="362" text-anchor="middle" fill="#cbd5e1" font-size="10">sla-monitor · patrol-watcher</text>
-  <text x="380" y="377" text-anchor="middle" fill="#cbd5e1" font-size="10">transcribe-audio · health-check</text>
-  <text x="380" y="396" text-anchor="middle" fill="#94a3b8" font-size="9.5">Deno · the only privileged key</text>
+  <text x="380" y="347" text-anchor="middle" fill="#cbd5e1" font-size="10">task-alerts · send-email</text>
+  <text x="380" y="362" text-anchor="middle" fill="#cbd5e1" font-size="10">webhook-deliver · sla-monitor</text>
+  <text x="380" y="377" text-anchor="middle" fill="#cbd5e1" font-size="10">patrol-watcher · transcribe-audio</text>
+  <text x="380" y="396" text-anchor="middle" fill="#94a3b8" font-size="9.5">health-check · the only privileged key</text>
 
   <rect x="500" y="290" width="220" height="120" rx="12" fill="url(#gcli)"/>
   <text x="610" y="315" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">MOBILE APP</text>
@@ -569,7 +571,7 @@
   <li><b>Apps talk to Postgres directly</b> with the public anon key. They can only ever see what row-level security allows — the guard's phone physically cannot query another organisation's rows.</li>
   <li><b>Privileged work goes through edge functions.</b> Creating users, minting API tokens, verifying PINs, sending email: only these Deno functions hold the service-role key, and each one re-checks the caller's role before acting.</li>
   <li><b>Realtime is push, not poll.</b> Postgres replicates changes on key tables (occurrences, comments, notifications, tasks, scans…) to WebSocket subscribers. The admin's <code>&lt;RealtimeRefresh&gt;</code> component debounce-refreshes any server-rendered table when its tables change.</li>
-  <li><b>Cron closes the loop.</b> Every 5 minutes, <code>sla-monitor</code> hunts for breached or update-due occurrences and <code>patrol-watcher</code> hunts for missed patrol slots — then notify inbox, push and email.</li>
+  <li><b>Cron closes the loop.</b> Every 5 minutes, <code>sla-monitor</code> hunts for breached or update-due occurrences and <code>patrol-watcher</code> hunts for missed patrol slots — then notify inbox, push and email. Every minute, <code>task-alerts</code> drains the email outbox and scans for overdue tasks, so no alert email ever waits longer than ~60 seconds.</li>
 </ul>
 
 <div class="callout note"><b class="cap">Note — why this is safe</b>The capability matrix (Chapter 5) hides UI, but security never depends on it: even a modified client with a stolen anon key hits RLS, which re-evaluates the caller's org and roles on every single query. Storage is protected the same way — file paths must begin with the caller's own <code>&lt;org_slug&gt;/</code> prefix.</div>
@@ -811,9 +813,10 @@
   <tr><td>Security (2FA)</td><td>TOTP enrolment</td><td><code>security.manage_2fa</code></td></tr>
   <tr><td>Webhooks</td><td>Outbound integrations</td><td><code>webhooks.manage</code></td></tr>
   <tr><td>API Tokens</td><td>Org-scoped access tokens</td><td><code>api_tokens.manage</code></td></tr>
-  <tr><td rowspan="4"><b>Super User</b></td><td>Organisations / All Users</td><td>Tenant + cross-org user management</td><td><code>super.orgs_manage</code> · <code>super.users_cross_org</code></td></tr>
+  <tr><td rowspan="5"><b>Super User</b></td><td>Organisations / All Users</td><td>Tenant + cross-org user management</td><td><code>super.orgs_manage</code> · <code>super.users_cross_org</code></td></tr>
   <tr><td>Permissions</td><td>Role × capability matrix editor</td><td><code>super.permissions_manage</code></td></tr>
   <tr><td>Branding · Form Builder · Mobile Layout</td><td>Per-org customisation</td><td>—</td></tr>
+  <tr><td>Email Alerts</td><td>Per-org Resend email configuration, live preview, test sends + the delivery audit</td><td>—</td></tr>
   <tr><td>Taxonomy · Assignees · Mgmt Reports · Health</td><td>Platform-wide controls</td><td><code>super.platform_health</code></td></tr>
 </table>
 
@@ -1129,8 +1132,8 @@
   <div class="task-body">
     <ol class="steps">
       <li>Open the occurrence. The detail shows severity and status badges, the details grid, description, <b>photo gallery</b>, report card, comments and the update timeline.</li>
-      <li><b>Change status:</b> use the status control, add notes, save. The timeline and SLA timers update instantly.</li>
-      <li><b>Assign a reviewer:</b> in the assignment card pick a person (the list is the org's assignment allow-list). They are notified in-app and by push, and it appears in their <b>Assigned to Me</b> queue.</li>
+      <li><b>Change status:</b> use the status control, add notes, save. The timeline and SLA timers update instantly, and if the occurrence is assigned, the reviewer and the original logger are emailed the update.</li>
+      <li><b>Assign a reviewer:</b> in the assignment card pick a person (the list is the org's assignment allow-list). They are notified in-app, by push <b>and by email</b>, and it appears in their <b>Assigned to Me</b> queue.</li>
       <li><b>Discuss:</b> the comment thread is realtime — mobile and web users converse live. You can edit or delete your own comments.</li>
       <li><b>Report:</b> add or complete the formal report; it becomes the PDF (Chapter 21).</li>
     </ol>
@@ -1395,7 +1398,36 @@
   </div>
 </div>
 
-<h2><span class="no">13.5</span>Platform health</h2>
+<h2><span class="no">13.5</span>Email alerts</h2>
+<div class="task">
+  <div class="task-head"><h4>Configure an organisation's email alerts</h4><div class="where">Sidebar → Super User → Email Alerts</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Pick the <b>organisation</b>. Everything on this page is configured per tenant.</li>
+      <li>Set the identity: <b>master switch</b>, <b>sender name</b> (address comes from the platform's verified Resend domain), <b>reply-to</b>, <b>accent colour</b>, <b>footer note</b>, and whether org admins are <b>copied on overdue breaches</b>.</li>
+      <li>Tune each of the six events — <b>Task assigned</b>, <b>Occurrence assigned</b>, <b>Task updated</b>, <b>Occurrence updated</b>, <b>Task completed</b>, <b>Task overdue (breach)</b>: toggle it, and optionally override the <b>subject</b> and <b>intro paragraph</b> using <code>{{variable}}</code> chips (task title, OB number, assignee, due date…).</li>
+      <li>Watch the <b>live preview</b> — it is rendered by the exact template module the sending function uses, so what you see is what recipients get.</li>
+      <li><b>Save</b>. New emails use the configuration immediately.</li>
+      <li><b>Send a test</b> to any address (or blank for your own) to see the real email land in a real inbox.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Who receives what: assignment emails always go to the assignee (even self-assigned); updates and completions go to assigner + assignee minus whoever made the change; overdue goes to both plus optional admins. Per-user opt-outs under <span class="path">Settings → My Preferences</span> are always respected.</div>
+</div>
+
+<div class="task">
+  <div class="task-head"><h4>Audit every outgoing email — Delivery history</h4><div class="where">Email Alerts → Delivery history</div></div>
+  <div class="task-body">
+    <ol class="steps">
+      <li>Scroll to <b>Delivery history</b> — one row per recipient per send attempt, newest first (latest 200).</li>
+      <li>Filter with the <b>All / Sent / Failed / Dev / Tests</b> chips or <b>search</b> by recipient, subject or OB number.</li>
+      <li>Every successful row carries the <b>Resend message ID</b> — proof of hand-off you can trace in the Resend dashboard. Failed rows show the exact provider error.</li>
+      <li>An amber <b>“N queued”</b> badge means emails are waiting in the outbox — the every-minute sweep sends them; press <b>Refresh</b> to watch them land.</li>
+    </ol>
+  </div>
+  <div class="task-foot">Backed by the immutable <code>email_log</code> ledger. Test sends are recorded too, tagged so they never muddy the real history.</div>
+</div>
+
+<h2><span class="no">13.6</span>Platform health</h2>
 <p><span class="path">Super User → Platform Health</span> (<code>super.platform_health</code>) aggregates KPIs and recent activity across every tenant — your first stop each morning and your dashboard during incidents. Pair it with the public <code>health-check</code> endpoint wired into external uptime monitoring (Chapter 24).</p>
 
 <div class="callout note"><b class="cap">Note — the super user's golden rule</b>Work as super_user only for platform tasks. For day-to-day operational work inside a tenant, use a normal admin account in that org — it keeps the audit log honest and prevents accidental cross-tenant changes.</div>
@@ -1725,6 +1757,8 @@
   <div class="task-foot">Tasks stop "we'll fix it tomorrow" from evaporating: the occurrence closes, the follow-up survives with its own owner and trail.</div>
 </div>
 
+<div class="callout note"><b class="cap">Note — tasks email people automatically</b>Assignment, status updates, completion and overdue breaches each send a branded email to the task's assigner and assignee (see §22 for exact routing). Give a task a <b>due date</b> and the platform watches it: pass the deadline and a red overdue email fires once — editing the due date re-arms it.</div>
+
 <!-- ================= CH 21 REPORTS ================= -->
 <div class="pagebreak"></div>
 <div class="chapter" data-num="21">
@@ -1759,7 +1793,7 @@
   <tr><th>Channel</th><th>Driven by</th><th>User control</th></tr>
   <tr><td><b>In-app inbox</b> (web bell + mobile inbox)</td><td>SLA monitor, patrol watcher, assignments, manager decisions, handovers, system notices</td><td>Mark read / mark all / delete</td></tr>
   <tr><td><b>Push</b> (mobile)</td><td>Same events, sent via Expo Push</td><td><span class="path">Settings → My Preferences</span> — push toggle</td></tr>
-  <tr><td><b>Email</b></td><td>SLA breach summaries (Resend)</td><td>My Preferences — email toggle</td></tr>
+  <tr><td><b>Email</b> (Resend)</td><td>Task &amp; occurrence alerts — assigned / updated / completed / overdue — plus SLA breach summaries</td><td>My Preferences — email + assignment toggles</td></tr>
 </table>
 
 <h3>Where a tapped push takes you</h3>
@@ -1772,6 +1806,36 @@
   <tr><td>Everything else</td><td>Inbox</td></tr>
 </table>
 <p>Deep links work from cold start too — if the app was closed, it boots straight into the right screen after PIN entry.</p>
+
+<h3>Email alerts in depth</h3>
+<p>Every task and occurrence email is a branded, mobile-friendly message: gradient header with the organisation's name, event pill, personal greeting, a detail card with priority/severity and status chips, due time, linked OB, and the latest note.</p>
+
+<div class="callout tip"><b class="cap">Every email opens the record in one click</b>Each message carries a gradient <b>Open occurrence OB-…</b> (or <b>Open task</b>) button that deep-links straight into the console. The <b>OB number itself is a clickable link</b>, task emails tied to an incident carry a second <b>View occurrence</b> link, and a plain copy-paste URL sits underneath for mail clients that strip styled buttons. The plain-text version of every email carries the same links.</div>
+
+<div class="callout warn"><b class="cap">Warning — links need the app URL</b>The buttons are built from the <code>PUBLIC_APP_URL</code> secret. If it is ever unset, emails still send but render <b>with no links at all</b>. Set it whenever the console moves: <code>supabase secrets set PUBLIC_APP_URL=https://…</code></div>
+
+<h4>Who receives which email</h4>
+<table class="compact">
+  <tr><th>Event</th><th>Recipients</th></tr>
+  <tr><td><b>Task assigned</b></td><td>The assignee — always, even when they assigned it to themselves (the email is the record)</td></tr>
+  <tr><td><b>Occurrence assigned</b></td><td>The reviewer, from <i>any</i> assignment path: the log form, the detail-page assignment card, or a bulk action</td></tr>
+  <tr><td><b>Task updated</b></td><td>Assigner + assignee, excluding whoever made the change</td></tr>
+  <tr><td><b>Occurrence updated</b></td><td>The assigned reviewer + whoever logged it, excluding whoever made the change. Fires on every status change and posted note — including resolution. Only <i>assigned</i> occurrences send these, so bulk actions on unassigned history stay silent</td></tr>
+  <tr><td><b>Task completed</b></td><td>Assigner + assignee, excluding whoever completed it</td></tr>
+  <tr><td><b>Task overdue (breach)</b></td><td>Assignee + assigner, plus every org admin if enabled</td></tr>
+</table>
+<p>Per-user preferences always win: no email address, email notifications off, or (for assignments) notify-on-assignment off — no email.</p>
+
+<h4>How an alert email travels</h4>
+<div class="flow">
+  <div class="n dark"><b>Event happens</b><span>Assignment, status change, note, or a due date passing</span></div>
+  <div class="n"><b>Outbox</b><span>A database trigger enqueues it durably — nothing is ever lost</span></div>
+  <div class="n"><b>task-alerts</b><span>Flushed instantly by the apps; a cron sweep retries every minute and catches overdue tasks</span></div>
+  <div class="n"><b>Resend</b><span>Sent from the verified domain with the org's branding</span></div>
+  <div class="n good"><b>Ledger</b><span>Every delivery recorded in the audit history with its Resend message ID</span></div>
+</div>
+
+<div class="callout tip"><b class="cap">Tip — customising and auditing</b>The super user shapes all of this per organisation — subjects, intro copy, colours, sender identity, per-event switches — from <span class="path">Super User → Email Alerts</span> (§13.5), which also hosts the full <b>Delivery history</b> audit of every mail that went out.</div>
 
 <!-- ================= PART V DIVIDER ================= -->
 <div class="pagebreak"></div>
@@ -1792,7 +1856,7 @@
 <div class="chapter" data-num="23">
   <div class="part">Part V · Administration &amp; Operations</div>
   <h1>Integrations</h1>
-  <p>Signed outbound webhooks, org-scoped API tokens, and the fifteen edge functions that do the platform's privileged work.</p>
+  <p>Signed outbound webhooks, org-scoped API tokens, Resend email delivery, and the sixteen edge functions that do the platform's privileged work.</p>
 </div>
 
 <h2><span class="no">23.1</span>Outbound webhooks</h2>
@@ -1835,6 +1899,7 @@
   <tr><td><code>send-email</code></td><td>Resend wrapper (logs to console if unconfigured)</td><td>Internal · admin</td></tr>
   <tr><td><code>webhook-deliver</code></td><td>Fan out signed events, record deliveries</td><td>Internal · admin</td></tr>
   <tr><td><code>sla-monitor</code> / <code>patrol-watcher</code></td><td>The five-minute watchdogs (Chapter 16, 17)</td><td>Cron</td></tr>
+  <tr><td><code>task-alerts</code></td><td>Drains the email outbox through Resend (task &amp; occurrence alerts), scans for overdue tasks, sends configurable test emails, and writes the <code>email_log</code> delivery ledger</td><td>Signed-in (flush) · Cron · super_user (test)</td></tr>
   <tr><td><code>transcribe-audio</code></td><td>Whisper transcription of voice notes</td><td>Signed-in</td></tr>
   <tr><td><code>health-check</code></td><td>Public uptime probe (DB connectivity + counts)</td><td>Anyone</td></tr>
 </table>
@@ -1856,8 +1921,9 @@
       <li><b>Configure env files</b> — <code>.env</code> (service role, for scripts), <code>apps/admin/.env.local</code> and <code>apps/mobile/.env</code> (URL + anon key each).</li>
       <li><b>Apply migrations</b> — <code>npx supabase db push</code> (or paste <code>supabase/_deploy_all.sql</code> into the SQL editor). All 45+ migrations are idempotent and safe to re-run.</li>
       <li><b>Regenerate types</b> — <code>npm run db:types</code>.</li>
-      <li><b>Deploy the 15 edge functions</b> — <code>npx supabase functions deploy …</code> (list in README §Quick Start).</li>
-      <li><b>Schedule cron</b> — SLA monitor and patrol watcher every 5 minutes (<code>supabase/schedule_sla_monitor.sql</code> is the template).</li>
+      <li><b>Deploy the 16 edge functions</b> — <code>npx supabase functions deploy …</code> (list in README §Quick Start).</li>
+      <li><b>Set email secrets</b> — <code>supabase secrets set RESEND_API_KEY=… "EMAIL_FROM=DigiLog 360 &lt;alerts@your-verified-domain&gt;" PUBLIC_APP_URL=https://your-console</code> (verify the sending domain at resend.com/domains first). <b>PUBLIC_APP_URL is what puts the clickable buttons in every alert email</b> — without it they render link-free.</li>
+      <li><b>Schedule cron</b> — SLA monitor and patrol watcher every 5 minutes (<code>supabase/schedule_sla_monitor.sql</code>). The email sweep schedules itself: call <code>admin_schedule_task_alerts(url, service_key)</code> once via RPC.</li>
       <li><b>Seed</b> — <code>node --env-file=.env scripts/seed-accounts.mjs</code> creates the demo org, the full role line-up and a cross-org super user.</li>
       <li><b>Host</b> — admin console to Vercel (root <code>apps/admin</code>); mobile via Expo EAS builds for iOS + Android.</li>
     </ol>
@@ -1869,7 +1935,7 @@
 <table>
   <tr><th>Cadence</th><th>Task</th></tr>
   <tr><td>Daily</td><td>Glance at Platform Health (super user) and your uptime monitor on <code>health-check</code></td></tr>
-  <tr><td>Weekly</td><td>Review webhook delivery failures; check the audit log for anomalies (PIN lockouts, off-hours admin actions)</td></tr>
+  <tr><td>Weekly</td><td>Review webhook delivery failures and the email <b>Delivery history</b> for failed sends; check the audit log for anomalies (PIN lockouts, off-hours admin actions)</td></tr>
   <tr><td>Quarterly</td><td>Rotate <code>SUPABASE_SERVICE_ROLE_KEY</code> (90 d); review user lists per org — deactivate leavers, reset their PINs</td></tr>
   <tr><td>Twice yearly</td><td>Rotate anon key, <code>RESEND_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>INTERNAL_FN_KEY</code> (180 d)</td></tr>
   <tr><td>On staff exit</td><td>Deactivate the account and reset/park its PIN the same day</td></tr>
@@ -1940,6 +2006,8 @@
   <tr><td><b>Handover</b></td><td>A signed shift-change summary the incoming guard must acknowledge</td></tr>
   <tr><td><b>Edge function</b></td><td>A serverless backend function holding the privileged key for admin operations</td></tr>
   <tr><td><b>Offline queue</b></td><td>On-device store of occurrences logged without signal, auto-synced later</td></tr>
+  <tr><td><b>Email outbox</b></td><td>Durable queue of alert emails, drained within a minute of any event</td></tr>
+  <tr><td><b>Delivery ledger</b></td><td>Immutable per-recipient record of every email sent, with its Resend message ID</td></tr>
 </table>
 
 <h2><span class="no">A.3</span>Core data model</h2>
@@ -1949,11 +2017,11 @@
   <tr><td>Occurrences</td><td><code>occurrences</code> · <code>occurrence_updates</code> · <code>occurrence_reports</code> · <code>occurrence_images</code> · <code>occurrence_comments</code> · <code>manager_acknowledgements</code></td></tr>
   <tr><td>Patrols</td><td><code>patrol_routes</code> · <code>checkpoints</code> · <code>route_checkpoints</code> · <code>patrols</code> · <code>checkpoint_scans</code> · <code>patrol_schedules</code> · <code>expected_patrols</code> · <code>guard_positions</code></td></tr>
   <tr><td>Field ops</td><td><code>shifts</code> · <code>shift_handovers</code> · <code>visitors</code> · <code>keys</code> · <code>key_handovers</code> · <code>tasks</code> · <code>task_updates</code></td></tr>
-  <tr><td>Platform</td><td><code>notifications</code> · <code>saved_views</code> · <code>audit_log</code> · <code>pin_attempts</code> · <code>org_sla_overrides</code> · <code>org_occurrence_types</code> · <code>org_webhooks</code> · <code>webhook_deliveries</code> · <code>api_tokens</code></td></tr>
+  <tr><td>Platform</td><td><code>notifications</code> · <code>saved_views</code> · <code>audit_log</code> · <code>pin_attempts</code> · <code>org_sla_overrides</code> · <code>org_occurrence_types</code> · <code>org_webhooks</code> · <code>webhook_deliveries</code> · <code>api_tokens</code> · <code>org_email_settings</code> · <code>email_outbox</code> · <code>email_log</code></td></tr>
 </table>
 
 <div class="footer-note">
-  <span>DigiLog 360 — Platform Wiki &amp; Operations Manual · Edition 1.0 · August 2026</span>
+  <span>DigiLog 360 — Platform Wiki &amp; Operations Manual · Edition 1.1 · August 2026</span>
   <span>© 2026 Kruz Naidoo · Netstream Intergrated Solutions · Proprietary &amp; Confidential</span>
 </div>
 
