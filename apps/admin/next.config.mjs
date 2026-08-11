@@ -143,7 +143,15 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           // HSTS — only honoured over HTTPS. 2 years, include subdomains.
-          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+          //
+          // Deliberately WITHOUT `preload`. That token declares the domain
+          // ready for the browser-hardcoded preload list, which covers the
+          // bare apex too — and the apex still points at legacy hosting that
+          // serves someone else's certificate. Submitting it in that state
+          // would make digilog360.co.za unreachable for every Chrome user,
+          // and removal from the list takes months. Restore `preload` once
+          // the apex is on Vercel with a valid certificate.
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
           { key: 'X-DNS-Prefetch-Control', value: 'on' },
           // Allow the microphone for our OWN origin only (voice notes on the Log
           // Occurrence form). Camera/geolocation stay disabled — the web console
