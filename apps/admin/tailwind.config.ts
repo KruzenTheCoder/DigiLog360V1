@@ -37,10 +37,19 @@ const config: Config = {
           '70%': { boxShadow: '0 0 0 8px rgba(220,38,38,0)' },
           '100%': { boxShadow: '0 0 0 0 rgba(220,38,38,0)' },
         },
+        // Landing page: the hero's slow radar sweep.
+        'radar-sweep': { to: { transform: 'rotate(360deg)' } },
+        // Landing page: a new incident arriving on the live board.
+        'flash-in': {
+          '0%': { backgroundColor: 'rgba(102,126,234,0.28)' },
+          '100%': { backgroundColor: 'transparent' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 0.2s ease-out',
         'pulse-ring': 'pulse-ring 1.8s infinite',
+        'radar-sweep': 'radar-sweep 9s linear infinite',
+        'flash-in': 'flash-in 2.4s ease',
       },
     },
   },

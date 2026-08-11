@@ -6,6 +6,9 @@ import { getSupabaseUrl, getSupabaseAnonKey } from './env';
 // Performance Optimizations
 // ============================================================================
 
+// Routes anyone may view without signing in.
+const PUBLIC_PATHS = new Set(['/']);
+
 // Cache duration in seconds
 const CACHE_DURATION = {
   static: 60 * 60 * 24 * 365, // 1 year for static assets
@@ -131,6 +134,13 @@ export async function updateSession(request: NextRequest) {
     if (user && !userError && !hasParams) {
       return NextResponse.redirect(new URL('/menu', request.url));
     }
+    return supabaseResponse;
+  }
+
+  // Public pages — viewable without a session. The landing page at `/` is the
+  // product's front door: anyone can read what the platform does. Signed-in
+  // visitors are sent on to /menu by the page itself, not here.
+  if (PUBLIC_PATHS.has(pathname)) {
     return supabaseResponse;
   }
 
