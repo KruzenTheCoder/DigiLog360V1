@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/brand/logo';
 import { BRAND } from '@digilog/shared';
 import { LiveTicker } from './live-ticker';
 import { LiveBoard } from './live-board';
@@ -178,14 +179,9 @@ export function LandingPage() {
 
         {/* Nav */}
         <nav className="relative z-10 mx-auto flex w-full max-w-[100rem] items-center justify-between px-6 py-6 lg:px-14">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/[0.18] text-lg font-extrabold backdrop-blur-sm">
-              D
-            </div>
-            <div className="min-w-0">
-              <b className="block text-base font-bold leading-tight">{BRAND.name}</b>
-              <span className="text-xs text-white/75">{BRAND.tagline}</span>
-            </div>
+          <div className="min-w-0">
+            <Logo className="text-2xl sm:text-3xl" onDark />
+            <p className="mt-1 text-xs text-white/75">{BRAND.tagline}</p>
           </div>
           <Link href="/login">
             <Button variant="secondary" className="shadow-sm">
@@ -627,8 +623,9 @@ export function LandingPage() {
 
       <footer className="w-full bg-slate-950 py-10 text-slate-500">
         <div className="mx-auto flex w-full max-w-[100rem] flex-wrap items-center justify-between gap-4 px-6 text-sm lg:px-14">
-          <span>
-            <b className="text-slate-300">{BRAND.name}</b> — {BRAND.tagline}
+          <span className="flex items-center gap-2">
+            <Logo className="text-lg" onDark />
+            <span className="text-slate-500">— {BRAND.tagline}</span>
           </span>
           <span>Proprietary &amp; confidential</span>
         </div>
