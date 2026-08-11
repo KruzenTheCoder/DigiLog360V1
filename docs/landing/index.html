@@ -1,0 +1,1270 @@
+<title>DigiLog 360 — Security Operations Platform</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  /* ═══════════════════════════════════════════════════════════════
+     DigiLog 360 — landing page
+     Problem → Solution → Story → Outcome, built in the console's own
+     design language. Tokens mirror apps/admin/src/app/globals.css.
+     All sites, people and locations are generic by design.
+     ═══════════════════════════════════════════════════════════════ */
+
+  :root {
+    --background: 210 40% 98%;
+    --surface:      0 0% 100%;
+    --foreground: 222 47% 11%;
+    --muted:      215 20% 45%;
+    --border:     214 32% 91%;
+    --brand:      245 75% 66%;
+
+    --grad-from: #667eea;
+    --grad-to:   #764ba2;
+
+    --critical: #dc2626;
+    --high:     #ea580c;
+    --medium:   #d97706;
+    --low:      #16a34a;
+    --open:     #3b82f6;
+    --progress: #0ea5e9;
+    --resolved: #16a34a;
+
+    --tone-red-a:    #f43f5e; --tone-red-b:    #dc2626;
+    --tone-amber-a:  #f59e0b; --tone-amber-b:  #ea580c;
+    --tone-sky-a:    #0ea5e9; --tone-sky-b:    #2563eb;
+    --tone-violet-a: #8b5cf6; --tone-violet-b: #9333ea;
+    --tone-green-a:  #10b981; --tone-green-b:  #0d9488;
+    --tone-slate-a:  #475569; --tone-slate-b:  #1e293b;
+
+    --radius-xl:  0.75rem;
+    --radius-2xl: 1rem;
+    --shadow-sm:  0 1px 2px 0 rgb(15 23 42 / 0.05);
+    --shadow-md:  0 4px 14px -4px rgb(15 23 42 / 0.10);
+    --shadow-lg:  0 18px 50px -18px rgb(102 126 234 / 0.55);
+
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: 222 47% 9%;  --surface: 222 40% 13%;
+      --foreground: 210 40% 96%; --muted: 215 20% 65%;
+      --border: 217 30% 22%;     --brand: 245 75% 70%;
+    }
+  }
+  :root[data-theme="dark"] {
+    --background: 222 47% 9%;  --surface: 222 40% 13%;
+    --foreground: 210 40% 96%; --muted: 215 20% 65%;
+    --border: 217 30% 22%;     --brand: 245 75% 70%;
+  }
+  :root[data-theme="light"] {
+    --background: 210 40% 98%; --surface: 0 0% 100%;
+    --foreground: 222 47% 11%; --muted: 215 20% 45%;
+    --border: 214 32% 91%;     --brand: 245 75% 66%;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; border-color: hsl(var(--border)); }
+
+  body {
+    margin: 0;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--sans);
+    font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell { width: min(1140px, 100% - 2rem); margin-inline: auto; }
+  .stack { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  a { color: hsl(var(--brand)); }
+  :focus-visible { outline: 2px solid hsl(var(--brand)); outline-offset: 2px; border-radius: 6px; }
+
+  h1, h2, h3 { margin: 0; text-wrap: balance; }
+  p { margin: 0; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ══ HERO ═══════════════════════════════════════════════════════ */
+  .hero {
+    position: relative; overflow: hidden;
+    border-radius: var(--radius-2xl);
+    background-image: linear-gradient(135deg, #5a67d8 0%, var(--grad-from) 38%, var(--grad-to) 100%);
+    color: #fff;
+    box-shadow: var(--shadow-lg);
+    padding: clamp(2rem, 5vw, 4.5rem) clamp(1.5rem, 5vw, 4rem) clamp(2rem, 4vw, 3rem);
+    margin-top: 1.5rem;
+  }
+  /* Depth: a soft top-light plus a slow radar sweep — the subject's own motif */
+  .hero::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(900px 420px at 82% -18%, rgba(255,255,255,.28), transparent 62%),
+      radial-gradient(620px 380px at 8% 108%, rgba(15,23,42,.22), transparent 60%);
+  }
+  .hero::after {
+    content: ""; position: absolute;
+    width: 780px; height: 780px; right: -290px; top: -320px;
+    border-radius: 50%; pointer-events: none; opacity: .16;
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,.85) 32deg, transparent 66deg);
+    animation: sweep 9s linear infinite;
+  }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+
+  .hero > * { position: relative; }
+
+  .hero-top { display: flex; align-items: center; gap: .75rem; margin-bottom: clamp(2rem, 5vw, 3.5rem); }
+  .hero-mark {
+    width: 46px; height: 46px; flex: none;
+    border-radius: var(--radius-xl);
+    background: rgba(255,255,255,.18);
+    border: 1px solid rgba(255,255,255,.28);
+    backdrop-filter: blur(6px);
+    display: grid; place-items: center;
+    font-weight: 800; font-size: 1.2rem;
+  }
+  .hero-top b { font-size: 1.02rem; font-weight: 700; display: block; letter-spacing: .01em; }
+  .hero-top span { font-size: .78rem; color: rgba(255,255,255,.82); }
+
+  .kicker {
+    display: inline-flex; align-items: center; gap: .5rem;
+    border: 1px solid rgba(255,255,255,.32);
+    background: rgba(255,255,255,.12);
+    backdrop-filter: blur(6px);
+    border-radius: 999px; padding: .3rem .85rem;
+    font-size: .72rem; font-weight: 700;
+    letter-spacing: .14em; text-transform: uppercase;
+    margin-bottom: 1.4rem;
+  }
+  .kicker::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 0 0 rgba(255,255,255,.8); animation: ping 2.4s infinite;
+  }
+  @keyframes ping {
+    0%   { box-shadow: 0 0 0 0 rgba(255,255,255,.6); }
+    70%  { box-shadow: 0 0 0 9px rgba(255,255,255,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+  }
+
+  .hero h1 {
+    font-size: clamp(2.15rem, 6vw, 4.4rem);
+    font-weight: 800; letter-spacing: -.035em; line-height: 1.03;
+    max-width: 17ch;
+  }
+  .hero h1 .thin { font-weight: 300; opacity: .92; }
+  .hero .sub {
+    margin-top: 1.4rem; max-width: 60ch;
+    font-size: clamp(1rem, 1.6vw, 1.18rem);
+    color: rgba(255,255,255,.9);
+  }
+
+  /* Live ticker — the realtime promise, demonstrated in the hero */
+  .ticker {
+    margin-top: clamp(1.8rem, 4vw, 2.75rem);
+    background: rgba(255,255,255,.13);
+    border: 1px solid rgba(255,255,255,.26);
+    border-radius: var(--radius-xl);
+    backdrop-filter: blur(8px);
+    padding: .3rem;
+    max-width: 620px;
+  }
+  .ticker__head {
+    display: flex; align-items: center; gap: .5rem;
+    padding: .45rem .75rem .3rem;
+    font-size: .66rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+    color: rgba(255,255,255,.78);
+  }
+  .ticker__item {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem;
+    background: rgba(255,255,255,.14);
+    border-radius: .6rem;
+    padding: .7rem .85rem;
+    font-size: .88rem;
+    transition: opacity .4s ease;
+  }
+  .ticker__item .ob { font-family: var(--mono); font-weight: 700; }
+  .ticker__item .sep { opacity: .5; }
+  .ticker__item .clk {
+    margin-left: auto; font-family: var(--mono); font-weight: 700; font-size: .8rem;
+    background: #fff; color: var(--critical);
+    border-radius: 999px; padding: .1rem .65rem;
+  }
+  .ticker__item.fade { opacity: 0; }
+
+  .hero-stats {
+    margin-top: clamp(2rem, 4vw, 3rem);
+    display: grid; gap: 1px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    border-top: 1px solid rgba(255,255,255,.24);
+    padding-top: clamp(1.4rem, 3vw, 2rem);
+  }
+  .hero-stats div { padding-right: 1rem; }
+  .hero-stats b {
+    display: block; font-size: clamp(1.5rem, 2.8vw, 2.1rem); font-weight: 800;
+    letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.1;
+  }
+  .hero-stats span {
+    display: block; margin-top: .15rem;
+    font-size: .72rem; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: rgba(255,255,255,.78);
+  }
+
+  /* ══ GradientSection ════════════════════════════════════════════ */
+  .gs {
+    overflow: hidden;
+    border: 1px solid hsl(var(--border));
+    border-left: 4px solid var(--lip, var(--grad-from));
+    border-radius: var(--radius-2xl);
+    background: hsl(var(--surface));
+    box-shadow: var(--shadow-sm), 0 0 0 1px var(--ring, rgba(102,126,234,.15));
+  }
+  .gs > header {
+    display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+    padding: .8rem 1.25rem;
+    background-image: linear-gradient(to right, var(--bar-a, var(--grad-from)), var(--bar-b, var(--grad-to)));
+    color: #fff;
+  }
+  .gs > header h2 { font-size: .9rem; font-weight: 700; letter-spacing: .02em; }
+  .gs > header p  { font-size: .72rem; color: rgba(255,255,255,.85); }
+  .gs__body { padding: clamp(1.25rem, 2.8vw, 2rem); }
+
+  .gs--brand  { --lip: var(--grad-from);     --bar-a: var(--grad-from);     --bar-b: var(--grad-to);       --ring: rgba(102,126,234,.15); }
+  .gs--red    { --lip: var(--tone-red-a);    --bar-a: var(--tone-red-a);    --bar-b: var(--tone-red-b);    --ring: rgba(244,63,94,.15); }
+  .gs--amber  { --lip: var(--tone-amber-a);  --bar-a: var(--tone-amber-a);  --bar-b: var(--tone-amber-b);  --ring: rgba(245,158,11,.15); }
+  .gs--sky    { --lip: var(--tone-sky-a);    --bar-a: var(--tone-sky-a);    --bar-b: var(--tone-sky-b);    --ring: rgba(14,165,233,.15); }
+  .gs--violet { --lip: var(--tone-violet-a); --bar-a: var(--tone-violet-a); --bar-b: var(--tone-violet-b); --ring: rgba(139,92,246,.15); }
+  .gs--green  { --lip: var(--tone-green-a);  --bar-a: var(--tone-green-a);  --bar-b: var(--tone-green-b);  --ring: rgba(16,185,129,.15); }
+  .gs--slate  { --lip: var(--tone-slate-a);  --bar-a: var(--tone-slate-a);  --bar-b: var(--tone-slate-b);  --ring: rgba(71,85,105,.15); }
+
+  .lead {
+    font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+    font-weight: 800; letter-spacing: -.025em; line-height: 1.18;
+    margin-bottom: .55rem; max-width: 26ch;
+  }
+  .sub { color: hsl(var(--muted)); max-width: 70ch; font-size: .97rem; }
+  .spacer { margin-bottom: 1.5rem; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: .3rem;
+    border-radius: 999px; padding: .12rem .625rem;
+    font-size: .74rem; font-weight: 600; white-space: nowrap;
+    background: color-mix(in srgb, var(--c) 12%, transparent);
+    color: var(--c);
+  }
+  .badge--critical { --c: var(--critical); }
+  .badge--high     { --c: var(--high); }
+  .badge--medium   { --c: var(--medium); }
+  .badge--low      { --c: var(--low); }
+  .badge--progress { --c: var(--progress); }
+  .badge--resolved { --c: var(--resolved); }
+  .badge--brand    { --c: hsl(var(--brand)); }
+
+  /* ══ PROBLEM ════════════════════════════════════════════════════ */
+  .probs { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(236px, 1fr)); }
+  .prob {
+    border: 1px solid hsl(var(--border));
+    border-top: 3px solid var(--critical);
+    border-radius: var(--radius-xl);
+    background: hsl(var(--surface));
+    padding: 1.05rem 1.15rem 1.2rem;
+  }
+  .prob b { display: block; font-size: .98rem; margin-bottom: .3rem; }
+  .prob p { font-size: .89rem; color: hsl(var(--muted)); }
+  .cost {
+    margin-top: 1.35rem; padding: 1rem 1.15rem;
+    border-radius: var(--radius-xl);
+    background: color-mix(in srgb, var(--critical) 7%, transparent);
+    border: 1px solid color-mix(in srgb, var(--critical) 22%, transparent);
+    font-size: .95rem;
+  }
+  .cost b { color: var(--critical); }
+
+  /* ══ SOLUTION ═══════════════════════════════════════════════════ */
+  .pillars { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+  .pillar {
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-xl);
+    background: hsl(var(--surface));
+    box-shadow: var(--shadow-sm);
+    padding: 1.15rem 1.25rem 1.3rem;
+    transition: box-shadow .25s ease, transform .25s ease;
+  }
+  .pillar:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .pillar .num {
+    font-family: var(--mono); font-size: .7rem; font-weight: 700;
+    letter-spacing: .1em; color: var(--pc, hsl(var(--brand)));
+  }
+  .pillar h3 { font-size: 1.02rem; font-weight: 700; margin: .4rem 0 .35rem; }
+  .pillar p  { font-size: .89rem; color: hsl(var(--muted)); }
+
+  /* ══ STORY FRAMES ═══════════════════════════════════════════════ */
+  .act {
+    display: flex; align-items: center; gap: .7rem;
+    margin: 1.75rem 0 .9rem;
+    font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: hsl(var(--muted));
+  }
+  .act::after { content: ""; flex: 1; height: 1px; background: hsl(var(--border)); }
+  .act:first-of-type { margin-top: 0; }
+
+  .frames { display: flex; flex-direction: column; }
+
+  .frame {
+    display: grid; grid-template-columns: 7.5rem 1fr; gap: 0 1.35rem;
+    background: hsl(var(--surface));
+    border: 1px solid hsl(var(--border));
+    border-left: 5px solid var(--fc, hsl(var(--brand)));
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+    padding: 1.15rem 1.35rem;
+    opacity: 0; transform: translateY(14px);
+    transition: opacity .55s ease, transform .55s ease, box-shadow .25s ease;
+  }
+  .frame.in { opacity: 1; transform: none; }
+  .frame:hover { box-shadow: var(--shadow-md); }
+
+  /* Connector: the frames read as one flow, not eight cards */
+  .link {
+    width: 2px; height: 1.6rem; margin-left: calc(3.75rem - 1px);
+    background: linear-gradient(180deg, var(--from-c), var(--to-c));
+    position: relative;
+  }
+  .link::after {
+    content: ""; position: absolute; left: 50%; bottom: -1px;
+    width: 7px; height: 7px; transform: translateX(-50%) rotate(45deg);
+    border-right: 2px solid var(--to-c); border-bottom: 2px solid var(--to-c);
+  }
+
+  .frame__meta { display: flex; flex-direction: column; gap: .3rem; }
+  .frame__no {
+    font-family: var(--mono); font-size: .67rem; font-weight: 700;
+    letter-spacing: .1em; color: var(--fc);
+  }
+  .frame__clock {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 1.02rem; font-weight: 800; letter-spacing: -.02em;
+  }
+  .frame__who {
+    font-size: .67rem; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; color: hsl(var(--muted));
+  }
+  .frame h3 { font-size: 1.06rem; font-weight: 700; letter-spacing: -.015em; margin-bottom: .3rem; }
+  .frame p  { font-size: .93rem; color: hsl(var(--muted)); max-width: 62ch; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .85rem; }
+  .chip {
+    font-family: var(--mono); font-size: .71rem; font-weight: 600;
+    background: color-mix(in srgb, var(--fc) 9%, transparent);
+    color: var(--fc);
+    border: 1px solid color-mix(in srgb, var(--fc) 22%, transparent);
+    border-radius: 7px; padding: .22rem .5rem;
+  }
+
+  .f--crit { --fc: var(--critical); }
+  .f--high { --fc: var(--high); }
+  .f--sky  { --fc: var(--progress); }
+  .f--brand{ --fc: hsl(var(--brand)); }
+  .f--good { --fc: var(--resolved); }
+
+  .counter {
+    margin-top: 1.5rem;
+    border: 1px dashed hsl(var(--border));
+    border-radius: var(--radius-xl);
+    background: hsl(var(--background));
+    padding: 1.15rem 1.35rem;
+  }
+  .counter h3 {
+    font-size: .74rem; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: hsl(var(--muted)); margin-bottom: .5rem;
+  }
+  .counter p { font-size: .92rem; color: hsl(var(--muted)); max-width: 76ch; }
+  .counter .mono { color: hsl(var(--foreground)); font-weight: 700; }
+
+  /* ══ FLOW ═══════════════════════════════════════════════════════ */
+  .pipe { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  .node {
+    background: hsl(var(--surface));
+    border: 1px solid hsl(var(--border));
+    border-top: 3px solid var(--nc);
+    border-radius: var(--radius-xl);
+    padding: 1rem 1.1rem 1.15rem;
+    box-shadow: var(--shadow-sm);
+  }
+  .node .step {
+    font-family: var(--mono); font-size: .68rem; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--nc);
+  }
+  .node h3 { font-size: .98rem; font-weight: 700; margin: .35rem 0 .3rem; }
+  .node p  { font-size: .86rem; color: hsl(var(--muted)); }
+
+  /* ══ CONSOLE ════════════════════════════════════════════════════ */
+  .ckpis {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-xl); overflow: hidden; margin-bottom: 1.15rem;
+  }
+  .ckpis > div { padding: .8rem 1rem; border-right: 1px solid hsl(var(--border)); background: hsl(var(--surface)); }
+  .ckpis b {
+    display: block; font-size: 1.45rem; font-weight: 800;
+    font-variant-numeric: tabular-nums; letter-spacing: -.02em; color: var(--kc, inherit);
+  }
+  .ckpis span {
+    font-size: .68rem; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; color: hsl(var(--muted));
+  }
+
+  .table-wrap { overflow-x: auto; border-radius: var(--radius-xl); border: 1px solid hsl(var(--border)); }
+  table { width: 100%; border-collapse: collapse; min-width: 660px; background: hsl(var(--surface)); }
+  thead th {
+    text-align: left; font-size: .68rem; font-weight: 700;
+    letter-spacing: .07em; text-transform: uppercase; color: hsl(var(--muted));
+    padding: .7rem 1rem; border-bottom: 1px solid hsl(var(--border));
+    background: hsl(var(--background));
+  }
+  tbody td { padding: .7rem 1rem; border-bottom: 1px solid hsl(var(--border)); font-size: .9rem; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.ob { font-family: var(--mono); font-weight: 700; white-space: nowrap; }
+  td.sla { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+  tbody tr { border-left: 5px solid var(--rail, transparent); }
+  tr.r-critical { --rail: var(--critical); background: linear-gradient(90deg, rgb(220 38 38 / .10), rgb(220 38 38 / .03)); }
+  tr.r-high     { --rail: var(--high);     background: linear-gradient(90deg, rgb(234 88 12 / .10), rgb(234 88 12 / .03)); }
+  tr.r-medium   { --rail: var(--medium);   background: linear-gradient(90deg, rgb(217 119 6 / .09), rgb(217 119 6 / .03)); }
+  tr.r-low      { --rail: var(--low);      background: linear-gradient(90deg, rgb(22 163 74 / .08), rgb(22 163 74 / .02)); }
+  .sla--ok { color: var(--resolved); } .sla--soon { color: var(--medium); } .sla--breach { color: var(--critical); }
+  tr.flash { animation: flashin 2.4s ease; }
+  @keyframes flashin { 0% { background-color: rgb(102 126 234 / .28); } 100% { background-color: transparent; } }
+  .foot-note {
+    margin-top: .85rem; font-size: .8rem; color: hsl(var(--muted));
+    display: flex; flex-wrap: wrap; gap: .35rem .9rem;
+  }
+
+  /* ══ CARDS ══════════════════════════════════════════════════════ */
+  .cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); }
+  .fcard {
+    background: hsl(var(--surface)); border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-xl); padding: 1.15rem 1.25rem 1.3rem;
+    box-shadow: var(--shadow-sm); transition: box-shadow .25s ease, transform .25s ease;
+  }
+  .fcard:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .fcard h3 { font-size: 1rem; font-weight: 700; margin: .55rem 0 .35rem; }
+  .fcard p  { font-size: .89rem; color: hsl(var(--muted)); }
+
+  /* ══ ROLES ══════════════════════════════════════════════════════ */
+  .roles { border: 1px solid hsl(var(--border)); border-radius: var(--radius-xl); overflow: hidden; }
+  .role {
+    display: grid; grid-template-columns: 11rem 1fr; gap: 1.2rem;
+    padding: .95rem 1.15rem; border-bottom: 1px solid hsl(var(--border));
+    background: hsl(var(--surface)); align-items: baseline;
+  }
+  .role:last-child { border-bottom: 0; }
+  .role dd { margin: 0; font-size: .92rem; color: hsl(var(--muted)); }
+  .role dd b { color: hsl(var(--foreground)); }
+
+  /* ══ OUTCOME ════════════════════════════════════════════════════ */
+  .shift {
+    display: grid; gap: 0;
+    grid-template-columns: 1fr auto 1fr;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-xl); overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+  .shift > div { padding: 1.05rem 1.2rem; background: hsl(var(--surface)); }
+  .shift .hdr {
+    font-size: .68rem; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; margin-bottom: .6rem;
+  }
+  .shift .before .hdr { color: var(--critical); }
+  .shift .after  .hdr { color: var(--resolved); }
+  .shift ul { margin: 0; padding-left: 1.05rem; }
+  .shift li { font-size: .9rem; color: hsl(var(--muted)); margin-bottom: .3rem; }
+  .shift .arrow {
+    display: grid; place-items: center; padding-inline: .9rem;
+    background: hsl(var(--background));
+    border-inline: 1px solid hsl(var(--border));
+    color: hsl(var(--muted)); font-size: 1.2rem;
+  }
+
+  .outcomes { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(228px, 1fr)); }
+  .outcome {
+    border: 1px solid hsl(var(--border)); border-top: 3px solid var(--oc);
+    border-radius: var(--radius-xl); background: hsl(var(--surface));
+    padding: 1.05rem 1.15rem 1.2rem; box-shadow: var(--shadow-sm);
+  }
+  .outcome b { display: block; font-size: .98rem; margin-bottom: .3rem; }
+  .outcome p { font-size: .88rem; color: hsl(var(--muted)); }
+
+  /* ══ CLOSE ══════════════════════════════════════════════════════ */
+  .close {
+    border-radius: var(--radius-2xl);
+    background-image: linear-gradient(135deg, var(--grad-from), var(--grad-to));
+    color: #fff; padding: clamp(1.75rem, 4vw, 2.75rem);
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+  }
+  .close h2 {
+    font-size: clamp(1.4rem, 3.2vw, 2.1rem); font-weight: 800;
+    letter-spacing: -.025em; margin-bottom: .7rem;
+  }
+  .close p { color: rgba(255,255,255,.9); max-width: 56ch; margin-inline: auto; font-size: 1rem; }
+
+  .foot {
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem 2rem;
+    padding: 1.5rem 0 3rem; font-size: .82rem; color: hsl(var(--muted));
+  }
+  .foot b { color: hsl(var(--foreground)); }
+
+  @media (max-width: 700px) {
+    .frame { grid-template-columns: 1fr; gap: .55rem; }
+    .frame__meta { flex-direction: row; align-items: baseline; gap: .6rem; }
+    .link { margin-left: 1rem; }
+    .role { grid-template-columns: 1fr; gap: .25rem; }
+    .shift { grid-template-columns: 1fr; }
+    .shift .arrow { border-inline: 0; border-block: 1px solid hsl(var(--border)); padding-block: .4rem; }
+    .ticker__item .clk { margin-left: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .frame { opacity: 1; transform: none; }
+  }
+</style>
+
+<div class="shell stack">
+
+  <!-- ══ HERO ═══════════════════════════════════════════════════ -->
+  <header class="hero">
+    <div class="hero-top">
+      <div class="hero-mark">D</div>
+      <div>
+        <b>DigiLog 360</b>
+        <span>Security Operations Platform</span>
+      </div>
+    </div>
+
+    <p class="kicker">Live from the first second</p>
+
+    <h1>Know what happened.<br><span class="thin">While it is still</span> happening.</h1>
+
+    <p class="sub">
+      Security runs on information that arrives too late — written from memory, hours after
+      the fact, in a book nobody can search. DigiLog 360 puts every incident, patrol,
+      visitor and key on one live system the moment it occurs.
+    </p>
+
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker__head">Control room · live feed</div>
+      <div class="ticker__item" id="tick">
+        <span class="ob">OB11432</span>
+        <span class="sep">·</span>
+        <span id="tickWhat">Perimeter breach</span>
+        <span class="sep">·</span>
+        <span id="tickWhere">North fence line</span>
+        <span class="clk" id="tickClock">SLA 59:12</span>
+      </div>
+    </div>
+
+    <div class="hero-stats">
+      <div><b>&lt;60s</b><span>Field to control room</span></div>
+      <div><b>24/7</b><span>Clock on every incident</span></div>
+      <div><b>100%</b><span>Logged with evidence</span></div>
+      <div><b>0</b><span>Signal needed to report</span></div>
+    </div>
+  </header>
+
+  <!-- ══ PROBLEM ════════════════════════════════════════════════ -->
+  <section class="gs gs--red">
+    <header><div><h2>The problem</h2><p>Why incidents are discovered too late</p></div></header>
+    <div class="gs__body">
+      <p class="lead">A paper book cannot raise the alarm.</p>
+      <p class="sub spacer">
+        The occurrence book has run security operations for a century. It has one fatal
+        property: it only speaks when somebody opens it — and by then the night is over.
+      </p>
+
+      <div class="probs">
+        <div class="prob">
+          <b>Written from memory</b>
+          <p>Entries are filled in at the end of a twelve-hour shift, long after the event, with the details worn smooth.</p>
+        </div>
+        <div class="prob">
+          <b>Nobody knows where anyone is</b>
+          <p>An officer walks into a live intrusion and the control room only finds out when they stop answering the radio.</p>
+        </div>
+        <div class="prob">
+          <b>No clock on the response</b>
+          <p>Nothing measures the gap between something happening and somebody acting on it. What isn't measured isn't managed.</p>
+        </div>
+        <div class="prob">
+          <b>Evidence you cannot produce</b>
+          <p>Weeks later a client asks what happened. The answer is a photocopy of somebody's handwriting, if the book can be found at all.</p>
+        </div>
+      </div>
+
+      <p class="cost">
+        <b>The cost is not paperwork.</b> It is an officer standing next to a threat that
+        nobody in the control room knows about, and a contract that cannot be defended when
+        the client asks for proof.
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ SOLUTION ═══════════════════════════════════════════════ -->
+  <section class="gs gs--brand">
+    <header><div><h2>The solution</h2><p>One connected system, from the field to the archive</p></div></header>
+    <div class="gs__body">
+      <p class="lead">Capture it at the source. Everything else follows.</p>
+      <p class="sub spacer">
+        DigiLog 360 replaces the occurrence book, the patrol clock, the visitor register and
+        the key ledger with a single platform — a phone in the field, a live console in the
+        control room, and one database that never forgets.
+      </p>
+
+      <div class="pillars">
+        <div class="pillar" style="--pc: var(--critical)">
+          <p class="num">01</p>
+          <h3>Report from the scene</h3>
+          <p>Officers log incidents on a handset in under a minute, with photographs, voice notes and location — and no signal required.</p>
+        </div>
+        <div class="pillar" style="--pc: var(--high)">
+          <p class="num">02</p>
+          <h3>A clock on everything</h3>
+          <p>Severity sets a response target the moment an incident is filed. The countdown runs on its own and escalates itself when it lapses.</p>
+        </div>
+        <div class="pillar" style="--pc: var(--progress)">
+          <p class="num">03</p>
+          <h3>See the whole operation</h3>
+          <p>A live console shows every open incident, every officer on patrol and every visitor on site — updating as it happens, without a refresh.</p>
+        </div>
+        <div class="pillar" style="--pc: hsl(var(--brand))">
+          <p class="num">04</p>
+          <h3>Prove the patrol</h3>
+          <p>Checkpoints are verified by QR, NFC tag or GPS geofence, so presence is a record rather than a claim.</p>
+        </div>
+        <div class="pillar" style="--pc: var(--tone-violet-a)">
+          <p class="num">05</p>
+          <h3>Review and sign off</h3>
+          <p>Every incident is read by a manager and acknowledged, escalated or rejected with notes — against a real name and timestamp.</p>
+        </div>
+        <div class="pillar" style="--pc: var(--resolved)">
+          <p class="num">06</p>
+          <h3>Answer any question, later</h3>
+          <p>One click produces a branded report with the full timeline and evidence attached, years after the shift ended.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ STORY ══════════════════════════════════════════════════ -->
+  <section class="gs gs--amber">
+    <header><div><h2>The story</h2><p>One incident, end to end</p></div></header>
+    <div class="gs__body">
+      <p class="lead">A perimeter breach, minute by minute.</p>
+      <p class="sub spacer">
+        This is the same night twice: once on DigiLog 360, and once in the book. Every
+        timestamp below is recorded by the platform itself — nobody types these in
+        afterwards.
+      </p>
+
+      <p class="act">Act one — it happens</p>
+      <div class="frames">
+
+        <article class="frame f--crit">
+          <div class="frame__meta">
+            <span class="frame__no">FRAME 01</span>
+            <span class="frame__clock">02:14:07</span>
+            <span class="frame__who">Field</span>
+          </div>
+          <div>
+            <h3>Two figures cut the perimeter fence.</h3>
+            <p>
+              An officer is eleven minutes into a patrol route. A beam trips and he sees
+              them from thirty metres — bolt cutters, no vehicle yet. He does not walk
+              closer. He takes out his phone.
+            </p>
+          </div>
+        </article>
+
+        <div class="link" style="--from-c: var(--critical); --to-c: var(--critical)"></div>
+
+        <article class="frame f--crit">
+          <div class="frame__meta">
+            <span class="frame__no">FRAME 02</span>
+            <span class="frame__clock">02:14:47</span>
+            <span class="frame__who">Mobile</span>
+          </div>
+          <div>
+            <h3>Forty seconds to file it — with evidence.</h3>
+            <p>
+              Type: intrusion. Severity: <span class="badge badge--critical">Critical</span>.
+              Two photographs and a nine-second voice note describing what he can see. There
+              is no signal at the fence line, so it queues on the handset and files itself
+              the moment the phone finds a bar.
+            </p>
+            <div class="chips">
+              <span class="chip">OB number issued</span>
+              <span class="chip">2 photos · 1 voice note</span>
+              <span class="chip">Voice transcribed to text</span>
+            </div>
+          </div>
+        </article>
+
+        <div class="link" style="--from-c: var(--critical); --to-c: var(--high)"></div>
+
+        <article class="frame f--high">
+          <div class="frame__meta">
+            <span class="frame__no">FRAME 03</span>
+            <span class="frame__clock">02:14:52</span>
+            <span class="frame__who">Control room</span>
+          </div>
+          <div>
+            <h3>The board flashes before he has put the phone away.</h3>
+            <p>
+              The incident lands on the live board with a banner. Critical severity sets the
+              response target — resolve within the hour, post an update every thirty
+              minutes — and the countdown starts without anyone touching it.
+            </p>
+            <div class="chips">
+              <span class="chip">Response clock armed</span>
+              <span class="chip">Push + email to duty manager</span>
+              <span class="chip">Realtime — no refresh</span>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <p class="act">Act two — the response</p>
+      <div class="frames">
+
+        <article class="frame f--sky">
+          <div class="frame__meta">
+            <span class="frame__no">FRAME 04</span>
+            <span class="frame__clock">02:16:20</span>
+            <span class="frame__who">Supervisor</span>
+          </div>
+          <div>
+            <h3>The map is why he goes home in the morning.</h3>
+            <p>
+              The supervisor opens the officer map and sees his position updating every
+              thirty seconds — right on top of the breach. One tap calls him from the same
+              screen: withdraw to the guard house, armed response is rolling. Knowing where
+              your people are is the whole point.
+            </p>
+            <div class="chips">
+              <span class="chip">Position every 30s while on patrol</span>
+              <span class="chip">Tap-to-call from the team view</span>
+            </div>
+          </div>
+        </article>
+
+        <div class="link" style="--from-c: var(--progress); --to-c: var(--progress)"></div>
+
+        <article class="frame f--sky">
+          <div class="frame__meta">
+            <span class="frame__no">FRAME 05</span>
+            <span class="frame__clock">02:22:41</span>
+            <span class="frame__who">Control room</span>
+          </div>
+          <div>
+            <h3>Nothing waits on a phone call being answered.</h3>
+            <p>
+              The controller assigns the incident to the duty manager and dispatches armed
+              response. The assignment reaches the manager as an in-app alert, a push
+              notification and an email that opens straight onto the incident.
+            </p>
+            <div class="chips">
+              <span class="chip">Assigned + notified in one action</span>
+              <span class="chip">Every alert deep-links to the record</span>
+            </div>
+          </div>
+        </article>
+
+        <div class="link" style="--from-c: var(--progress); --to-c: hsl(var(--brand))"></div>
+
+        <article class="frame f--brand">
+          <div class="frame__meta">
+            <span class="frame__no">FRAME 06</span>
+            <span class="frame__clock">02:31:05</span>
+            <span class="frame__who">Field</span>
+          </div>
+          <div>
+            <h3>Armed response on scene. The record keeps up.</h3>
+            <p>
+              The responding officer's note goes onto the incident from a phone at the gate.
+              It appears in the control room mid-sentence, resets the update clock, and
+              emails everyone attached to the incident.
+            </p>
+            <div class="chips">
+              <span class="chip">Update clock reset</span>
+              <span class="chip">Comment thread live on every screen</span>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <p class="act">Act three — the record</p>
+      <div class="frames">
+
+        <article class="frame f--good">
+          <div class="frame__meta">
+            <span class="frame__no">FRAME 07</span>
+            <span class="frame__clock">03:05:41</span>
+            <span class="frame__who">Resolved</span>
+          </div>
+          <div>
+            <h3>Closed at fifty-one minutes. Inside the promise.</h3>
+            <p>
+              Fence secured, no entry to the building, nobody hurt. The status moves to
+              <span class="badge badge--resolved">Resolved</span>, the clock stops, and the
+              incident leaves the live board with its response time measured against the
+              target it was given at 02:14.
+            </p>
+            <div class="chips">
+              <span class="chip">Resolved in 51m of 60m</span>
+              <span class="chip">Target met</span>
+            </div>
+          </div>
+        </article>
+
+        <div class="link" style="--from-c: var(--resolved); --to-c: hsl(var(--brand))"></div>
+
+        <article class="frame f--brand">
+          <div class="frame__meta">
+            <span class="frame__no">FRAME 08</span>
+            <span class="frame__clock">09:12</span>
+            <span class="frame__who">Manager</span>
+          </div>
+          <div>
+            <h3>Signed off by a person, not a rubber stamp.</h3>
+            <p>
+              The duty manager reads the whole thread — photographs, transcript, every
+              update, who did what and when — and acknowledges it with notes. That decision
+              is stored against her name permanently.
+            </p>
+            <div class="chips">
+              <span class="chip">Acknowledge · escalate · reject</span>
+              <span class="chip">Written to the audit log</span>
+            </div>
+          </div>
+        </article>
+
+        <div class="link" style="--from-c: hsl(var(--brand)); --to-c: var(--resolved)"></div>
+
+        <article class="frame f--good">
+          <div class="frame__meta">
+            <span class="frame__no">FRAME 09</span>
+            <span class="frame__clock">Any time</span>
+            <span class="frame__who">Evidence</span>
+          </div>
+          <div>
+            <h3>Weeks later, the client asks.</h3>
+            <p>
+              One click produces a branded report: the timeline to the second, the
+              photographs, the response, the sign-off. Not a recollection — a record that
+              was built while it happened.
+            </p>
+            <div class="chips">
+              <span class="chip">Report exported in one click</span>
+              <span class="chip">Evidence retained and searchable</span>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div class="counter">
+        <h3>The same night, in the paper book</h3>
+        <p>
+          <span class="mono">02:14</span> — nobody knows.
+          <span class="mono">02:45</span> — nobody knows.
+          <span class="mono">06:00</span> — the outgoing officer writes
+          <em>“suspicious persons at fence, chased away”</em> from memory, in a book that
+          stays in a drawer at the guard house. The control room hears about it at handover.
+          The supervisor never knew an officer was standing thirty metres from two men with
+          bolt cutters. And when the client asks weeks later, that one line is the entire
+          record.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ FLOW ═══════════════════════════════════════════════════ -->
+  <section class="gs gs--sky">
+    <header><div><h2>The flow</h2><p>The route every incident takes</p></div></header>
+    <div class="gs__body">
+      <p class="lead">One path, and nothing falls off it.</p>
+      <p class="sub spacer">
+        Those nine frames are not a special case — they are the standard route. Every
+        incident travels it, and every hop is a write with a timestamp and a name against it.
+      </p>
+      <div class="pipe">
+        <div class="node" style="--nc: var(--critical)">
+          <p class="step">01 · Field</p>
+          <h3>Logged where it happened</h3>
+          <p>On a handset, with photographs, voice and location. Works offline and syncs itself.</p>
+        </div>
+        <div class="node" style="--nc: var(--high)">
+          <p class="step">02 · System</p>
+          <h3>Numbered and clocked</h3>
+          <p>A reference number is issued and the response target stamped from the severity.</p>
+        </div>
+        <div class="node" style="--nc: var(--progress)">
+          <p class="step">03 · Control room</p>
+          <h3>Worked in the open</h3>
+          <p>Live board, assignment, updates and comments. Breaches escalate themselves.</p>
+        </div>
+        <div class="node" style="--nc: hsl(var(--brand))">
+          <p class="step">04 · Manager</p>
+          <h3>Reviewed and signed</h3>
+          <p>Acknowledged, escalated or rejected with notes — against a real name.</p>
+        </div>
+        <div class="node" style="--nc: var(--resolved)">
+          <p class="step">05 · Record</p>
+          <h3>Kept, and provable</h3>
+          <p>Exportable report, evidence in isolated storage, and a full audit trail.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ CONSOLE ════════════════════════════════════════════════ -->
+  <section class="gs gs--violet">
+    <header>
+      <div><h2>The console</h2><p>The screen the control room actually watches</p></div>
+    </header>
+    <div class="gs__body">
+      <p class="lead">Open incidents, ranked by how close they are to breaching.</p>
+      <p class="sub spacer">
+        The clocks below are running right now — and a new critical will arrive while you
+        are reading. Sample data; the layout is the real thing.
+      </p>
+
+      <div class="ckpis">
+        <div><b id="kpiOpen">18</b><span>Open</span></div>
+        <div style="--kc: var(--critical)"><b id="kpiCrit">3</b><span>Critical</span></div>
+        <div style="--kc: var(--medium)"><b>2</b><span>Update due</span></div>
+        <div style="--kc: var(--progress)"><b>7</b><span>On patrol</span></div>
+        <div><b>41</b><span>On site</span></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Reference</th>
+              <th scope="col">Type</th>
+              <th scope="col">Location</th>
+              <th scope="col">Severity</th>
+              <th scope="col">Resolve within</th>
+            </tr>
+          </thead>
+          <tbody id="rows">
+            <tr class="r-critical" data-sla="212">
+              <td class="ob">OB11430</td>
+              <td>Alarm activation</td>
+              <td>Plant room</td>
+              <td><span class="badge badge--critical">Critical</span></td>
+              <td class="sla"></td>
+            </tr>
+            <tr class="r-high" data-sla="1985">
+              <td class="ob">OB11431</td>
+              <td>Attempted break-in</td>
+              <td>Loading bay</td>
+              <td><span class="badge badge--high">High</span></td>
+              <td class="sla"></td>
+            </tr>
+            <tr class="r-medium" data-sla="9240">
+              <td class="ob">OB11429</td>
+              <td>Suspicious vehicle</td>
+              <td>Visitor entrance</td>
+              <td><span class="badge badge--medium">Medium</span></td>
+              <td class="sla"></td>
+            </tr>
+            <tr class="r-low" data-sla="41300">
+              <td class="ob">OB11427</td>
+              <td>Lighting fault</td>
+              <td>Yard</td>
+              <td><span class="badge badge--low">Low</span></td>
+              <td class="sla"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="foot-note">
+        <span>Updated <span class="mono" id="stamp">now</span></span>
+        <span>·</span>
+        <span>Streaming over websockets — no polling, no refresh button</span>
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ CAPABILITIES ═══════════════════════════════════════════ -->
+  <section class="gs gs--sky">
+    <header><div><h2>Realtime, meant literally</h2><p>Replication, not polling dressed up</p></div></header>
+    <div class="gs__body">
+      <p class="lead">Nothing here waits to be asked.</p>
+      <p class="sub spacer">The database pushes changes to every screen the moment they are written.</p>
+      <div class="cards">
+        <div class="fcard">
+          <span class="badge badge--brand">Live board</span>
+          <h3>Incidents appear as they are logged</h3>
+          <p>New incidents flash onto the control-room board with a banner, and every response badge counts down on its own.</p>
+        </div>
+        <div class="fcard">
+          <span class="badge badge--progress">Officer map</span>
+          <h3>Where your people are, right now</h3>
+          <p>Positions land every thirty seconds while an officer is on patrol — and only while they are on patrol.</p>
+        </div>
+        <div class="fcard">
+          <span class="badge badge--critical">Alerts</span>
+          <h3>Breaches escalate themselves</h3>
+          <p>Miss a target and the platform notifies the control room, supervisor, manager and administrator — in-app, push and email.</p>
+        </div>
+        <div class="fcard">
+          <span class="badge badge--resolved">Offline first</span>
+          <h3>No signal is not an excuse</h3>
+          <p>Incidents logged in a basement or a dead zone queue on the handset with their photographs and file themselves when coverage returns.</p>
+        </div>
+        <div class="fcard">
+          <span class="badge badge--high">Verified patrols</span>
+          <h3>Presence you can prove</h3>
+          <p>QR labels, NFC tags or a GPS geofence — three ways to prove an officer stood at a checkpoint, with method and distance recorded.</p>
+        </div>
+        <div class="fcard">
+          <span class="badge badge--medium">Gate house</span>
+          <h3>Scan the licence, not the clipboard</h3>
+          <p>Vehicle disks and drivers' licences scan straight into the visitor register, and scanning on the way out signs the right person off.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ ROLES ══════════════════════════════════════════════════ -->
+  <section class="gs gs--slate">
+    <header><div><h2>Who it is for</h2><p>Six roles, one version of the truth</p></div></header>
+    <div class="gs__body">
+      <dl class="roles">
+        <div class="role">
+          <dt><span class="badge badge--progress">Officer</span></dt>
+          <dd><b>Works the site from a phone.</b> Clocks on, runs patrols, logs incidents, staffs the gate and hands over at the end of the shift — signing in with an employee number and a PIN.</dd>
+        </div>
+        <div class="role">
+          <dt><span class="badge badge--resolved">Supervisor</span></dt>
+          <dd><b>Runs the shift.</b> The site board, the team's live positions, patrol oversight, and the ability to close out a patrol somebody forgot to end.</dd>
+        </div>
+        <div class="role">
+          <dt><span class="badge badge--brand">Control room</span></dt>
+          <dd><b>Holds the line.</b> Watches every open incident against its clock, logs what comes in over the radio, assigns reviewers and answers for the response.</dd>
+        </div>
+        <div class="role">
+          <dt><span class="badge badge--critical">Manager</span></dt>
+          <dd><b>Signs it off.</b> Reviews every incident — acknowledge, escalate or reject with notes — and reports on how the team actually performed.</dd>
+        </div>
+        <div class="role">
+          <dt><span class="badge badge--high">Administrator</span></dt>
+          <dd><b>Shapes the operation.</b> People, sites, response targets, incident types and integrations — tuned per organisation without touching code.</dd>
+        </div>
+        <div class="role">
+          <dt><span class="badge badge--medium">Platform owner</span></dt>
+          <dd><b>Runs the platform.</b> Many client organisations from one deployment, each sealed off from the others, each with its own branding, permissions and rules.</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ══ OUTCOME ════════════════════════════════════════════════ -->
+  <section class="gs gs--green">
+    <header><div><h2>The outcome</h2><p>What changes once it is running</p></div></header>
+    <div class="gs__body">
+      <p class="lead">From a book nobody reads to a record nobody can dispute.</p>
+      <p class="sub spacer">The same operation, before and after.</p>
+
+      <div class="shift">
+        <div class="before">
+          <p class="hdr">Before</p>
+          <ul>
+            <li>Incidents surface at the 06:00 handover</li>
+            <li>Officer locations are unknown between radio calls</li>
+            <li>Patrols are a signature on a sheet</li>
+            <li>Response time is nobody's number</li>
+            <li>Client disputes come down to memory</li>
+          </ul>
+        </div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="after">
+          <p class="hdr">After</p>
+          <ul>
+            <li>Incidents reach the control room in under a minute</li>
+            <li>Every officer on patrol is on a live map</li>
+            <li>Patrols are verified scans with time and place</li>
+            <li>Every incident is measured against a target</li>
+            <li>Disputes are answered with an exported report</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="outcomes">
+        <div class="outcome" style="--oc: var(--critical)">
+          <b>Minutes, not shifts</b>
+          <p>The gap between an event and the right people knowing collapses from a handover to under a minute.</p>
+        </div>
+        <div class="outcome" style="--oc: var(--progress)">
+          <b>People nobody loses</b>
+          <p>A supervisor can see where every officer on patrol is standing, and reach them from the same screen.</p>
+        </div>
+        <div class="outcome" style="--oc: hsl(var(--brand))">
+          <b>Accountability with a name on it</b>
+          <p>Every status change, decision and sign-off is stored against a person and a timestamp that cannot be quietly edited.</p>
+        </div>
+        <div class="outcome" style="--oc: var(--resolved)">
+          <b>Contracts you can defend</b>
+          <p>Response times measured against agreed targets, and evidence produced in one click instead of one week.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ CLOSE ══════════════════════════════════════════════════ -->
+  <section class="close">
+    <h2>Make every incident answerable.</h2>
+    <p>
+      Who was there, what they saw, when they acted and what came of it — captured while it
+      happened, provable years later, across every site and every shift.
+    </p>
+  </section>
+
+  <footer class="foot">
+    <div><b>DigiLog 360</b> — Security Operations Platform</div>
+    <div>Proprietary &amp; confidential</div>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* Story frames reveal as you reach them */
+    var frames = document.querySelectorAll('.frame');
+    if (reduced || !('IntersectionObserver' in window)) {
+      frames.forEach(function (f) { f.classList.add('in'); });
+    } else {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e, i) {
+          if (e.isIntersecting) {
+            setTimeout(function () { e.target.classList.add('in'); }, i * 80);
+            io.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.2, rootMargin: '0px 0px -6% 0px' });
+      frames.forEach(function (f) { io.observe(f); });
+    }
+
+    function fmt(t) {
+      if (t <= 0) return 'BREACHED';
+      var h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+      var p = function (n) { return (n < 10 ? '0' : '') + n; };
+      return h > 0 ? h + 'h ' + p(m) + 'm' : p(m) + ':' + p(s);
+    }
+
+    /* ── Hero ticker: three incidents cycling, clock always running ── */
+    var feed = [
+      { ob: 'OB11432', what: 'Perimeter breach',   where: 'North fence line',  left: 3552 },
+      { ob: 'OB11433', what: 'Panic button',       where: 'Reception desk',    left: 2410 },
+      { ob: 'OB11434', what: 'Alarm activation',   where: 'Plant room',        left: 1145 }
+    ];
+    var fi = 0;
+    var tick = document.getElementById('tick');
+    var tObNode = tick ? tick.querySelector('.ob') : null;
+    var tWhat = document.getElementById('tickWhat');
+    var tWhere = document.getElementById('tickWhere');
+    var tClock = document.getElementById('tickClock');
+
+    function renderTicker() {
+      var f = feed[fi];
+      if (tObNode) tObNode.textContent = f.ob;
+      if (tWhat) tWhat.textContent = f.what;
+      if (tWhere) tWhere.textContent = f.where;
+    }
+    function cycle() {
+      if (!tick) return;
+      tick.classList.add('fade');
+      setTimeout(function () {
+        fi = (fi + 1) % feed.length;
+        renderTicker();
+        tick.classList.remove('fade');
+      }, 420);
+    }
+    renderTicker();
+    if (!reduced) setInterval(cycle, 5200);
+
+    /* ── Console board ── */
+    var rows = document.getElementById('rows');
+    var stamp = document.getElementById('stamp');
+    var kpiOpen = document.getElementById('kpiOpen');
+    var kpiCrit = document.getElementById('kpiCrit');
+
+    function paint() {
+      Array.prototype.forEach.call(rows.querySelectorAll('tr'), function (tr) {
+        var left = parseInt(tr.getAttribute('data-sla'), 10);
+        var cell = tr.querySelector('.sla');
+        cell.textContent = fmt(left);
+        cell.className = 'sla ' + (left <= 0 ? 'sla--breach' : left < 900 ? 'sla--soon' : 'sla--ok');
+      });
+    }
+
+    function everySecond() {
+      Array.prototype.forEach.call(rows.querySelectorAll('tr'), function (tr) {
+        tr.setAttribute('data-sla', parseInt(tr.getAttribute('data-sla'), 10) - 1);
+      });
+      paint();
+      feed.forEach(function (f) { if (f.left > 0) f.left -= 1; });
+      if (tClock) {
+        var l = feed[fi].left, m = Math.floor(l / 60), s = l % 60;
+        tClock.textContent = l > 0
+          ? 'SLA ' + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s
+          : 'BREACHED';
+      }
+    }
+
+    paint();
+    if (!reduced) setInterval(everySecond, 1000);
+
+    /* A new critical arrives, exactly as it would on the real board */
+    var incoming = [
+      { ob: 'OB11435', type: 'Panic button activated', site: 'Reception desk',  sev: 'critical', label: 'Critical', sla: 3600 },
+      { ob: 'OB11436', type: 'Fire alarm',             site: 'Storage level 2', sev: 'critical', label: 'Critical', sla: 3600 },
+      { ob: 'OB11437', type: 'Theft reported',         site: 'Staff entrance',  sev: 'high',     label: 'High',     sla: 14400 }
+    ];
+    var next = 0;
+
+    function arrive() {
+      if (next >= incoming.length) return;
+      var it = incoming[next++];
+      var tr = document.createElement('tr');
+      tr.className = 'r-' + it.sev + ' flash';
+      tr.setAttribute('data-sla', it.sla);
+      tr.innerHTML =
+        '<td class="ob">' + it.ob + '</td>' +
+        '<td>' + it.type + '</td>' +
+        '<td>' + it.site + '</td>' +
+        '<td><span class="badge badge--' + it.sev + '">' + it.label + '</span></td>' +
+        '<td class="sla"></td>';
+      rows.insertBefore(tr, rows.firstChild);
+      paint();
+      kpiOpen.textContent = parseInt(kpiOpen.textContent, 10) + 1;
+      if (it.sev === 'critical') kpiCrit.textContent = parseInt(kpiCrit.textContent, 10) + 1;
+      if (stamp) stamp.textContent = 'just now';
+      setTimeout(arrive, 11000);
+    }
+
+    if (!reduced) {
+      var board = document.querySelector('.gs--violet');
+      if ('IntersectionObserver' in window && board) {
+        var io2 = new IntersectionObserver(function (entries) {
+          if (entries[0].isIntersecting) { setTimeout(arrive, 3000); io2.disconnect(); }
+        }, { threshold: 0.2 });
+        io2.observe(board);
+      } else {
+        setTimeout(arrive, 5000);
+      }
+    }
+  })();
+</script>
