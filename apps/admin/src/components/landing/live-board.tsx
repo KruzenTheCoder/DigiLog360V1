@@ -104,7 +104,10 @@ export function LiveBoard() {
   }, []);
 
   return (
-    <div ref={hostRef}>
+    // The board sits inside a dark, `text-white` section but renders on the
+    // app surface, so it must state its own foreground colour — otherwise
+    // every cell without an explicit colour inherits white and disappears.
+    <div ref={hostRef} className="text-[hsl(var(--foreground))]">
       <div className="mb-4 grid grid-cols-2 overflow-hidden rounded-xl border sm:grid-cols-3 lg:grid-cols-5">
         <Kpi value={open} label="Open" />
         <Kpi value={critical} label="Critical" tone="text-red-600" />
@@ -134,9 +137,11 @@ export function LiveBoard() {
                 key={r.ref}
                 className={`border-l-[5px] ${RAIL[r.severity]} ${r.fresh ? 'animate-flash-in' : ''}`}
               >
-                <td className="border-b px-4 py-2.5 font-mono text-sm font-bold">{r.ref}</td>
-                <td className="border-b px-4 py-2.5 text-sm">{r.type}</td>
-                <td className="border-b px-4 py-2.5 text-sm">{r.where}</td>
+                <td className="border-b px-4 py-2.5 font-mono text-sm font-bold text-[hsl(var(--foreground))]">
+                  {r.ref}
+                </td>
+                <td className="border-b px-4 py-2.5 text-sm text-[hsl(var(--foreground))]">{r.type}</td>
+                <td className="border-b px-4 py-2.5 text-sm text-[hsl(var(--muted))]">{r.where}</td>
                 <td className="border-b px-4 py-2.5">
                   <Badge color={SEVERITY_COLORS[r.severity]}>{SEVERITY_LABELS[r.severity]}</Badge>
                 </td>
@@ -165,7 +170,13 @@ export function LiveBoard() {
 function Kpi({ value, label, tone }: { value: number; label: string; tone?: string }) {
   return (
     <div className="border-b border-r bg-[hsl(var(--surface))] px-4 py-3 last:border-r-0">
-      <b className={`block text-2xl font-extrabold tabular-nums tracking-tight ${tone ?? ''}`}>{value}</b>
+      <b
+        className={`block text-2xl font-extrabold tabular-nums tracking-tight ${
+          tone ?? 'text-[hsl(var(--foreground))]'
+        }`}
+      >
+        {value}
+      </b>
       <span className="text-[0.68rem] font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
         {label}
       </span>

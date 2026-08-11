@@ -6,7 +6,6 @@ import { BRAND } from '@digilog/shared';
 import { LiveTicker } from './live-ticker';
 import { LiveBoard } from './live-board';
 import { Reveal } from './reveal';
-import { CountUp } from './count-up';
 
 // ---------------------------------------------------------------------------
 // Content lives as data so the markup stays readable. Every location and
@@ -176,6 +175,19 @@ export function LandingPage() {
               'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.9) 30deg, transparent 64deg)',
           }}
         />
+        {/* A fine survey grid, masked so it fades out before the copy —
+            texture you feel rather than notice. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.06]"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
+            backgroundSize: '72px 72px',
+            maskImage: 'radial-gradient(120% 90% at 70% 0%, #000 20%, transparent 75%)',
+            WebkitMaskImage: 'radial-gradient(120% 90% at 70% 0%, #000 20%, transparent 75%)',
+          }}
+        />
 
         {/* Nav */}
         <nav className="relative z-10 mx-auto flex w-full max-w-[100rem] items-center justify-between px-6 py-6 lg:px-14">
@@ -239,13 +251,21 @@ export function LandingPage() {
         {/* Stat band pinned to the base of the hero */}
         <div className="relative z-10 border-t border-white/20 bg-black/10 backdrop-blur-sm">
           <dl className="mx-auto grid w-full max-w-[100rem] grid-cols-2 gap-y-8 px-6 py-10 lg:grid-cols-4 lg:px-14">
+            {/* Rendered statically, not counted up: these are small factual
+                figures, and a count-up reads "<21s" mid-flight — briefly
+                claiming a faster number than the truth. */}
             {[
-              { v: <>&lt;<CountUp to={60} suffix="s" /></>, l: 'Field to control room' },
-              { v: <CountUp to={3} />, l: 'Ways to prove a patrol' },
-              { v: <CountUp to={6} />, l: 'Roles, one platform' },
-              { v: <CountUp to={0} />, l: 'Signal needed to report' },
-            ].map((s) => (
-              <div key={s.l}>
+              { v: '<60s', l: 'Field to control room' },
+              { v: '3', l: 'Ways to prove a patrol' },
+              { v: '6', l: 'Roles, one platform' },
+              { v: '0', l: 'Signal needed to report' },
+            ].map((s, i) => (
+              <div
+                key={s.l}
+                // Hairline rules between figures on wide screens; none on the
+                // first, and none at all once the grid wraps to two columns.
+                className={i > 0 ? 'lg:border-l lg:border-white/20 lg:pl-8' : ''}
+              >
                 <dt className="text-[clamp(2rem,4vw,3.25rem)] font-extrabold leading-none tracking-tight tabular-nums">
                   {s.v}
                 </dt>
@@ -435,7 +455,10 @@ export function LandingPage() {
       </section>
 
       {/* ══ CONSOLE SHOWCASE ═══════════════════════════════════════════ */}
-      <section className="relative w-full overflow-hidden bg-slate-900 py-24 text-white lg:py-36">
+      <section
+        id="console"
+        className="relative w-full scroll-mt-4 overflow-hidden bg-slate-900 py-24 text-white lg:py-36"
+      >
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(1000px_500px_at_50%_0%,rgba(102,126,234,0.25),transparent_65%)]"
