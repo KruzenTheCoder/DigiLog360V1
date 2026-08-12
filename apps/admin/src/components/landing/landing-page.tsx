@@ -12,6 +12,7 @@ import { BRAND, SLA_CONFIG, SEVERITY_LABELS, SEVERITY_COLORS, SEVERITIES } from 
 import { HeroBoard } from './hero-board';
 import { LiveBoard } from './live-board';
 import { Reveal } from './reveal';
+import { Ambient } from './ambient';
 
 // ---------------------------------------------------------------------------
 // Content lives as data so the markup stays readable. Every location and
@@ -371,8 +372,9 @@ export function LandingPage() {
       </section>
 
       {/* ══ SOLUTION ═══════════════════════════════════════════════════ */}
-      <section className="w-full bg-[hsl(var(--background))] py-16 lg:py-24">
-        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
+        <Ambient tone="brand" />
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -523,8 +525,9 @@ export function LandingPage() {
       </section>
 
       {/* ══ RESPONSE TARGETS ═══════════════════════════════════════════ */}
-      <section className="w-full bg-[hsl(var(--background))] py-16 lg:py-24">
-        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
+        <Ambient tone="sky" />
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <div className="grid gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16">
             {/* min-w-0 on both tracks: grid items default to min-width:auto and
                 refuse to shrink below their content, so the table's min-w-[30rem]
@@ -654,8 +657,9 @@ export function LandingPage() {
       </section>
 
       {/* ══ CAPABILITIES ═══════════════════════════════════════════════ */}
-      <section className="w-full bg-[hsl(var(--background))] py-16 lg:py-24">
-        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
+        <Ambient tone="sky" />
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -764,8 +768,9 @@ export function LandingPage() {
       </section>
 
       {/* ══ PLATFORM ═══════════════════════════════════════════════════ */}
-      <section className="w-full bg-[hsl(var(--background))] py-16 lg:py-24">
-        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
+        <Ambient tone="brand" />
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -843,8 +848,9 @@ export function LandingPage() {
       </section>
 
       {/* ══ FAQ ════════════════════════════════════════════════════════ */}
-      <section className="w-full bg-[hsl(var(--background))] py-16 lg:py-24">
-        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
+        <Ambient tone="emerald" />
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <Eyebrow tone="text-brand">Questions</Eyebrow>
             <h2 className="mt-5 max-w-[20ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">

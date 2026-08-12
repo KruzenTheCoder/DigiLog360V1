@@ -39,6 +39,16 @@ const config: Config = {
         },
         // Landing page: the hero's slow radar sweep.
         'radar-sweep': { to: { transform: 'rotate(360deg)' } },
+        // Landing page: ambient washes drifting behind the light sections.
+        // Transform and opacity only, so these stay on the compositor.
+        'drift-a': {
+          '0%, 100%': { transform: 'translate3d(0, 0, 0) scale(1)', opacity: '0.55' },
+          '50%': { transform: 'translate3d(7%, -5%, 0) scale(1.15)', opacity: '0.8' },
+        },
+        'drift-b': {
+          '0%, 100%': { transform: 'translate3d(0, 0, 0) scale(1.1)', opacity: '0.5' },
+          '50%': { transform: 'translate3d(-6%, 6%, 0) scale(1)', opacity: '0.75' },
+        },
         // Landing page: a new incident arriving on the live board.
         'flash-in': {
           '0%': { backgroundColor: 'rgba(102,126,234,0.28)' },
@@ -49,6 +59,8 @@ const config: Config = {
         'fade-in': 'fade-in 0.2s ease-out',
         'pulse-ring': 'pulse-ring 1.8s infinite',
         'radar-sweep': 'radar-sweep 9s linear infinite',
+        'drift-a': 'drift-a 28s ease-in-out infinite',
+        'drift-b': 'drift-b 36s ease-in-out infinite',
         'flash-in': 'flash-in 2.4s ease',
       },
     },
