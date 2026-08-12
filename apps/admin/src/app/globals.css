@@ -15,6 +15,10 @@
   --muted: 215 20% 45%;
   --border: 214 32% 91%;
   --brand: 245 75% 66%;
+  /* Scrollbar thumb — a touch darker than --border so it reads as a control
+     rather than a rule, but never competes with content. */
+  --scrollbar: 214 20% 80%;
+  --scrollbar-hover: 215 18% 64%;
   color-scheme: light;
 }
 
@@ -29,6 +33,8 @@ html.dark {
   --muted: 215 20% 65%;
   --border: 217 30% 22%;
   --brand: 245 75% 70%;
+  --scrollbar: 217 24% 30%;
+  --scrollbar-hover: 217 20% 44%;
   color-scheme: dark;
 }
 
@@ -40,6 +46,45 @@ body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------------------------------------------------------------------
+   Scrollbars — the page's own bar on the right, and every overflow container.
+   Two syntaxes are needed: `scrollbar-*` is the standard (Firefox), and the
+   `::-webkit-scrollbar` pseudo-elements cover Chrome, Edge and Safari. Both
+   read the same tokens, so the bar follows the theme like everything else.
+   `scrollbar-color` inherits, so setting it on html reaches nested scrollers.
+--------------------------------------------------------------------------- */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--scrollbar)) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  /* A transparent border plus background-clip insets the thumb, so it reads
+     as a floating pill rather than a bar welded to the edge. */
+  background-color: hsl(var(--scrollbar));
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--scrollbar-hover));
+}
+
+/* Stop the corner square between two scrollbars rendering as a grey block. */
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 @layer components {
