@@ -49,6 +49,22 @@ const config: Config = {
           '0%, 100%': { transform: 'translate3d(0, 0, 0) scale(1.1)', opacity: '0.5' },
           '50%': { transform: 'translate3d(-6%, 6%, 0) scale(1)', opacity: '0.75' },
         },
+        // Landing page: a scan running down the story rail, pulling the eye
+        // through the nine frames in order. translateY is a percentage of the
+        // pulse's own height, so 400% carries it the full length of a rail
+        // whose height we never need to know.
+        'rail-pulse': {
+          '0%': { transform: 'translateY(-120%)', opacity: '0' },
+          '12%': { opacity: '1' },
+          '88%': { opacity: '1' },
+          '100%': { transform: 'translateY(420%)', opacity: '0' },
+        },
+        // Landing page: the console glow inhaling, so the showcase is not
+        // completely static behind a board that is.
+        breathe: {
+          '0%, 100%': { opacity: '0.7', transform: 'scale(1)' },
+          '50%': { opacity: '1', transform: 'scale(1.06)' },
+        },
         // Landing page: a new incident arriving on the live board.
         'flash-in': {
           '0%': { backgroundColor: 'rgba(102,126,234,0.28)' },
@@ -61,6 +77,8 @@ const config: Config = {
         'radar-sweep': 'radar-sweep 9s linear infinite',
         'drift-a': 'drift-a 28s ease-in-out infinite',
         'drift-b': 'drift-b 36s ease-in-out infinite',
+        'rail-pulse': 'rail-pulse 7s ease-in-out infinite',
+        breathe: 'breathe 12s ease-in-out infinite',
         'flash-in': 'flash-in 2.4s ease',
       },
     },

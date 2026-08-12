@@ -13,6 +13,7 @@ import { HeroBoard } from './hero-board';
 import { LiveBoard } from './live-board';
 import { Reveal } from './reveal';
 import { Ambient } from './ambient';
+import { Constellation } from './constellation';
 
 // ---------------------------------------------------------------------------
 // Content lives as data so the markup stays readable. Every location and
@@ -304,8 +305,12 @@ export function LandingPage() {
       </section>
 
       {/* ══ PROBLEM ════════════════════════════════════════════════════ */}
-      <section id="problem" className="w-full scroll-mt-2 bg-slate-950 py-16 text-white lg:py-24">
-        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+      <section
+        id="problem"
+        className="relative isolate w-full scroll-mt-2 overflow-hidden bg-slate-950 py-16 text-white lg:py-24"
+      >
+        <Ambient tone="red" scheme="dark" />
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -443,8 +448,20 @@ export function LandingPage() {
       </section>
 
       {/* ══ STORY ══════════════════════════════════════════════════════ */}
-      <section className="w-full bg-slate-950 py-16 text-white lg:py-24">
-        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+      <section className="relative isolate w-full overflow-hidden bg-slate-950 py-16 text-white lg:py-24">
+        <Ambient tone="amber" scheme="dark" />
+        {/* A slow sweep centred on the timeline — the watch being kept, and
+            something in the wide gutters either side of the frames. */}
+        <div
+          aria-hidden
+          className="animate-radar-sweep pointer-events-none absolute left-1/2 top-1/3 h-[70rem] w-[70rem] -translate-x-1/2 rounded-full opacity-[0.05] motion-reduce:animate-none"
+          style={{
+            background:
+              'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.9) 26deg, transparent 58deg)',
+            animationDuration: '48s',
+          }}
+        />
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -463,8 +480,13 @@ export function LandingPage() {
           <div className="relative mt-12 lg:mt-16">
             <div
               aria-hidden
-              className="absolute bottom-0 left-[7px] top-2 w-px bg-gradient-to-b from-red-500 via-sky-400 to-emerald-500 opacity-40 lg:left-1/2 lg:-translate-x-1/2"
-            />
+              className="absolute bottom-0 left-[7px] top-2 w-px overflow-hidden bg-gradient-to-b from-red-500 via-sky-400 to-emerald-500 opacity-40 lg:left-1/2 lg:-translate-x-1/2"
+            >
+              {/* A scan running the length of the rail. Its height is a share
+                  of the rail, so the 420% travel in the keyframe covers the
+                  whole run whatever the section ends up measuring. */}
+              <span className="animate-rail-pulse absolute inset-x-0 top-0 block h-[24%] bg-gradient-to-b from-transparent via-white to-transparent motion-reduce:hidden" />
+            </div>
             <div className="flex flex-col gap-6 lg:gap-8">
               {FRAMES.map((f, i) => {
                 const right = i % 2 === 1;
@@ -610,7 +632,7 @@ export function LandingPage() {
       <section id="console" className="relative w-full scroll-mt-2 overflow-hidden bg-slate-900 py-16 text-white lg:py-24">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(1000px_500px_at_50%_0%,rgba(102,126,234,0.25),transparent_65%)]"
+          className="animate-breathe pointer-events-none absolute inset-0 bg-[radial-gradient(1000px_500px_at_50%_0%,rgba(102,126,234,0.25),transparent_65%)] motion-reduce:animate-none"
         />
         <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
@@ -729,8 +751,10 @@ export function LandingPage() {
       </section>
 
       {/* ══ ROLES ══════════════════════════════════════════════════════ */}
-      <section className="w-full bg-slate-950 py-16 text-white lg:py-24">
-        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+      <section className="relative isolate w-full overflow-hidden bg-slate-950 py-16 text-white lg:py-24">
+        <Ambient tone="brand" scheme="dark" />
+        <Constellation />
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -876,6 +900,16 @@ export function LandingPage() {
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_450px_at_50%_-20%,rgba(255,255,255,0.25),transparent_60%)]"
+        />
+        {/* The hero's sweep, returning to close the page */}
+        <div
+          aria-hidden
+          className="animate-radar-sweep pointer-events-none absolute -top-[34rem] left-1/2 h-[52rem] w-[52rem] -translate-x-1/2 rounded-full opacity-[0.13] motion-reduce:animate-none"
+          style={{
+            background:
+              'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.9) 30deg, transparent 64deg)',
+            animationDuration: '22s',
+          }}
         />
         <div className="relative mx-auto w-full max-w-[60rem] px-5 text-center sm:px-8">
           <h2 className="text-[clamp(1.9rem,4.4vw,3.25rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
