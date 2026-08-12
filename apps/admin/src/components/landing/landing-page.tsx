@@ -1,5 +1,11 @@
 import Link from 'next/link';
-import { ArrowRight, ArrowDown, Check } from 'lucide-react';
+import {
+  Activity, AlertTriangle, ArrowDown, ArrowRight, BadgeCheck, Bell, Camera, Check,
+  ClipboardCheck, Clock, Database, FileText, Footprints, Gauge, KeyRound, Layers,
+  Lock, LogIn, Map, MapPin, PhoneCall, QrCode, Radio, Route, ScrollText,
+  ShieldCheck, Siren, Smartphone, TrendingUp, Users, Webhook, WifiOff,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/brand/logo';
 import { BRAND, SLA_CONFIG, SEVERITY_LABELS, SEVERITY_COLORS, SEVERITIES } from '@digilog/shared';
@@ -14,31 +20,37 @@ import { Reveal } from './reveal';
 
 const HERO_CHIPS = ['Works offline', 'QR · NFC · GPS patrols', 'Multi-site', 'Audit trail on everything'];
 
-const PROBLEMS = [
-  { k: '01', title: 'Written from memory', body: 'Entries are filled in at the end of a twelve-hour shift, long after the event, with the details worn smooth.' },
-  { k: '02', title: 'Nobody knows where anyone is', body: 'An officer walks into a live intrusion and the control room only finds out when they stop answering the radio.' },
-  { k: '03', title: 'No clock on the response', body: "Nothing measures the gap between something happening and somebody acting on it. What isn't measured isn't managed." },
-  { k: '04', title: 'Evidence you cannot produce', body: 'Weeks later a client asks what happened. The answer is a photocopy of somebody’s handwriting — if the book can be found.' },
+const PATROLS = [
+  { route: 'North perimeter', done: 7, total: 9, tone: 'bg-emerald-400' },
+  { route: 'Yard & loading bay', done: 4, total: 8, tone: 'bg-sky-400' },
+  { route: 'Roof & plant rooms', done: 1, total: 6, tone: 'bg-amber-300' },
 ];
 
-const PILLARS = [
-  { n: '01', dot: 'bg-red-500', title: 'Report from the scene', body: 'Officers log incidents on a handset in under a minute, with photographs, voice notes and location — and no signal required.' },
-  { n: '02', dot: 'bg-orange-500', title: 'A clock on everything', body: 'Severity sets a response target the moment an incident is filed. The countdown runs on its own and escalates itself when it lapses.' },
-  { n: '03', dot: 'bg-sky-500', title: 'See the whole operation', body: 'A live console shows every open incident, every officer on patrol and every visitor on site — updating as it happens.' },
-  { n: '04', dot: 'bg-brand', title: 'Prove the patrol', body: 'Checkpoints are verified by QR, NFC tag or GPS geofence, so presence is a record rather than a claim.' },
-  { n: '05', dot: 'bg-violet-500', title: 'Review and sign off', body: 'Every incident is read by a manager and acknowledged, escalated or rejected with notes — against a real name and timestamp.' },
-  { n: '06', dot: 'bg-emerald-500', title: 'Answer any question, later', body: 'One click produces a branded report with the full timeline and evidence attached, years after the shift ended.' },
+const PROBLEMS: { k: string; icon: LucideIcon; title: string; body: string }[] = [
+  { k: '01', icon: ScrollText, title: 'Written from memory', body: 'Entries are filled in at the end of a twelve-hour shift, long after the event, with the details worn smooth.' },
+  { k: '02', icon: MapPin, title: 'Nobody knows where anyone is', body: 'An officer walks into a live intrusion and the control room only finds out when they stop answering the radio.' },
+  { k: '03', icon: Clock, title: 'No clock on the response', body: "Nothing measures the gap between something happening and somebody acting on it. What isn't measured isn't managed." },
+  { k: '04', icon: FileText, title: 'Evidence you cannot produce', body: 'Weeks later a client asks what happened. The answer is a photocopy of somebody’s handwriting — if the book can be found.' },
 ];
 
-const MODULES = [
-  { name: 'Occurrences', body: 'Numbered incidents with severity, photographs, voice notes, comments and a full update timeline.' },
-  { name: 'Patrols & checkpoints', body: 'Routes, schedules and verified scans by QR label, NFC tag or GPS geofence — with late-patrol alerts.' },
-  { name: 'Officer map', body: 'Live positions every thirty seconds while on patrol, with tap-to-call straight from the team view.' },
-  { name: 'Visitor register', body: 'Licence-disk and driver’s-licence scanning in, scan-to-sign-out on the way back through the gate.' },
-  { name: 'Key register', body: 'Every hand-over captured against a name and ID number, with the full history kept per key.' },
-  { name: 'Shifts & handovers', body: 'Clock-in and clock-out with live counters, plus signed handovers the incoming officer must acknowledge.' },
-  { name: 'Tasks', body: 'Follow-up work linked to the incident that caused it, with its own owner, due date and update thread.' },
-  { name: 'Reports & exports', body: 'Branded PDF reports, evidence galleries and CSV exports for client packs and disputes.' },
+const PILLARS: { n: string; icon: LucideIcon; tint: string; title: string; body: string }[] = [
+  { n: '01', icon: Smartphone, tint: 'bg-red-500/10 text-red-600', title: 'Report from the scene', body: 'Officers log incidents on a handset in under a minute, with photographs, voice notes and location — and no signal required.' },
+  { n: '02', icon: Gauge, tint: 'bg-orange-500/10 text-orange-600', title: 'A clock on everything', body: 'Severity sets a response target the moment an incident is filed. The countdown runs on its own and escalates itself when it lapses.' },
+  { n: '03', icon: Radio, tint: 'bg-sky-500/10 text-sky-600', title: 'See the whole operation', body: 'A live console shows every open incident, every officer on patrol and every visitor on site — updating as it happens.' },
+  { n: '04', icon: QrCode, tint: 'bg-brand/10 text-brand', title: 'Prove the patrol', body: 'Checkpoints are verified by QR, NFC tag or GPS geofence, so presence is a record rather than a claim.' },
+  { n: '05', icon: ClipboardCheck, tint: 'bg-violet-500/10 text-violet-600', title: 'Review and sign off', body: 'Every incident is read by a manager and acknowledged, escalated or rejected with notes — against a real name and timestamp.' },
+  { n: '06', icon: FileText, tint: 'bg-emerald-500/10 text-emerald-600', title: 'Answer any question, later', body: 'One click produces a branded report with the full timeline and evidence attached, years after the shift ended.' },
+];
+
+const MODULES: { icon: LucideIcon; name: string; body: string; meta: string }[] = [
+  { icon: Siren, name: 'Occurrences', body: 'Numbered incidents with severity, photographs, voice notes, comments and a full update timeline.', meta: 'OB-numbered' },
+  { icon: Footprints, name: 'Patrols & checkpoints', body: 'Routes, schedules and verified scans, with alerts when an expected patrol does not happen.', meta: 'QR · NFC · GPS' },
+  { icon: Map, name: 'Officer map', body: 'Live positions while on patrol, with tap-to-call straight from the team view.', meta: 'Every 30s' },
+  { icon: LogIn, name: 'Visitor register', body: 'Licence scanning on the way in, and scanning the disk on the way out signs the right person off.', meta: 'Scan in · scan out' },
+  { icon: KeyRound, name: 'Key register', body: 'Every hand-over captured against a name and ID number, with the full history kept per key.', meta: 'Held vs available' },
+  { icon: Clock, name: 'Shifts & handovers', body: 'Clock-in and clock-out with live counters, plus signed handovers the incoming officer acknowledges.', meta: 'Signed off' },
+  { icon: ClipboardCheck, name: 'Tasks', body: 'Follow-up work linked to the incident that caused it, with its own owner and due date.', meta: 'Linked to an OB' },
+  { icon: FileText, name: 'Reports & exports', body: 'Branded PDF reports, evidence galleries and CSV exports for client packs and disputes.', meta: 'One click' },
 ];
 
 interface Frame {
@@ -58,40 +70,49 @@ const FRAMES: Frame[] = [
   { no: '09', time: 'Any time', who: 'Evidence', title: 'Weeks later, the client asks.', body: 'One click produces a branded report: the timeline to the second, the photographs, the response, the sign-off. Not a recollection — a record that was built while it happened.', chips: ['Exported in one click', 'Evidence retained and searchable'], dot: 'bg-emerald-500', ring: 'ring-emerald-500/30' },
 ];
 
-const FIELD_APP = [
-  'Signs in with an employee number and a four-digit PIN — no passwords in the dark.',
-  'Logs an incident in under a minute with photographs and a voice note that is transcribed for you.',
-  'Queues everything on the handset when there is no signal, and files it the moment coverage returns.',
-  'Scans checkpoints by QR label, NFC tag or GPS geofence, recording method and distance.',
-  'Runs the gate house: licence scanning in, scan-to-sign-out, and the key register.',
-  'Clocks shifts and writes a signed handover the incoming officer has to acknowledge.',
+const FIELD_APP: { icon: LucideIcon; title: string; body: string }[] = [
+  { icon: Lock, title: 'A PIN, not a password', body: 'Officers sign in with an employee number and four digits — nothing to forget at two in the morning.' },
+  { icon: Camera, title: 'Evidence as you go', body: 'Photographs and a voice note attach to the incident, and the recording is transcribed to searchable text.' },
+  { icon: WifiOff, title: 'Signal optional', body: 'Everything queues on the handset in a dead zone and files itself the moment coverage returns.' },
+  { icon: QrCode, title: 'Three ways to scan', body: 'QR label, NFC tag or GPS geofence — whichever suits the point, with method and distance recorded.' },
+  { icon: LogIn, title: 'The gate house in a pocket', body: 'Licence scanning, the visitor register and the key hand-over log, all from the same device.' },
+  { icon: BadgeCheck, title: 'Shifts and handovers', body: 'Clock on and off, then leave a signed handover the next officer has to acknowledge before starting.' },
 ];
 
-const CAPABILITIES = [
-  { tag: 'Live board', accent: 'text-indigo-500', title: 'Incidents appear as they are logged', body: 'New incidents flash onto the control-room board with a banner, and every response badge counts down on its own.' },
-  { tag: 'Officer map', accent: 'text-sky-500', title: 'Where your people are, right now', body: 'Positions land every thirty seconds while an officer is on patrol — and only while they are on patrol.' },
-  { tag: 'Alerts', accent: 'text-red-500', title: 'Breaches escalate themselves', body: 'Miss a target and the platform notifies the control room, supervisor, manager and administrator — in-app, push and email.' },
-  { tag: 'Offline first', accent: 'text-emerald-500', title: 'No signal is not an excuse', body: 'Incidents logged in a basement or a dead zone queue on the handset with their photographs and file themselves when coverage returns.' },
-  { tag: 'Verified patrols', accent: 'text-orange-500', title: 'Presence you can prove', body: 'QR labels, NFC tags or a GPS geofence — three ways to prove an officer stood at a checkpoint, with method and distance recorded.' },
-  { tag: 'Gate house', accent: 'text-amber-500', title: 'Scan the licence, not the clipboard', body: 'Vehicle disks and drivers’ licences scan straight into the visitor register, and scanning on the way out signs the right person off.' },
+const CAPABILITIES: { icon: LucideIcon; tag: string; accent: string; title: string; body: string }[] = [
+  { icon: Radio, tag: 'Live board', accent: 'text-indigo-500', title: 'Incidents appear as they are logged', body: 'New incidents flash onto the control-room board with a banner, and every response badge counts down on its own.' },
+  { icon: Map, tag: 'Officer map', accent: 'text-sky-500', title: 'Where your people are, right now', body: 'Positions land every thirty seconds while an officer is on patrol — and only while they are on patrol.' },
+  { icon: Bell, tag: 'Alerts', accent: 'text-red-500', title: 'Breaches escalate themselves', body: 'Miss a target and the platform notifies the control room, supervisor, manager and administrator — in-app, push and email.' },
+  { icon: WifiOff, tag: 'Offline first', accent: 'text-emerald-500', title: 'No signal is not an excuse', body: 'Incidents logged in a basement or a dead zone queue on the handset and file themselves when coverage returns.' },
+  { icon: Footprints, tag: 'Verified patrols', accent: 'text-orange-500', title: 'Presence you can prove', body: 'Three ways to prove an officer stood at a checkpoint, with the method and the distance recorded on every scan.' },
+  { icon: PhoneCall, tag: 'Reach anyone', accent: 'text-amber-500', title: 'One tap from the record', body: 'Call the officer on the incident straight from the team view, without hunting for a number on a roster.' },
 ];
 
 const ROLES = [
-  { role: 'Officer', accent: 'text-sky-400 border-sky-400/30', lead: 'Works the site from a phone.', body: 'Clocks on, runs patrols, logs incidents, staffs the gate and hands over — signing in with an employee number and a PIN.' },
-  { role: 'Supervisor', accent: 'text-emerald-400 border-emerald-400/30', lead: 'Runs the shift.', body: 'The site board, the team’s live positions, patrol oversight, and the ability to close out a patrol somebody forgot to end.' },
-  { role: 'Control room', accent: 'text-indigo-300 border-indigo-300/30', lead: 'Holds the line.', body: 'Watches every open incident against its clock, logs what comes in over the radio and answers for the response.' },
-  { role: 'Manager', accent: 'text-red-400 border-red-400/30', lead: 'Signs it off.', body: 'Reviews every incident — acknowledge, escalate or reject with notes — and reports on how the team actually performed.' },
-  { role: 'Administrator', accent: 'text-orange-400 border-orange-400/30', lead: 'Shapes the operation.', body: 'People, sites, response targets, incident types and integrations — tuned per organisation without touching code.' },
-  { role: 'Platform owner', accent: 'text-amber-400 border-amber-400/30', lead: 'Runs the platform.', body: 'Many client organisations from one deployment, each sealed off from the others, with its own branding and rules.' },
+  { role: 'Officer', icon: Smartphone, accent: 'text-sky-400 border-sky-400/30', lead: 'Works the site from a phone.', body: 'Clocks on, runs patrols, logs incidents, staffs the gate and hands over — signing in with an employee number and a PIN.' },
+  { role: 'Supervisor', icon: Users, accent: 'text-emerald-400 border-emerald-400/30', lead: 'Runs the shift.', body: 'The site board, the team’s live positions, patrol oversight, and the ability to close out a patrol somebody forgot to end.' },
+  { role: 'Control room', icon: Radio, accent: 'text-indigo-300 border-indigo-300/30', lead: 'Holds the line.', body: 'Watches every open incident against its clock, logs what comes in over the radio and answers for the response.' },
+  { role: 'Manager', icon: ClipboardCheck, accent: 'text-red-400 border-red-400/30', lead: 'Signs it off.', body: 'Reviews every incident — acknowledge, escalate or reject with notes — and reports on how the team actually performed.' },
+  { role: 'Administrator', icon: Layers, accent: 'text-orange-400 border-orange-400/30', lead: 'Shapes the operation.', body: 'People, sites, response targets, incident types and integrations — tuned per organisation without touching code.' },
+  { role: 'Platform owner', icon: Database, accent: 'text-amber-400 border-amber-400/30', lead: 'Runs the platform.', body: 'Many client organisations from one deployment, each sealed off from the others, with its own branding and rules.' },
 ];
 
-const PLATFORM = [
-  { title: 'Separated by tenant', body: 'Every organisation’s data is isolated at the database level, not by a filter in the application. One deployment serves many clients without them ever meeting.' },
-  { title: 'An audit trail you cannot edit', body: 'Sign-ins, role changes, manager decisions and configuration changes are written with the actor, their role, the target and a timestamp.' },
-  { title: 'Access that fits the job', body: 'Six ranked roles plus a per-organisation capability grid, so a client can be given exactly the screens they bought — and nothing else.' },
-  { title: 'Accounts held properly', body: 'Passwords with optional two-factor for the console, hashed PINs with lockout for the field, and tokens stored only as hashes.' },
-  { title: 'It talks to your other systems', body: 'Signed outbound webhooks and organisation-scoped API tokens, so incidents can reach your ticketing, monitoring or reporting stack.' },
-  { title: 'Built to keep running', body: 'Watchdogs sweep for breached targets and missed patrols on a schedule, and alert emails retry until they are delivered or recorded as failed.' },
+const PLATFORM: { icon: LucideIcon; title: string; body: string }[] = [
+  { icon: Database, title: 'Separated by tenant', body: 'Every organisation’s data is isolated at the database level, not by a filter in the application. One deployment serves many clients without them ever meeting.' },
+  { icon: ScrollText, title: 'An audit trail you cannot edit', body: 'Sign-ins, role changes, manager decisions and configuration changes are written with the actor, their role, the target and a timestamp.' },
+  { icon: ShieldCheck, title: 'Access that fits the job', body: 'Six ranked roles plus a per-organisation capability grid, so a client sees exactly the screens they bought — and nothing else.' },
+  { icon: Lock, title: 'Accounts held properly', body: 'Passwords with optional two-factor for the console, hashed PINs with lockout for the field, and tokens stored only as hashes.' },
+  { icon: Webhook, title: 'It talks to your other systems', body: 'Signed outbound webhooks and organisation-scoped API tokens, so incidents can reach your ticketing, monitoring or reporting stack.' },
+  { icon: Activity, title: 'Built to keep running', body: 'Watchdogs sweep for breached targets and missed patrols on a schedule, and alert emails retry until delivered or recorded as failed.' },
+];
+
+const FAQ = [
+  { q: 'What happens where there is no signal?', a: 'The handset keeps working. Incidents, photographs and voice notes queue on the device and file themselves the moment coverage returns, keeping the time they were captured rather than the time they synced.' },
+  { q: 'Do officers need to remember a password?', a: 'No. They sign in with their employee number and a four-digit PIN. PINs are stored hashed and lock out after repeated failures, and an administrator can reset one in seconds.' },
+  { q: 'Can we keep our own response times?', a: 'Yes. The severity matrix ships with sensible defaults, and each organisation can set its own resolve and update targets to match what it has promised its clients.' },
+  { q: 'How do we prove a patrol actually happened?', a: 'Checkpoints are scanned by QR label, NFC tag or GPS geofence. Each scan records the method, the time and the distance from the point, so presence is evidence rather than a signature.' },
+  { q: 'Can more than one company use the same system?', a: 'Yes. It is multi-tenant by design — each organisation is isolated at the database level, with its own branding, sites, users, response targets and permissions.' },
+  { q: 'What can we hand a client after an incident?', a: 'A branded report with the full timeline to the second, the photographs, every update and the manager’s sign-off — produced in one click, years after the shift ended.' },
 ];
 
 const BEFORE = [
@@ -125,6 +146,19 @@ function intervalLabel(minutes: number) {
     return hours === 1 ? 'hourly' : `every ${hours} hours`;
   }
   return `every ${minutes} min`;
+}
+
+/** Section label with a short gradient rule under it — used on every section. */
+function Eyebrow({ children, tone, dark }: { children: string; tone: string; dark?: boolean }) {
+  return (
+    <div>
+      <p className={`text-[0.7rem] font-bold uppercase tracking-[0.22em] ${tone}`}>{children}</p>
+      <span
+        aria-hidden
+        className={`mt-3 block h-px w-14 ${dark ? 'bg-white/25' : 'bg-[hsl(var(--border))]'}`}
+      />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -167,9 +201,9 @@ export function LandingPage() {
           </Link>
         </nav>
 
-        <div className="relative z-10 mx-auto w-full max-w-[92rem] px-5 pb-12 pt-6 sm:px-8 lg:px-12 lg:pb-16 lg:pt-10">
-          <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-14">
-            <div>
+        <div className="relative z-10 mx-auto w-full max-w-[92rem] px-5 pb-12 pt-4 sm:px-8 lg:px-12 lg:pb-16 lg:pt-8">
+          <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-14">
+            <div className="min-w-0">
               <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/[0.12] px-3.5 py-1.5 text-[0.68rem] font-bold uppercase tracking-[0.16em] backdrop-blur-sm">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
@@ -214,8 +248,35 @@ export function LandingPage() {
               </ul>
             </div>
 
-            <div className="lg:justify-self-end lg:pl-4">
+            {/* Two stacked panels: what is happening, and who is out there */}
+            <div className="grid min-w-0 gap-4">
               <HeroBoard />
+
+              <div className="rounded-2xl border border-white/25 bg-white/[0.08] p-4 backdrop-blur-md">
+                <div className="mb-3 flex items-center gap-2">
+                  <Route className="h-4 w-4 text-white/70" />
+                  <span className="font-mono text-[0.64rem] font-bold uppercase tracking-[0.16em] text-white/70">
+                    On patrol now
+                  </span>
+                  <span className="ml-auto font-mono text-[0.64rem] text-white/60">3 routes</span>
+                </div>
+                <ul className="grid gap-2.5">
+                  {PATROLS.map((p) => (
+                    <li key={p.route} className="flex items-center gap-3">
+                      <span className="min-w-0 flex-1 truncate text-sm text-white/90">{p.route}</span>
+                      <span className="h-1.5 w-20 overflow-hidden rounded-full bg-white/20 sm:w-28">
+                        <span
+                          className={`block h-full rounded-full ${p.tone}`}
+                          style={{ width: `${(p.done / p.total) * 100}%` }}
+                        />
+                      </span>
+                      <span className="w-10 shrink-0 text-right font-mono text-xs tabular-nums text-white/75">
+                        {p.done}/{p.total}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -246,13 +307,13 @@ export function LandingPage() {
         <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
-              <div>
-                <p className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-red-400">The problem</p>
-                <h2 className="mt-4 max-w-[17ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
+              <div className="min-w-0">
+                <Eyebrow tone="text-red-400" dark>The problem</Eyebrow>
+                <h2 className="mt-5 max-w-[17ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
                   A paper book cannot raise the alarm.
                 </h2>
               </div>
-              <p className="text-base leading-relaxed text-slate-400 lg:text-lg">
+              <p className="min-w-0 text-base leading-relaxed text-slate-400 lg:text-lg">
                 The occurrence book has run security operations for a century. It has one fatal
                 property: it only speaks when somebody opens it — and by then the night is over.
                 Everything below follows from that single flaw.
@@ -260,12 +321,39 @@ export function LandingPage() {
             </div>
           </Reveal>
 
-          <div className="mt-10 grid gap-px overflow-hidden rounded-2xl bg-white/10 sm:grid-cols-2 lg:mt-14 lg:grid-cols-4">
+          {/* The silent hours — the gap made visible */}
+          <Reveal delay={80}>
+            <div className="mt-10 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 lg:mt-14 lg:p-8">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="flex items-center gap-2 font-mono text-sm font-bold tabular-nums text-red-400">
+                  <AlertTriangle className="h-4 w-4" /> 02:14 · fence cut
+                </span>
+                <span className="font-mono text-sm font-bold tabular-nums text-slate-400">
+                  06:00 · handover
+                </span>
+              </div>
+              <div className="relative mt-4 h-2 w-full overflow-hidden rounded-full bg-white/10">
+                <div className="absolute inset-y-0 left-0 w-full rounded-full bg-gradient-to-r from-red-600 via-red-500/60 to-slate-600" />
+              </div>
+              <p className="mt-4 text-sm text-slate-400">
+                <b className="text-white">Three hours forty-six minutes</b> in which the control room,
+                the supervisor and the client all believe the site is quiet. On paper, that gap is
+                invisible — there is nothing to notice, because nothing was written down.
+              </p>
+            </div>
+          </Reveal>
+
+          <div className="mt-8 grid gap-px overflow-hidden rounded-2xl bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
             {PROBLEMS.map((p, i) => (
               <Reveal key={p.k} delay={i * 80}>
                 <div className="h-full bg-slate-950 p-6 lg:p-7">
-                  <span className="font-mono text-xs font-bold tracking-widest text-red-400/70">{p.k}</span>
-                  <h3 className="mb-2 mt-3 text-lg font-bold tracking-tight">{p.title}</h3>
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/10 text-red-400">
+                      <p.icon className="h-[18px] w-[18px]" />
+                    </span>
+                    <span className="font-mono text-xs font-bold tracking-widest text-red-400/70">{p.k}</span>
+                  </div>
+                  <h3 className="mb-2 mt-4 text-lg font-bold tracking-tight">{p.title}</h3>
                   <p className="text-sm leading-relaxed text-slate-400">{p.body}</p>
                 </div>
               </Reveal>
@@ -287,13 +375,13 @@ export function LandingPage() {
         <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
-              <div>
-                <p className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-brand">The solution</p>
-                <h2 className="mt-4 max-w-[19ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
+              <div className="min-w-0">
+                <Eyebrow tone="text-brand">The solution</Eyebrow>
+                <h2 className="mt-5 max-w-[19ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
                   Capture it at the source. Everything else follows.
                 </h2>
               </div>
-              <p className="text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
+              <p className="min-w-0 text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
                 A phone in the field, a live console in the control room, and one database that never
                 forgets. Six things change the moment it is running.
               </p>
@@ -303,12 +391,14 @@ export function LandingPage() {
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
             {PILLARS.map((p, i) => (
               <Reveal key={p.n} delay={i * 60}>
-                <div className="h-full rounded-2xl border bg-[hsl(var(--surface))] p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                  <div className="flex items-center gap-2.5">
-                    <span className={`h-2.5 w-2.5 rounded-full ${p.dot}`} />
+                <div className="group h-full rounded-2xl border bg-[hsl(var(--surface))] p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-brand/30 hover:shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${p.tint}`}>
+                      <p.icon className="h-5 w-5" />
+                    </span>
                     <span className="font-mono text-xs font-bold tracking-widest text-[hsl(var(--muted))]">{p.n}</span>
                   </div>
-                  <h3 className="mb-2 mt-4 text-lg font-bold tracking-tight">{p.title}</h3>
+                  <h3 className="mb-2 mt-5 text-lg font-bold tracking-tight">{p.title}</h3>
                   <p className="text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]">{p.body}</p>
                 </div>
               </Reveal>
@@ -321,22 +411,28 @@ export function LandingPage() {
       <section className="w-full border-y bg-[hsl(var(--surface))] py-16 lg:py-24">
         <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
-            <p className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-violet-600">What you get</p>
-            <h2 className="mt-4 max-w-[24ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
+            <Eyebrow tone="text-violet-600">What you get</Eyebrow>
+            <h2 className="mt-5 max-w-[24ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
               Eight registers, one system, no double entry.
             </h2>
             <p className="mt-5 max-w-[68ch] text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
-              Each of these replaces a book, a clipboard or a spreadsheet — and because they share
-              one database, an incident can carry the patrol, the visitor and the key that relate to it.
+              Each of these replaces a book, a clipboard or a spreadsheet — and because they share one
+              database, an incident can carry the patrol, the visitor and the key that relate to it.
             </p>
           </Reveal>
 
           <div className="mt-10 grid gap-px overflow-hidden rounded-2xl border bg-[hsl(var(--border))] sm:grid-cols-2 lg:mt-14 lg:grid-cols-4">
             {MODULES.map((m, i) => (
               <Reveal key={m.name} delay={i * 45}>
-                <div className="h-full bg-[hsl(var(--surface))] p-6">
-                  <h3 className="text-base font-bold tracking-tight">{m.name}</h3>
+                <div className="group h-full bg-[hsl(var(--surface))] p-6 transition-colors duration-300 hover:bg-[hsl(var(--background))]">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                    <m.icon className="h-5 w-5" />
+                  </span>
+                  <h3 className="mt-4 text-base font-bold tracking-tight">{m.name}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-[hsl(var(--muted))]">{m.body}</p>
+                  <p className="mt-3 font-mono text-[0.68rem] uppercase tracking-wider text-[hsl(var(--muted))]/70">
+                    {m.meta}
+                  </p>
                 </div>
               </Reveal>
             ))}
@@ -349,13 +445,13 @@ export function LandingPage() {
         <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
-              <div>
-                <p className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-amber-400">One night, minute by minute</p>
-                <h2 className="mt-4 max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
+              <div className="min-w-0">
+                <Eyebrow tone="text-amber-400" dark>One night, minute by minute</Eyebrow>
+                <h2 className="mt-5 max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
                   A perimeter breach, end to end.
                 </h2>
               </div>
-              <p className="text-base leading-relaxed text-slate-400 lg:text-lg">
+              <p className="min-w-0 text-base leading-relaxed text-slate-400 lg:text-lg">
                 Every timestamp below is recorded by the platform itself. Nobody types these in
                 afterwards — which is exactly the point.
               </p>
@@ -376,7 +472,7 @@ export function LandingPage() {
                       aria-hidden
                       className={`absolute left-0 top-2 h-4 w-4 rounded-full ring-4 ${f.dot} ${f.ring} lg:left-1/2 lg:-translate-x-1/2`}
                     />
-                    <Reveal className={right ? 'lg:col-start-2' : 'lg:col-start-1 lg:row-start-1'}>
+                    <Reveal className={`min-w-0 ${right ? 'lg:col-start-2' : 'lg:col-start-1 lg:row-start-1'}`}>
                       <article className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-sm transition duration-300 hover:border-white/20 hover:bg-white/[0.07] lg:p-6">
                         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                           <span className="font-mono text-[0.68rem] font-bold tracking-widest text-slate-500">
@@ -435,8 +531,8 @@ export function LandingPage() {
                 would otherwise force this whole section wider than a phone. */}
             <Reveal className="min-w-0">
               <div>
-                <p className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-orange-600">Response targets</p>
-                <h2 className="mt-4 max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
+                <Eyebrow tone="text-orange-600">Response targets</Eyebrow>
+                <h2 className="mt-5 max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
                   Every incident gets a clock.
                 </h2>
                 <p className="mt-5 max-w-[52ch] text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
@@ -444,10 +540,18 @@ export function LandingPage() {
                   incident must be resolved and how often it must be updated — and it chases the
                   deadline itself rather than waiting to be asked.
                 </p>
-                <p className="mt-5 max-w-[52ch] text-base leading-relaxed text-[hsl(var(--muted))]">
-                  These are the defaults. Every organisation can tune its own matrix to match what it
-                  has promised its clients.
-                </p>
+                <ul className="mt-6 grid gap-2.5">
+                  {[
+                    'The countdown starts the second it is filed',
+                    'Change the severity and the clock recalculates',
+                    'A lapse notifies the whole chain, not just one inbox',
+                  ].map((t) => (
+                    <li key={t} className="flex items-start gap-2.5 text-[0.95rem] text-[hsl(var(--muted))]">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
+                      {t}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </Reveal>
 
@@ -469,14 +573,11 @@ export function LandingPage() {
                   </thead>
                   <tbody>
                     {SEVERITIES.map((sev) => (
-                      <tr key={sev}>
+                      <tr key={sev} className="transition-colors hover:bg-[hsl(var(--background))]">
                         <td className="border-b px-5 py-4">
                           <span
                             className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                            style={{
-                              backgroundColor: `${SEVERITY_COLORS[sev]}1a`,
-                              color: SEVERITY_COLORS[sev],
-                            }}
+                            style={{ backgroundColor: `${SEVERITY_COLORS[sev]}1a`, color: SEVERITY_COLORS[sev] }}
                           >
                             {SEVERITY_LABELS[sev]}
                           </span>
@@ -557,13 +658,13 @@ export function LandingPage() {
         <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
-              <div>
-                <p className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-sky-500">Realtime, meant literally</p>
-                <h2 className="mt-4 max-w-[16ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
+              <div className="min-w-0">
+                <Eyebrow tone="text-sky-500">Realtime, meant literally</Eyebrow>
+                <h2 className="mt-5 max-w-[16ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
                   Nothing here waits to be asked.
                 </h2>
               </div>
-              <p className="text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
+              <p className="min-w-0 text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
                 The database pushes changes to every screen the moment they are written. No polling,
                 no refresh button, no wondering whether what you are looking at is current.
               </p>
@@ -574,8 +675,11 @@ export function LandingPage() {
             {CAPABILITIES.map((c, i) => (
               <Reveal key={c.tag} delay={i * 60}>
                 <div className="h-full rounded-2xl border bg-[hsl(var(--surface))] p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                  <p className={`text-[0.68rem] font-bold uppercase tracking-[0.16em] ${c.accent}`}>{c.tag}</p>
-                  <h3 className="mb-2 mt-3 text-lg font-bold leading-snug tracking-tight">{c.title}</h3>
+                  <div className="flex items-center gap-2.5">
+                    <c.icon className={`h-[18px] w-[18px] ${c.accent}`} />
+                    <p className={`text-[0.68rem] font-bold uppercase tracking-[0.16em] ${c.accent}`}>{c.tag}</p>
+                  </div>
+                  <h3 className="mb-2 mt-4 text-lg font-bold leading-snug tracking-tight">{c.title}</h3>
                   <p className="text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]">{c.body}</p>
                 </div>
               </Reveal>
@@ -587,34 +691,35 @@ export function LandingPage() {
       {/* ══ THE FIELD APP ══════════════════════════════════════════════ */}
       <section className="w-full border-y bg-[hsl(var(--surface))] py-16 lg:py-24">
         <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-16">
-            <Reveal>
-              <div>
-                <p className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-emerald-600">In the field</p>
-                <h2 className="mt-4 max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
+          <Reveal>
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
+              <div className="min-w-0">
+                <Eyebrow tone="text-emerald-600">In the field</Eyebrow>
+                <h2 className="mt-5 max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
                   The whole shift, from one handset.
                 </h2>
-                <p className="mt-5 max-w-[54ch] text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
-                  Officers do not carry a laptop and they should not have to remember a password at
-                  two in the morning. The field app is built for gloved hands, poor light and worse
-                  signal — and it never asks anyone to write anything down twice.
-                </p>
               </div>
-            </Reveal>
+              <p className="min-w-0 text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
+                Officers do not carry a laptop, and they should not have to remember a password at two
+                in the morning. The field app is built for gloved hands, poor light and worse signal.
+              </p>
+            </div>
+          </Reveal>
 
-            <Reveal delay={100}>
-              <ul className="grid gap-3">
-                {FIELD_APP.map((f) => (
-                  <li
-                    key={f}
-                    className="flex gap-3 rounded-xl border bg-[hsl(var(--background))] p-4 text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]"
-                  >
-                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-            </Reveal>
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
+            {FIELD_APP.map((f, i) => (
+              <Reveal key={f.title} delay={i * 55}>
+                <div className="flex h-full gap-4 rounded-2xl border bg-[hsl(var(--background))] p-5">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                    <f.icon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold tracking-tight">{f.title}</h3>
+                    <p className="mt-1.5 text-sm leading-relaxed text-[hsl(var(--muted))]">{f.body}</p>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
           </div>
         </div>
       </section>
@@ -624,13 +729,13 @@ export function LandingPage() {
         <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
-              <div>
-                <p className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-indigo-300">Who it is for</p>
-                <h2 className="mt-4 max-w-[16ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
+              <div className="min-w-0">
+                <Eyebrow tone="text-indigo-300" dark>Who it is for</Eyebrow>
+                <h2 className="mt-5 max-w-[16ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
                   Six roles, one version of the truth.
                 </h2>
               </div>
-              <p className="text-base leading-relaxed text-slate-400 lg:text-lg">
+              <p className="min-w-0 text-base leading-relaxed text-slate-400 lg:text-lg">
                 Everyone sees the same records, filtered to what their job needs. Nobody keeps a
                 private spreadsheet, because there is nothing the system does not already hold.
               </p>
@@ -641,9 +746,14 @@ export function LandingPage() {
             {ROLES.map((r, i) => (
               <Reveal key={r.role} delay={i * 50}>
                 <div className="h-full rounded-2xl border border-white/10 bg-white/[0.04] p-6 transition duration-300 hover:border-white/20 hover:bg-white/[0.07]">
-                  <span className={`inline-block rounded-full border px-3 py-0.5 text-[0.7rem] font-bold uppercase tracking-[0.1em] ${r.accent}`}>
-                    {r.role}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
+                      <r.icon className={`h-5 w-5 ${r.accent.split(' ')[0]}`} />
+                    </span>
+                    <span className={`inline-block rounded-full border px-3 py-0.5 text-[0.7rem] font-bold uppercase tracking-[0.1em] ${r.accent}`}>
+                      {r.role}
+                    </span>
+                  </div>
                   <p className="mt-4 text-base font-bold leading-snug">{r.lead}</p>
                   <p className="mt-1.5 text-[0.95rem] leading-relaxed text-slate-400">{r.body}</p>
                 </div>
@@ -658,13 +768,13 @@ export function LandingPage() {
         <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
-              <div>
-                <p className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-slate-500">Underneath</p>
-                <h2 className="mt-4 max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
+              <div className="min-w-0">
+                <Eyebrow tone="text-slate-500">Underneath</Eyebrow>
+                <h2 className="mt-5 max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
                   Built to hold up in a dispute.
                 </h2>
               </div>
-              <p className="text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
+              <p className="min-w-0 text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
                 A security record is only worth what it can prove. These are the parts that make the
                 platform trustworthy when somebody starts asking hard questions.
               </p>
@@ -675,7 +785,10 @@ export function LandingPage() {
             {PLATFORM.map((p, i) => (
               <Reveal key={p.title} delay={i * 55}>
                 <div className="h-full rounded-2xl border bg-[hsl(var(--surface))] p-6 shadow-sm">
-                  <h3 className="text-lg font-bold tracking-tight">{p.title}</h3>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500">
+                    <p.icon className="h-5 w-5" />
+                  </span>
+                  <h3 className="mt-4 text-lg font-bold tracking-tight">{p.title}</h3>
                   <p className="mt-2 text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]">{p.body}</p>
                 </div>
               </Reveal>
@@ -688,8 +801,8 @@ export function LandingPage() {
       <section className="w-full border-t bg-[hsl(var(--surface))] py-16 lg:py-24">
         <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
-            <p className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-emerald-600">The outcome</p>
-            <h2 className="mt-4 max-w-[22ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
+            <Eyebrow tone="text-emerald-600">The outcome</Eyebrow>
+            <h2 className="mt-5 max-w-[22ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
               From a book nobody reads to a record nobody can dispute.
             </h2>
           </Reveal>
@@ -697,7 +810,9 @@ export function LandingPage() {
           <div className="mt-10 grid gap-5 lg:mt-14 lg:grid-cols-2 lg:gap-8">
             <Reveal>
               <div className="h-full rounded-2xl border border-red-500/25 bg-red-500/[0.04] p-6 lg:p-8">
-                <p className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-red-600">Before</p>
+                <p className="flex items-center gap-2 text-[0.7rem] font-bold uppercase tracking-[0.16em] text-red-600">
+                  <AlertTriangle className="h-4 w-4" /> Before
+                </p>
                 <ul className="mt-5 space-y-3">
                   {BEFORE.map((b) => (
                     <li key={b} className="flex gap-3 text-[hsl(var(--muted))]">
@@ -710,7 +825,9 @@ export function LandingPage() {
             </Reveal>
             <Reveal delay={100}>
               <div className="h-full rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.04] p-6 lg:p-8">
-                <p className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-emerald-600">After</p>
+                <p className="flex items-center gap-2 text-[0.7rem] font-bold uppercase tracking-[0.16em] text-emerald-600">
+                  <TrendingUp className="h-4 w-4" /> After
+                </p>
                 <ul className="mt-5 space-y-3">
                   {AFTER.map((a) => (
                     <li key={a} className="flex gap-3">
@@ -721,6 +838,29 @@ export function LandingPage() {
                 </ul>
               </div>
             </Reveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ══ FAQ ════════════════════════════════════════════════════════ */}
+      <section className="w-full bg-[hsl(var(--background))] py-16 lg:py-24">
+        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+          <Reveal>
+            <Eyebrow tone="text-brand">Questions</Eyebrow>
+            <h2 className="mt-5 max-w-[20ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
+              The things operations managers ask first.
+            </h2>
+          </Reveal>
+
+          <div className="mt-10 grid gap-5 lg:mt-14 lg:grid-cols-2 lg:gap-x-10 lg:gap-y-6">
+            {FAQ.map((f, i) => (
+              <Reveal key={f.q} delay={i * 45}>
+                <div className="h-full rounded-2xl border bg-[hsl(var(--surface))] p-6 shadow-sm">
+                  <h3 className="text-base font-bold tracking-tight">{f.q}</h3>
+                  <p className="mt-2.5 text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]">{f.a}</p>
+                </div>
+              </Reveal>
+            ))}
           </div>
         </div>
       </section>
