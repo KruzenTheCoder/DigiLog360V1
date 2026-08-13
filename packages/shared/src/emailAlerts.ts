@@ -578,7 +578,7 @@ export const DEFAULT_WELCOME_INTRO =
 export const DEFAULT_UPDATED_SUBJECT = 'Your Digilog360 username has been updated — {{org_name}}';
 
 export const DEFAULT_UPDATED_INTRO =
-  'We have updated the username you use to sign in to Digilog360. Everything else stays exactly as it is — you keep your access, your history, and your password if you want it.';
+  'We have updated the username you use to sign in to Digilog360. Your access and your history remain unchanged, and you may continue using your current password.';
 
 /** Variables available in the welcome subject/intro overrides. */
 export const WELCOME_TEMPLATE_VARS = [
@@ -710,8 +710,8 @@ export function renderWelcomeEmail(
         <tr><td style="border-left:3px solid #16a34a;background:#f0fdf4;border-radius:0 8px 8px 0;padding:11px 14px;">
           <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#15803d;">Your password, your choice</p>
           <p style="margin:4px 0 0;font-size:13px;line-height:1.6;color:#14532d;">
-            You can carry on using your existing password, or create a new one — whichever you prefer.
-            You can change it at any time under <strong>Settings &rarr; Security</strong>.
+            You may continue using your current password, or create a new one.
+            Both options are offered on the page that opens when you confirm below.
           </p>
         </td></tr>
       </table>`
@@ -733,13 +733,14 @@ export function renderWelcomeEmail(
     ? [
         'Click the button above to confirm your new username.',
         data.password
-          ? 'Sign in with the one-time password above.'
-          : 'Choose to keep your existing password, or create a new one.',
-        'Set a password only you know, under Settings &rarr; Security.',
-        'Update your saved sign-in details on your browser or phone, so it stops filling in the old username.',
+          ? 'Sign in using the one-time password shown above.'
+          : 'On the page that opens, choose whether to keep your current password or set a new one.',
+        'Update your saved sign-in details on your browser or phone, so it stops offering the old username.',
       ]
     : [
-        'Open the sign-in link and enter the username and password above.',
+        data.password
+          ? 'Open the sign-in link and enter the username and password above.'
+          : 'Click the button above and choose the password you would like to use.',
         'Set a password only you know, under Settings &rarr; Security.',
         'Check Settings &rarr; My Preferences so alerts reach you the way you want them.',
       ];
@@ -886,7 +887,7 @@ export function renderWelcomeEmail(
     isExisting && data.previousEmail ? `Previously: ${data.previousEmail}` : '',
     isExisting ? 'Your previous login will no longer work — please use the username above from now on.' : '',
     isExisting && !data.password
-      ? 'You can carry on using your existing password, or create a new one — whichever you prefer. You can change it any time under Settings > Security.'
+      ? 'You may continue using your current password, or create a new one. Both options are offered on the page that opens when you confirm.'
       : '',
     data.password
       ? `Password: ${data.password}`
