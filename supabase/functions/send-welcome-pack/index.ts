@@ -226,10 +226,14 @@ Deno.serve(async (req) => {
         continue;
       }
     } else {
+      // NOTE: Supabase silently falls back to the project's Site URL when
+      // redirectTo isn't on the allow-list, which is how these links ended up
+      // pointing at localhost. The target must stay listed under
+      // Authentication → URL Configuration → Redirect URLs.
       const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
         type: 'recovery',
         email: to,
-        options: appUrl ? { redirectTo: `${appUrl}/login` } : undefined,
+        options: appUrl ? { redirectTo: `${appUrl}/reset-password` } : undefined,
       });
       if (linkErr) {
         results.push({ user_id: u.id, email: to, ok: false, error: `Link generation failed: ${linkErr.message}` });

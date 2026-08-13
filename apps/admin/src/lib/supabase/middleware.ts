@@ -7,7 +7,7 @@ import { getSupabaseUrl, getSupabaseAnonKey } from './env';
 // ============================================================================
 
 // Routes anyone may view without signing in.
-const PUBLIC_PATHS = new Set(['/']);
+const PUBLIC_PATHS = new Set(['/', '/reset-password']);
 
 // Cache duration in seconds
 const CACHE_DURATION = {
