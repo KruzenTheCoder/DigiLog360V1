@@ -82,8 +82,11 @@ export function WelcomePacksManager({
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Who is already a Digilog360 user. Anyone not in here is treated as new.
+  const [existing, setExisting] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<SendMode>('password');
   const [message, setMessage] = useState('');
+  const [previewAudience, setPreviewAudience] = useState<'new' | 'existing'>('new');
 
   const [testTo, setTestTo] = useState(currentUserEmail);
   const [testBusy, setTestBusy] = useState(false);
@@ -114,6 +117,14 @@ export function WelcomePacksManager({
 
   function toggle(id: string) {
     setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleExisting(id: string) {
+    setExisting((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
@@ -155,7 +166,11 @@ export function WelcomePacksManager({
     setResults([]);
     const supabase = createClient();
     const { data, error } = await supabase.functions.invoke('send-welcome-pack', {
-      body: { test_email: to, ...(message.trim() ? { message: message.trim() } : {}) },
+      body: {
+        test_email: to,
+        audience: previewAudience,
+        ...(message.trim() ? { message: message.trim() } : {}),
+      },
     });
     setTestBusy(false);
     const d = data as { ok?: boolean; dev?: boolean; sent_to?: string; error?: string } | null;
@@ -181,6 +196,9 @@ export function WelcomePacksManager({
     const { data, error } = await supabase.functions.invoke('send-welcome-pack', {
       body: {
         user_ids: [...selected],
+        // Only those actually being sent to — an existing-user tick on someone
+        // who isn't selected is irrelevant.
+        existing_user_ids: [...selected].filter((id) => existing.has(id)),
         mode,
         ...(message.trim() ? { message: message.trim() } : {}),
       },
@@ -207,14 +225,14 @@ export function WelcomePacksManager({
 
   // Live preview — same renderer the edge function calls.
   const preview = useMemo(() => {
-    const sample = sampleWelcomeEmailData(orgName, appUrl);
+    const sample = sampleWelcomeEmailData(orgName, appUrl, previewAudience);
     if (message.trim()) sample.message = message.trim();
     if (mode === 'link') {
       sample.password = null;
       sample.setPasswordUrl = `${(appUrl ?? 'https://digilog360.example').replace(/\/+$/, '')}/login`;
     }
     return renderWelcomeEmail(sample);
-  }, [orgName, appUrl, message, mode]);
+  }, [orgName, appUrl, message, mode, previewAudience]);
 
   return (
     <div className="space-y-5">
@@ -299,11 +317,12 @@ export function WelcomePacksManager({
                         <TH>Name</TH>
                         <TH>Sign-in address</TH>
                         <TH>Role</TH>
+                        <TH className="whitespace-nowrap">Already a user?</TH>
                       </TR>
                     </THead>
                     <TBody>
                       {visible.length === 0 && (
-                        <TR><TD colSpan={4} className="py-6 text-center text-sm text-[hsl(var(--muted))]">No users match.</TD></TR>
+                        <TR><TD colSpan={5} className="py-6 text-center text-sm text-[hsl(var(--muted))]">No users match.</TD></TR>
                       )}
                       {visible.map((u) => {
                         const mailable = !!u.email?.trim();
@@ -331,6 +350,19 @@ export function WelcomePacksManager({
                                 : <span className="text-xs italic text-[hsl(var(--muted))]">no address on file</span>}
                             </TD>
                             <TD className="text-sm">{u.role ? (ROLE_LABELS[u.role] ?? u.role) : '—'}</TD>
+                            <TD>
+                              <label className="flex cursor-pointer items-center gap-2 text-xs">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 accent-[hsl(var(--brand))]"
+                                  checked={existing.has(u.id)}
+                                  onChange={() => toggleExisting(u.id)}
+                                />
+                                <span className={existing.has(u.id) ? 'font-medium' : 'text-[hsl(var(--muted))]'}>
+                                  {existing.has(u.id) ? 'Existing user' : 'New user'}
+                                </span>
+                              </label>
+                            </TD>
                           </TR>
                         );
                       })}
@@ -449,6 +481,23 @@ export function WelcomePacksManager({
           <GradientSection title="Preview" icon="Mail" tone="green">
             <Card>
               <CardContent className="space-y-3 py-5">
+                {/* Which wording to look at — and what a preview send delivers. */}
+                <div className="flex gap-1 rounded-lg border p-1">
+                  {(['new', 'existing'] as const).map((a) => (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => setPreviewAudience(a)}
+                      className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                        previewAudience === a
+                          ? 'bg-brand-gradient text-white'
+                          : 'text-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'
+                      }`}
+                    >
+                      {a === 'new' ? 'New user' : 'Existing user'}
+                    </button>
+                  ))}
+                </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">Subject</p>
                   <p className="text-sm font-medium">{preview.subject}</p>

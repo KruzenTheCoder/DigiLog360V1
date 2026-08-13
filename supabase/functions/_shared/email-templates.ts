@@ -103,7 +103,7 @@ export const DEFAULT_EMAIL_SUBJECTS: Record<TaskEmailEvent, string> = {
 
 export const DEFAULT_EMAIL_INTROS: Record<TaskEmailEvent, string> = {
   'task.assigned':
-    '{{assigned_by_name}} assigned a task to you in {{org_name}}. The details are below — open it in DigiLog to accept and track it.',
+    '{{assigned_by_name}} assigned a task to you in {{org_name}}. The details are below — open it in Digilog360 to accept and track it.',
   'occurrence.assigned':
     '{{actor_name}} assigned occurrence {{ob_number}} to you for review in {{org_name}}. The details are below.',
   'task.updated':
@@ -390,7 +390,7 @@ export function renderTaskEmail(
           <td bgcolor="${accent}" style="background-image:linear-gradient(135deg,${accent} 0%,${BRAND_GRADIENT_TO} 100%);padding:22px 32px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
               <td style="font-family:'Segoe UI',Arial,sans-serif;font-size:17px;font-weight:800;color:#ffffff;letter-spacing:.14em;">
-                DIGILOG&nbsp;360
+                DIGILOG360
               </td>
               <td align="right" style="font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);">
                 ${escapeHtml(data.orgName)}
@@ -452,10 +452,10 @@ export function renderTaskEmail(
               <tr><td style="padding-top:18px;font-size:12px;line-height:1.7;color:#94a3b8;">
                 ${footerNote ? `<p style="margin:0 0 8px;color:#64748b;">${escapeHtml(footerNote)}</p>` : ''}
                 <p style="margin:0;">
-                  You are receiving this because you are involved in this task in <strong style="color:#64748b;">${escapeHtml(data.orgName)}</strong> on DigiLog&nbsp;360.
+                  You are receiving this because you are involved in this task in <strong style="color:#64748b;">${escapeHtml(data.orgName)}</strong> on Digilog360.
                   ${prefsUrl ? `Manage your alerts under <a href="${prefsUrl}" style="color:${accent};text-decoration:none;font-weight:600;">Settings &rarr; My Preferences</a>.` : ''}
                 </p>
-                <p style="margin:10px 0 0;">DigiLog 360 &middot; Security Operations Platform &middot; &copy; ${new Date().getFullYear()} Netstream Intergrated Solutions</p>
+                <p style="margin:10px 0 0;">Digilog360 &middot; Security Operations Platform &middot; &copy; ${new Date().getFullYear()} Netstream Intergrated Solutions</p>
               </td></tr>
             </table>
           </td>
@@ -482,7 +482,7 @@ export function renderTaskEmail(
     note ? `Latest note: "${note}"` : '',
     taskUrl ? `\n${isOccurrenceView ? 'Open the occurrence' : 'Open the task'}: ${taskUrl}` : '',
     linkedOccurrenceUrl ? `View occurrence ${data.obNumber ?? ''}: ${linkedOccurrenceUrl}` : '',
-    `\n— DigiLog 360 · ${data.orgName}`,
+    `\n— Digilog360 · ${data.orgName}`,
   ].filter((l) => l !== '');
 
   return { subject, html, text: textLines.join('\n') };
@@ -526,7 +526,17 @@ export function sampleTaskEmailData(orgName: string, appUrl?: string | null): Ta
 //   • link      — nothing secret is printed; the recipient follows a
 //                 set-your-own-password link instead. Safer, and the default
 //                 we recommend where the recipient can receive mail reliably.
+//
+// And two audiences, because they need to be told different things:
+//   • new       — never had an account. "Welcome aboard, here's how to get in."
+//   • existing  — already uses Digilog360 and their sign-in address is
+//                 changing. Greeting them with "welcome, your account has been
+//                 created" would be wrong and confusing; what they actually
+//                 need to know is that their OLD address stops working.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Who the pack is going to — drives the wording, not the mechanics. */
+export type WelcomeAudience = 'new' | 'existing';
 
 export interface WelcomeEmailData {
   /** First name or full name; falls back to a plain "Hi," when absent. */
@@ -544,12 +554,24 @@ export interface WelcomeEmailData {
   /** Optional personal line from whoever is onboarding them. */
   message?: string | null;
   senderName?: string | null;
+  /** Defaults to 'new'. */
+  audience?: WelcomeAudience;
+  /**
+   * The address they used to sign in with, shown to an existing user so it is
+   * unambiguous which login is being replaced.
+   */
+  previousEmail?: string | null;
 }
 
-export const DEFAULT_WELCOME_SUBJECT = 'Welcome to DigiLog 360 — your {{org_name}} account is ready';
+export const DEFAULT_WELCOME_SUBJECT = 'Welcome to Digilog360 — your {{org_name}} account is ready';
 
 export const DEFAULT_WELCOME_INTRO =
-  'Your DigiLog 360 account has been created. Everything you need to sign in for the first time is below.';
+  'Your Digilog360 account has been created. Everything you need to sign in for the first time is below.';
+
+export const DEFAULT_UPDATED_SUBJECT = 'Your Digilog360 sign-in has changed — {{org_name}}';
+
+export const DEFAULT_UPDATED_INTRO =
+  'Your Digilog360 account has been updated. From now on, sign in with the details below — your previous sign-in address will no longer work.';
 
 /** Variables available in the welcome subject/intro overrides. */
 export const WELCOME_TEMPLATE_VARS = [
@@ -583,16 +605,25 @@ export function renderWelcomeEmail(
 ): { subject: string; html: string; text: string } {
   const vars = welcomeVars(data);
   const accent = settings?.accent_color || BRAND_GRADIENT_FROM;
+  const isExisting = data.audience === 'existing';
 
-  const subject = renderTemplateString(DEFAULT_WELCOME_SUBJECT, vars);
-  const intro = renderTemplateString(DEFAULT_WELCOME_INTRO, vars);
+  const subject = renderTemplateString(
+    isExisting ? DEFAULT_UPDATED_SUBJECT : DEFAULT_WELCOME_SUBJECT,
+    vars,
+  );
+  const intro = renderTemplateString(
+    isExisting ? DEFAULT_UPDATED_INTRO : DEFAULT_WELCOME_INTRO,
+    vars,
+  );
 
   const appUrl = (data.appUrl ?? '').replace(/\/+$/, '');
   const loginUrl = appUrl ? `${appUrl}/login` : '';
   const greeting = data.recipientName ? `Hi ${escapeHtml(data.recipientName)},` : 'Hi,';
   const usesLink = !data.password && !!data.setPasswordUrl;
   const ctaUrl = usesLink ? (data.setPasswordUrl as string) : loginUrl;
-  const ctaLabel = usesLink ? 'Choose your password' : 'Sign in to DigiLog 360';
+  const ctaLabel = usesLink
+    ? 'Choose your password'
+    : isExisting ? 'Sign in with your new details' : 'Sign in to Digilog360';
 
   // The credential block. A monospaced, boxed value is far easier to retype
   // off a phone than inline body text, and the label row matches the meta
@@ -616,7 +647,18 @@ export function renderWelcomeEmail(
         ? `<a href="${loginUrl}" target="_blank" style="font-weight:700;color:${accent};text-decoration:underline;">${escapeHtml(loginUrl)}</a>`
         : '<span style="color:#94a3b8;">Provided separately</span>',
     ),
-    metaRow('Username', `<strong style="font-family:Consolas,'Courier New',monospace;">${escapeHtml(data.email)}</strong>`),
+    metaRow(
+      isExisting ? 'New username' : 'Username',
+      `<strong style="font-family:Consolas,'Courier New',monospace;">${escapeHtml(data.email)}</strong>`,
+    ),
+    // Spelling out the address being replaced removes any doubt about which
+    // login just stopped working.
+    isExisting && data.previousEmail
+      ? metaRow(
+          'Previously',
+          `<span style="font-family:Consolas,'Courier New',monospace;color:#94a3b8;text-decoration:line-through;">${escapeHtml(data.previousEmail)}</span>`,
+        )
+      : '',
     secretHtml,
     data.roleLabel ? metaRow('Your role', escapeHtml(data.roleLabel)) : '',
   ].filter(Boolean).join('');
@@ -644,11 +686,19 @@ export function renderWelcomeEmail(
       </table>`
     : '';
 
-  const steps = [
-    'Open the sign-in link and enter the username and password above.',
-    'Set a password only you know, under Settings &rarr; Security.',
-    'Check Settings &rarr; My Preferences so alerts reach you the way you want them.',
-  ];
+  // An existing user doesn't need to be taught the product — they need to know
+  // what changed and to fix anything their browser has saved.
+  const steps = isExisting
+    ? [
+        'Sign in using your <strong>new</strong> address above — the old one will be rejected.',
+        'Set a password only you know, under Settings &rarr; Security.',
+        'Update the saved sign-in details in your browser or phone, so autofill stops offering the old address.',
+      ]
+    : [
+        'Open the sign-in link and enter the username and password above.',
+        'Set a password only you know, under Settings &rarr; Security.',
+        'Check Settings &rarr; My Preferences so alerts reach you the way you want them.',
+      ];
   const stepsHtml = steps
     .map((s, i) => `<tr>
       <td style="padding:6px 12px 6px 0;vertical-align:top;width:26px;">
@@ -685,7 +735,7 @@ export function renderWelcomeEmail(
 </head>
 <body style="margin:0;padding:0;background:#eef1f7;-webkit-text-size-adjust:100%;">
   <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
-    Your ${escapeHtml(data.orgName)} account on DigiLog 360 is ready — here is how to sign in.
+    Your ${escapeHtml(data.orgName)} account on Digilog360 is ready — here is how to sign in.
   </div>
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f7;padding:32px 12px;">
@@ -699,7 +749,7 @@ export function renderWelcomeEmail(
           <td bgcolor="${accent}" style="background-image:linear-gradient(135deg,${accent} 0%,${BRAND_GRADIENT_TO} 100%);padding:22px 32px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
               <td style="font-family:'Segoe UI',Arial,sans-serif;font-size:17px;font-weight:800;color:#ffffff;letter-spacing:.14em;">
-                DIGILOG&nbsp;360
+                DIGILOG360
               </td>
               <td align="right" style="font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);">
                 ${escapeHtml(data.orgName)}
@@ -711,9 +761,9 @@ export function renderWelcomeEmail(
         <!-- Event band -->
         <tr>
           <td style="padding:34px 32px 0;font-family:'Segoe UI',Arial,sans-serif;">
-            ${chip('WELCOME ABOARD', '#16a34a')}
+            ${isExisting ? chip('ACCOUNT UPDATED', '#0ea5e9') : chip('WELCOME ABOARD', '#16a34a')}
             <h1 style="margin:14px 0 0;font-size:24px;line-height:1.25;color:#0f172a;font-weight:800;">
-              Welcome to DigiLog&nbsp;360
+              ${isExisting ? 'Your sign-in details have changed' : 'Welcome to Digilog360'}
             </h1>
           </td>
         </tr>
@@ -733,7 +783,7 @@ export function renderWelcomeEmail(
                    style="border:1px solid #e2e8f0;border-left:4px solid ${accent};border-radius:12px;background:#f8fafc;">
               <tr>
                 <td style="padding:20px 22px;font-family:'Segoe UI',Arial,sans-serif;">
-                  <p style="margin:0;font-size:17px;font-weight:700;color:#0f172a;">Your sign-in details</p>
+                  <p style="margin:0;font-size:17px;font-weight:700;color:#0f172a;">${isExisting ? 'Your new sign-in details' : 'Your sign-in details'}</p>
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:6px;">
                     ${credentialRows}
                   </table>
@@ -763,11 +813,11 @@ export function renderWelcomeEmail(
               <tr><td style="padding-top:18px;font-size:12px;line-height:1.7;color:#94a3b8;">
                 ${footerNote ? `<p style="margin:0 0 8px;color:#64748b;">${escapeHtml(footerNote)}</p>` : ''}
                 <p style="margin:0;">
-                  You are receiving this because an account was created for you in
-                  <strong style="color:#64748b;">${escapeHtml(data.orgName)}</strong> on DigiLog&nbsp;360.
+                  You are receiving this because ${isExisting ? 'your account details were updated' : 'an account was created for you'} in
+                  <strong style="color:#64748b;">${escapeHtml(data.orgName)}</strong> on Digilog360.
                   If you weren't expecting it, please tell your administrator and do not sign in.
                 </p>
-                <p style="margin:10px 0 0;">DigiLog 360 &middot; Security Operations Platform &middot; &copy; ${new Date().getFullYear()} Netstream Intergrated Solutions</p>
+                <p style="margin:10px 0 0;">Digilog360 &middot; Security Operations Platform &middot; &copy; ${new Date().getFullYear()} Netstream Intergrated Solutions</p>
               </td></tr>
             </table>
           </td>
@@ -781,12 +831,13 @@ export function renderWelcomeEmail(
 </html>`;
 
   const textLines = [
-    'Welcome to DigiLog 360',
+    isExisting ? 'Your Digilog360 sign-in details have changed' : 'Welcome to Digilog360',
     '',
     intro,
     '',
     loginUrl ? `Sign in: ${loginUrl}` : '',
-    `Username: ${data.email}`,
+    `${isExisting ? 'New username' : 'Username'}: ${data.email}`,
+    isExisting && data.previousEmail ? `Previously: ${data.previousEmail} (no longer works)` : '',
     data.password ? `Password: ${data.password}` : 'Password: choose your own using the link below.',
     data.roleLabel ? `Role: ${data.roleLabel}` : '',
     data.password
@@ -794,14 +845,18 @@ export function renderWelcomeEmail(
       : '',
     usesLink ? `\nChoose your password: ${data.setPasswordUrl}` : '',
     personalNote ? `\nNote${data.senderName ? ` from ${data.senderName}` : ''}: ${personalNote}` : '',
-    `\n— DigiLog 360 · ${data.orgName}`,
+    `\n— Digilog360 · ${data.orgName}`,
   ].filter((l) => l !== '');
 
   return { subject, html, text: textLines.join('\n') };
 }
 
 /** Sample payload for the preview pane and for test sends. */
-export function sampleWelcomeEmailData(orgName: string, appUrl?: string | null): WelcomeEmailData {
+export function sampleWelcomeEmailData(
+  orgName: string,
+  appUrl?: string | null,
+  audience: WelcomeAudience = 'new',
+): WelcomeEmailData {
   return {
     recipientName: 'Sipho',
     email: 'sipho.dlamini@example.com',
@@ -813,5 +868,7 @@ export function sampleWelcomeEmailData(orgName: string, appUrl?: string | null):
     roleLabel: 'Control Room',
     senderName: 'Ayesha Khan',
     message: 'Great to have you on the team — shout if anything looks off on your first shift.',
+    audience,
+    previousEmail: audience === 'existing' ? 's.dlamini@oldcompany.example' : null,
   };
 }

@@ -4,17 +4,22 @@
 // is always a deliberate human action rather than an event reaction.
 //
 // POST body (one of):
-//   { test_email: "someone@example.com" }
+//   { test_email: "someone@example.com", audience?: "new" | "existing" }
 //       Preview send. Renders the SAMPLE payload and mails it to that address.
 //       Touches no account and rotates no password — it exists purely to prove
 //       the pipeline and let you eyeball the design in a real inbox.
 //
-//   { user_ids: [uuid, ...], mode?: "password" | "link", message?: string }
+//   { user_ids: [uuid, ...], mode?: "password" | "link", message?: string,
+//     existing_user_ids?: [uuid, ...], previous_emails?: { uuid: "old@addr" } }
 //       Real send, one mail per user.
 //         mode "password" (default) — generates a one-time password, sets it on
 //           the account, and prints it in the mail.
 //         mode "link" — prints no secret; the recipient follows a Supabase
 //           recovery link to choose their own password.
+//         existing_user_ids — those already using Digilog360 whose sign-in
+//           address changed. They get "your sign-in details have changed"
+//           wording rather than "welcome aboard", because being welcomed to a
+//           product you already use reads as a mistake.
 //
 // Every send is appended to email_log as event 'user.welcome', so welcome packs
 // show up in the same audit history as the task alerts.
@@ -57,7 +62,7 @@ function generatePassword(): string {
 }
 
 function fromHeader(orgFromName: string | null | undefined): string {
-  const base = Deno.env.get('EMAIL_FROM') ?? 'DigiLog 360 <no-reply@digilog360.local>';
+  const base = Deno.env.get('EMAIL_FROM') ?? 'Digilog360 <no-reply@digilog360.local>';
   if (!orgFromName?.trim()) return base;
   const addr = base.match(/<([^>]+)>/)?.[1] ?? base;
   return `${orgFromName.trim().replace(/[<>]/g, '')} <${addr}>`;
@@ -108,7 +113,7 @@ async function loadOrg(admin: Sb, orgId: string) {
     admin.from('org_email_settings').select('*').eq('org_id', orgId).maybeSingle(),
   ]);
   return {
-    name: (org?.name as string) ?? 'DigiLog 360',
+    name: (org?.name as string) ?? 'Digilog360',
     settings: (settings as OrgEmailSettingsRow | null) ?? null,
   };
 }
@@ -143,7 +148,8 @@ Deno.serve(async (req) => {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(testEmail)) {
       return json({ error: 'test_email is not a valid address' }, 400);
     }
-    const data = sampleWelcomeEmailData(org.name, appUrl);
+    const previewAudience = body.audience === 'existing' ? 'existing' : 'new';
+    const data = sampleWelcomeEmailData(org.name, appUrl, previewAudience);
     if (message) data.message = message;
     data.senderName = senderName ?? data.senderName;
     const { subject, html, text } = renderWelcomeEmail(data, org.settings);
@@ -176,6 +182,14 @@ Deno.serve(async (req) => {
     return json({ error: 'Send to at most 50 users at a time' }, 400);
   }
   const mode = body.mode === 'link' ? 'link' : 'password';
+  // Subset of user_ids that are EXISTING users whose sign-in address changed —
+  // they get the "your details have changed" wording instead of "welcome".
+  const existingIds = new Set(
+    Array.isArray(body.existing_user_ids) ? body.existing_user_ids.map(String) : [],
+  );
+  // Optional { user_id: "old@address" } map, so the mail can name the login
+  // being replaced.
+  const previousEmails = (body.previous_emails ?? {}) as Record<string, string>;
 
   let q = admin.from('profiles').select('id, full_name, email, role, org_id').in('id', userIds);
   // Org admins never reach outside their own organisation.
@@ -234,6 +248,8 @@ Deno.serve(async (req) => {
       roleLabel: u.role ? (ROLE_LABELS[u.role] ?? u.role) : null,
       message,
       senderName,
+      audience: existingIds.has(u.id) ? 'existing' : 'new',
+      previousEmail: previousEmails[u.id] ?? null,
     };
     const { subject, html, text } = renderWelcomeEmail(data, theirOrg.settings);
     const sent = await sendViaResend({

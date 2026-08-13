@@ -66,9 +66,9 @@ function humanizeMs(ms: number): string {
   return `${m} m`;
 }
 
-/** "DigiLog 360 <no-reply@x>" + per-org from_name → "Org Name <no-reply@x>" */
+/** "Digilog360 <no-reply@x>" + per-org from_name → "Org Name <no-reply@x>" */
 function fromHeader(orgFromName: string | null | undefined): string {
-  const base = Deno.env.get('EMAIL_FROM') ?? 'DigiLog 360 <no-reply@digilog360.local>';
+  const base = Deno.env.get('EMAIL_FROM') ?? 'Digilog360 <no-reply@digilog360.local>';
   if (!orgFromName?.trim()) return base;
   const addr = base.match(/<([^>]+)>/)?.[1] ?? base;
   return `${orgFromName.trim().replace(/[<>]/g, '')} <${addr}>`;
@@ -132,7 +132,7 @@ async function loadOrg(admin: Sb, cache: Map<string, { name: string; settings: O
     admin.from('org_email_settings').select('*').eq('org_id', orgId).maybeSingle(),
   ]);
   const entry = {
-    name: (org?.name as string) ?? 'DigiLog 360',
+    name: (org?.name as string) ?? 'Digilog360',
     settings: (settings as OrgEmailSettingsRow | null) ?? null,
   };
   cache.set(orgId, entry);
@@ -480,7 +480,7 @@ Deno.serve(async (req) => {
     const cache = new Map<string, { name: string; settings: OrgEmailSettingsRow | null }>();
     const { name: orgName, settings } = orgId
       ? await loadOrg(admin, cache, orgId)
-      : { name: 'DigiLog 360', settings: null };
+      : { name: 'Digilog360', settings: null };
 
     const data = sampleTaskEmailData(orgName, Deno.env.get('PUBLIC_APP_URL'));
     data.recipientName = caller.profile?.full_name?.split(' ')[0] ?? null;
