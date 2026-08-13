@@ -515,7 +515,7 @@ function AddCards({
       <Card>
         <CardHeader><CardTitle className="text-base">Add category</CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          <Input value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="e.g. Compliance Incidents" />
+          <Input value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="e.g. Compliance Occurrences" />
           <Button onClick={addCategory} disabled={b1 || !catName.trim()} className="w-full">
             {b1 ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add
           </Button>

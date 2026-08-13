@@ -10,7 +10,7 @@ const META: Record<SeverityLevel, { icon: string; ring: string; bg: string; fg: 
   low: { icon: 'Info', ring: 'ring-sky-200 dark:ring-sky-900/50', bg: 'bg-sky-50 dark:bg-sky-950/30', fg: 'text-sky-600' },
 };
 
-/** Four big tonal tiles showing the count of incidents at each severity. */
+/** Four big tonal tiles showing the count of occurrences at each severity. */
 export function SeverityCards({
   counts, hrefFor,
 }: {

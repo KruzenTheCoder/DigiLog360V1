@@ -135,7 +135,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   const [{ data: allSites }, data, total30, prevTotal] = await Promise.all([
     sitesQ,
     fetchDashboardOccurrences(),
-    countBetween(last30),          // "Total Incidents" hero — last 30 days
+    countBetween(last30),          // "Total Occurrences" hero — last 30 days
     countBetween(last60, last30),  // previous window, for the trend delta
   ]);
   const activeSite = siteParam ? (allSites ?? []).find((s) => s.id === siteParam) : null;
@@ -324,7 +324,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
         <HeroKpi
           tone="red"
           icon="TriangleAlert"
-          label="Total Incidents"
+          label="Total Occurrences"
           sublabel="Last 30 days"
           value={total30}
           href={drill({})}
@@ -343,7 +343,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           sublabel="Occurrence Type"
           value={typeBreakdown[0]?.name ?? '—'}
           href={typeBreakdown[0] ? drill({ type: typeBreakdown[0].name }) : undefined}
-          footer={`${typeBreakdown[0]?.count ?? 0} incidents logged`}
+          footer={`${typeBreakdown[0]?.count ?? 0} occurrences logged`}
         />
         <HeroKpi
           tone={avgResolutionHrs <= 4 ? 'green' : 'red'}
@@ -406,12 +406,12 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
         </div>
       )}
 
-      {/* Category breakdown + high-frequency incidents */}
+      {/* Category breakdown + high-frequency occurrences */}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <GradientSection title="Occurrence Breakdown by Type" icon="PieChart" tone="brand">
           <CategoryDonut data={typeBreakdown} />
         </GradientSection>
-        <GradientSection title="High-Frequency Incidents" icon="Flame" tone="red">
+        <GradientSection title="High-Frequency Occurrences" icon="Flame" tone="red">
           <div className="space-y-3.5">
             {typeBreakdown.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
             {(() => {
@@ -451,7 +451,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
                         </div>
                       </div>
                       <div className="mt-1 text-right text-[10px] font-medium text-[hsl(var(--muted))]">
-                        {pct.toFixed(2)}% of total incidents
+                        {pct.toFixed(2)}% of total occurrences
                       </div>
                     </div>
                   </a>
@@ -483,7 +483,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
             })}
           </div>
         </GradientSection>
-        <GradientSection title="Monthly Incident Trend" icon="TrendingUp" tone="violet">
+        <GradientSection title="Monthly Occurrence Trend" icon="TrendingUp" tone="violet">
           <MonthlyTrendChart data={monthly} />
         </GradientSection>
       </div>

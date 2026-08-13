@@ -34,7 +34,7 @@ export default async function TaxonomyPage() {
   return (
     <div className="mx-auto max-w-4xl">
       <PageHeader
-        title="Incident Taxonomy"
+        title="Occurrence Taxonomy"
         description="Add, rename, reorder, disable, or delete the Category → Sub-category → Type dropdown lists used across the app. Renaming updates historical records too, so your reports stay grouped."
       />
       <TaxonomyManager

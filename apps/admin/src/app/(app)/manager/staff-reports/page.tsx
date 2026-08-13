@@ -174,7 +174,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
       )
     : 0;
 
-  // Highest-risk category — the type with the most incidents
+  // Most common category — the type with the most occurrences
   const typeMap = new Map<string, number>();
   occ.forEach((o) => typeMap.set(o.occurrence_type, (typeMap.get(o.occurrence_type) ?? 0) + 1));
   const typeBreakdown = [...typeMap.entries()]
@@ -420,9 +420,9 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
             <span aria-hidden>⚠ </span>Active System Alerts
           </p>
           <ul className="space-y-0.5 text-amber-700 dark:text-amber-200">
-            {openCount > 50 && <li>Too many open incidents ({openCount}) requiring attention.</li>}
-            {breached > 0 && <li>{breached} incident(s) have breached their SLA.</li>}
-            {updateDue > 0 && <li>{updateDue} incident(s) require SLA updates.</li>}
+            {openCount > 50 && <li>Too many open occurrences ({openCount}) requiring attention.</li>}
+            {breached > 0 && <li>{breached} occurrence(s) have breached their SLA.</li>}
+            {updateDue > 0 && <li>{updateDue} occurrence(s) require SLA updates.</li>}
           </ul>
         </div>
       )}
@@ -432,7 +432,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
         <HeroKpi
           tone="red"
           icon="TriangleAlert"
-          label="Total Incidents"
+          label="Total Occurrences"
           sublabel={`Last ${days} days`}
           value={totalInPeriod}
           footer={<span>{resolved} resolved · {openCount} open</span>}
@@ -443,7 +443,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
           label="Most Common Occurrence"
           sublabel="Occurrence Type"
           value={highestRisk.name}
-          footer={`${highestRisk.count} incidents logged`}
+          footer={`${highestRisk.count} occurrences logged`}
         />
         <HeroKpi
           tone={avgResHrs <= 4 ? 'green' : 'red'}
@@ -469,12 +469,12 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
         ))}
       </div>
 
-      {/* Category breakdown + high-frequency incidents */}
+      {/* Category breakdown + high-frequency occurrences */}
       <div className="mb-5 grid gap-4 lg:grid-cols-2">
         <GradientSection title="Occurrence Breakdown by Type" icon="PieChart" tone="brand">
           <CategoryDonut data={typeBreakdown.slice(0, 7)} />
         </GradientSection>
-        <GradientSection title="High-Frequency Incidents" icon="Flame" tone="red">
+        <GradientSection title="High-Frequency Occurrences" icon="Flame" tone="red">
           <div className="space-y-3.5">
             {typeBreakdown.length === 0 && <p className="text-sm text-[hsl(var(--muted))]">No data yet.</p>}
             {(() => {
@@ -512,7 +512,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
                         </div>
                       </div>
                       <div className="mt-1 text-right text-[10px] font-medium text-[hsl(var(--muted))]">
-                        {pct}% of total incidents
+                        {pct}% of total occurrences
                       </div>
                     </div>
                   </div>
@@ -544,7 +544,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
             })}
           </div>
         </GradientSection>
-        <GradientSection title="Monthly Incident Trend" icon="TrendingUp" tone="violet">
+        <GradientSection title="Monthly Occurrence Trend" icon="TrendingUp" tone="violet">
           <div className="h-72">
             <MonthlyTrendChart data={monthly} />
           </div>

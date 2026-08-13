@@ -29,7 +29,7 @@ export function CategoryDonut({ data }: { data: { name: string; count: number }[
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-5xl font-extrabold">{total}</span>
-              <span className="text-xs uppercase tracking-wider text-[hsl(var(--muted))]">Total incidents</span>
+              <span className="text-xs uppercase tracking-wider text-[hsl(var(--muted))]">Total occurrences</span>
             </div>
           </div>
           <ul className="grid w-full grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
@@ -55,7 +55,7 @@ export function CategoryDonut({ data }: { data: { name: string; count: number }[
 export function MonthlyTrendChart({ data }: { data: { month: string; count: number; breached: number }[] }) {
   return (
     <Card>
-      <CardHeader><CardTitle>Incident Trend (6 months)</CardTitle></CardHeader>
+      <CardHeader><CardTitle>Occurrence Trend (6 months)</CardTitle></CardHeader>
       <CardContent className="h-72">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ left: -20, right: 8 }}>
@@ -69,7 +69,7 @@ export function MonthlyTrendChart({ data }: { data: { month: string; count: numb
             <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
             <YAxis fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
             <Tooltip />
-            <Area type="monotone" dataKey="count" name="Incidents" stroke="#667eea" fill="url(#g1)" strokeWidth={2} />
+            <Area type="monotone" dataKey="count" name="Occurrences" stroke="#667eea" fill="url(#g1)" strokeWidth={2} />
             <Area type="monotone" dataKey="breached" name="SLA Breached" stroke="#ef4444" fill="none" strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
@@ -89,7 +89,7 @@ export function TypeBreakdownChart({ data }: { data: { name: string; count: numb
             <XAxis type="number" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
             <YAxis type="category" dataKey="name" fontSize={12} width={110} tickLine={false} axisLine={false} />
             <Tooltip />
-            <Bar dataKey="count" name="Incidents" radius={[0, 6, 6, 0]}>
+            <Bar dataKey="count" name="Occurrences" radius={[0, 6, 6, 0]}>
               {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
             </Bar>
           </BarChart>
