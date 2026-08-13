@@ -568,10 +568,10 @@ export const DEFAULT_WELCOME_SUBJECT = 'Welcome to Digilog360 — your {{org_nam
 export const DEFAULT_WELCOME_INTRO =
   'Your Digilog360 account has been created. Everything you need to sign in for the first time is below.';
 
-export const DEFAULT_UPDATED_SUBJECT = 'Your Digilog360 sign-in has changed — {{org_name}}';
+export const DEFAULT_UPDATED_SUBJECT = 'Your Digilog360 username has been updated — {{org_name}}';
 
 export const DEFAULT_UPDATED_INTRO =
-  'Your Digilog360 account has been updated. From now on, sign in with the details below — your previous sign-in address will no longer work.';
+  'We have updated the username you use to sign in to Digilog360. Everything else stays exactly as it is — you keep your access, your history, and your password if you want it.';
 
 /** Variables available in the welcome subject/intro overrides. */
 export const WELCOME_TEMPLATE_VARS = [
@@ -621,13 +621,18 @@ export function renderWelcomeEmail(
   const greeting = data.recipientName ? `Hi ${escapeHtml(data.recipientName)},` : 'Hi,';
   const usesLink = !data.password && !!data.setPasswordUrl;
   const ctaUrl = usesLink ? (data.setPasswordUrl as string) : loginUrl;
-  const ctaLabel = usesLink
-    ? 'Choose your password'
-    : isExisting ? 'Sign in with your new details' : 'Sign in to Digilog360';
+  const ctaLabel = isExisting
+    ? 'Confirm my new username'
+    : usesLink ? 'Choose your password' : 'Sign in to Digilog360';
 
   // The credential block. A monospaced, boxed value is far easier to retype
   // off a phone than inline body text, and the label row matches the meta
   // rows used by the task emails.
+  const passwordLabelHtml = (body: string) => `<tr>
+        <td style="padding:7px 0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;vertical-align:top;width:120px;">Password</td>
+        <td style="padding:7px 0;font-size:14px;color:#1e293b;vertical-align:top;">${body}</td>
+      </tr>`;
+
   const secretHtml = data.password
     ? `<tr>
         <td style="padding:7px 0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;vertical-align:top;width:120px;">Password</td>
@@ -635,10 +640,11 @@ export function renderWelcomeEmail(
           <span style="display:inline-block;padding:7px 14px;border-radius:8px;background:#0f172a;color:#ffffff;font-family:Consolas,'Courier New',monospace;font-size:16px;font-weight:700;letter-spacing:.06em;">${escapeHtml(data.password)}</span>
         </td>
       </tr>`
-    : `<tr>
-        <td style="padding:7px 0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;vertical-align:top;width:120px;">Password</td>
-        <td style="padding:7px 0;font-size:14px;color:#1e293b;vertical-align:top;">You'll choose your own — use the button below.</td>
-      </tr>`;
+    // An existing user already has a password that works, so the honest answer
+    // is "nothing to do here unless you want to" — not "you'll choose one".
+    : isExisting
+      ? passwordLabelHtml('<strong>Unchanged</strong> — keep the one you already use, or create a new one.')
+      : passwordLabelHtml("You'll choose your own — use the button below.");
 
   const credentialRows = [
     metaRow(
@@ -676,6 +682,34 @@ export function renderWelcomeEmail(
       </table>`
     : '';
 
+  // The single most important fact for an existing user — too important to
+  // leave as a line of body copy they might skim past.
+  const oldLoginNote = isExisting
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">
+        <tr><td style="border-left:3px solid #f59e0b;background:#fffbeb;border-radius:0 8px 8px 0;padding:11px 14px;">
+          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#b45309;">Please note</p>
+          <p style="margin:4px 0 0;font-size:13px;line-height:1.6;color:#78350f;">
+            Your previous login will no longer work. Please use the username above from now on.
+          </p>
+        </td></tr>
+      </table>`
+    : '';
+
+  // The reassuring half of the message: nothing is being forced on them.
+  // Only true when no password was printed — if one was, theirs is already
+  // gone and promising they can keep it would be a lie.
+  const passwordChoiceNote = isExisting && !data.password
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">
+        <tr><td style="border-left:3px solid #16a34a;background:#f0fdf4;border-radius:0 8px 8px 0;padding:11px 14px;">
+          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#15803d;">Your password, your choice</p>
+          <p style="margin:4px 0 0;font-size:13px;line-height:1.6;color:#14532d;">
+            You can carry on using your existing password, or create a new one — whichever you prefer.
+            You can change it at any time under <strong>Settings &rarr; Security</strong>.
+          </p>
+        </td></tr>
+      </table>`
+    : '';
+
   const personalNote = (data.message ?? '').trim();
   const noteHtml = personalNote
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">
@@ -690,9 +724,12 @@ export function renderWelcomeEmail(
   // what changed and to fix anything their browser has saved.
   const steps = isExisting
     ? [
-        'Sign in using your <strong>new</strong> address above — the old one will be rejected.',
+        'Click the button above to confirm your new username.',
+        data.password
+          ? 'Sign in with the one-time password above.'
+          : 'Choose to keep your existing password, or create a new one.',
         'Set a password only you know, under Settings &rarr; Security.',
-        'Update the saved sign-in details in your browser or phone, so autofill stops offering the old address.',
+        'Update your saved sign-in details on your browser or phone, so it stops filling in the old username.',
       ]
     : [
         'Open the sign-in link and enter the username and password above.',
@@ -761,9 +798,9 @@ export function renderWelcomeEmail(
         <!-- Event band -->
         <tr>
           <td style="padding:34px 32px 0;font-family:'Segoe UI',Arial,sans-serif;">
-            ${isExisting ? chip('ACCOUNT UPDATED', '#0ea5e9') : chip('WELCOME ABOARD', '#16a34a')}
+            ${isExisting ? chip('USERNAME UPDATED', '#0ea5e9') : chip('WELCOME ABOARD', '#16a34a')}
             <h1 style="margin:14px 0 0;font-size:24px;line-height:1.25;color:#0f172a;font-weight:800;">
-              ${isExisting ? 'Your sign-in details have changed' : 'Welcome to Digilog360'}
+              ${isExisting ? 'Your username has been updated' : 'Welcome to Digilog360'}
             </h1>
           </td>
         </tr>
@@ -787,6 +824,8 @@ export function renderWelcomeEmail(
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:6px;">
                     ${credentialRows}
                   </table>
+                  ${oldLoginNote}
+                  ${passwordChoiceNote}
                   ${securityNote}
                   ${noteHtml}
                 </td>
@@ -831,19 +870,29 @@ export function renderWelcomeEmail(
 </html>`;
 
   const textLines = [
-    isExisting ? 'Your Digilog360 sign-in details have changed' : 'Welcome to Digilog360',
+    isExisting ? 'Your Digilog360 username has been updated' : 'Welcome to Digilog360',
     '',
     intro,
     '',
     loginUrl ? `Sign in: ${loginUrl}` : '',
     `${isExisting ? 'New username' : 'Username'}: ${data.email}`,
-    isExisting && data.previousEmail ? `Previously: ${data.previousEmail} (no longer works)` : '',
-    data.password ? `Password: ${data.password}` : 'Password: choose your own using the link below.',
+    isExisting && data.previousEmail ? `Previously: ${data.previousEmail}` : '',
+    isExisting ? 'Your previous login will no longer work — please use the username above from now on.' : '',
+    isExisting && !data.password
+      ? 'You can carry on using your existing password, or create a new one — whichever you prefer. You can change it any time under Settings > Security.'
+      : '',
+    data.password
+      ? `Password: ${data.password}`
+      : isExisting
+        ? 'Password: unchanged — keep the one you already use, or create a new one.'
+        : 'Password: choose your own using the link below.',
     data.roleLabel ? `Role: ${data.roleLabel}` : '',
     data.password
       ? '\nThis is a one-time password. Please change it as soon as you sign in, under Settings > Security.'
       : '',
-    usesLink ? `\nChoose your password: ${data.setPasswordUrl}` : '',
+    usesLink
+      ? `\n${isExisting ? 'Confirm your new username' : 'Choose your password'}: ${data.setPasswordUrl}`
+      : '',
     personalNote ? `\nNote${data.senderName ? ` from ${data.senderName}` : ''}: ${personalNote}` : '',
     `\n— Digilog360 · ${data.orgName}`,
   ].filter((l) => l !== '');
