@@ -405,7 +405,7 @@ function RowShell({
       ) : <span className="w-4 shrink-0" />}
 
       {editing ? (
-        <div className="flex flex-1 items-center gap-1">
+        <div className="flex flex-1 items-center gap-1 max-w-[32rem]">
           <Input autoFocus value={val} onChange={(e) => setVal(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setEditing(false); setVal(node.name); } }} />
           <Button size="icon" variant="ghost" onClick={save} disabled={busy} title="Save"><Check className="h-4 w-4 text-emerald-600" /></Button>
