@@ -36,16 +36,16 @@ export default async function TypesPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <>
       <PageHeader
         title="Occurrence Types"
-        description="Add categories, sub-categories, and types. They appear in the log-incident picker alongside the built-in taxonomy."
+        description="Add categories, sub-categories, and types. They appear in the log-occurrence picker alongside the built-in taxonomy."
       />
       <TypesManager
         initialTypes={(typesRes.data ?? []) as TypeRow[]}
         initialCategories={(catsRes.data ?? []) as CategoryRow[]}
         initialSubcategories={(subsRes.data ?? []) as SubcategoryRow[]}
       />
-    </div>
+    </>
   );
 }

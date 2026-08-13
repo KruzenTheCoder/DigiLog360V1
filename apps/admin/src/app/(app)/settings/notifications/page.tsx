@@ -14,13 +14,13 @@ export default async function NotificationPrefsPage() {
     .eq('id', profile.id).single();
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <>
       <PageHeader
         title="Notification preferences"
         description="Choose how DigiLog reaches you for the things that matter."
       />
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <NotificationPrefsForm initial={(data ?? {}) as any} />
-    </div>
+    </>
   );
 }

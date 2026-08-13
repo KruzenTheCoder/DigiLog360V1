@@ -19,12 +19,12 @@ export default async function OrgSettingsPage() {
   if (!data) redirect('/dashboard');
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <>
       <PageHeader
         title="Organisation"
         description="Your organisation's branding, contact details and plan."
       />
       <OrgSettingsForm org={data as unknown as Organization} canEdit isSuperUser={profile.role === 'super_user'} />
-    </div>
+    </>
   );
 }

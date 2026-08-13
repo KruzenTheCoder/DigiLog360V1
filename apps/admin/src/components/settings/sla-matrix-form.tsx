@@ -62,14 +62,14 @@ export function SlaMatrixForm({ initial }: { initial: Row[] }) {
                   <p className="mt-1 text-[10px] uppercase tracking-wide text-brand">Override</p>
                 )}
               </div>
-              <div className="flex-1 min-w-[120px]">
+              <div className="flex-1 min-w-[120px] max-w-[18rem]">
                 <label className="text-xs text-[hsl(var(--muted))]">Resolve within (hours)</label>
                 <Input
                   type="number" min={1} value={r.resolve_hours}
                   onChange={(e) => patch(r.severity, 'resolve_hours', Number(e.target.value))}
                 />
               </div>
-              <div className="flex-1 min-w-[120px]">
+              <div className="flex-1 min-w-[120px] max-w-[18rem]">
                 <label className="text-xs text-[hsl(var(--muted))]">Update every (minutes)</label>
                 <Input
                   type="number" min={1} value={r.update_minutes}

@@ -99,7 +99,7 @@ export function SecuritySettings() {
             </p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={phase.qrCode} alt="2FA QR" className="h-40 w-40 self-start" />
-            <div>
+            <div className="max-w-[12rem]">
               <Label>6-digit code</Label>
               <Input
                 inputMode="numeric"

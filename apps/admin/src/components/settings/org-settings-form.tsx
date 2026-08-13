@@ -62,7 +62,7 @@ export function OrgSettingsForm({
           </div>
         </CardHeader>
         <CardContent>
-          <dl className="grid grid-cols-2 gap-4 text-sm">
+          <dl className="grid grid-cols-2 gap-4 text-sm lg:grid-cols-4">
             <div>
               <dt className="text-xs uppercase text-[hsl(var(--muted))]">Slug</dt>
               <dd className="font-mono">{org.slug}</dd>
@@ -89,7 +89,7 @@ export function OrgSettingsForm({
       <Card>
         <CardHeader><CardTitle>Branding &amp; Contact</CardTitle></CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <div>
               <Label>Display Name</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canEdit} />
@@ -106,7 +106,7 @@ export function OrgSettingsForm({
               <Label>Contact Phone</Label>
               <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} disabled={!canEdit} />
             </div>
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 xl:col-span-3">
               <Label>Address</Label>
               <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!canEdit} />
             </div>

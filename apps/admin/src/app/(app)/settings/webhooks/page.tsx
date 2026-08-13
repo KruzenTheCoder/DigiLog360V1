@@ -21,9 +21,9 @@ export default async function WebhooksPage() {
     .from('org_webhooks').select('*').order('created_at', { ascending: false });
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <>
       <PageHeader title="Webhooks" description="Fan out events to your monitoring or ticketing system." />
       <WebhooksManager initial={(data ?? []) as WebhookRow[]} />
-    </div>
+    </>
   );
 }

@@ -31,12 +31,12 @@ export default async function SlaSettingsPage() {
   }));
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <>
       <PageHeader
         title="SLA Matrix"
         description="Override the default response-time targets for your organisation."
       />
       <SlaMatrixForm initial={initial} />
-    </div>
+    </>
   );
 }

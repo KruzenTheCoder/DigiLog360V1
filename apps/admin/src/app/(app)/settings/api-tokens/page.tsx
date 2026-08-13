@@ -21,12 +21,12 @@ export default async function ApiTokensPage() {
     .from('api_tokens').select('*').order('created_at', { ascending: false });
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <>
       <PageHeader
         title="API Tokens"
         description="Personal tokens scoped to your organisation. Tokens cannot be viewed again after creation — store them securely."
       />
       <ApiTokensManager initial={(data ?? []) as TokenRow[]} />
-    </div>
+    </>
   );
 }
