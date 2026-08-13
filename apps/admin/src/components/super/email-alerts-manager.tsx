@@ -45,7 +45,20 @@ interface EmailLogRow {
   error: string | null;
   is_test: boolean;
   created_at: string;
+  /** What the provider reported after accepting the message, if anything. */
+  provider_status: 'delivered' | 'bounced' | 'complained' | 'delivery_delayed' | 'sent' | null;
+  provider_status_at: string | null;
+  bounce_type: string | null;
+  bounce_detail: string | null;
 }
+
+const DELIVERY_META: Record<string, { label: string; color: string }> = {
+  delivered: { label: 'Delivered', color: '#16a34a' },
+  bounced: { label: 'Bounced', color: '#dc2626' },
+  complained: { label: 'Spam complaint', color: '#ea580c' },
+  delivery_delayed: { label: 'Delayed', color: '#d97706' },
+  sent: { label: 'In transit', color: '#64748b' },
+};
 
 const LOG_STATUS_META: Record<EmailLogRow['status'], { label: string; color: string }> = {
   sent: { label: 'Sent', color: '#16a34a' },
@@ -97,7 +110,8 @@ export function EmailAlertsManager({
   // ── Delivery history (email_log ledger) ──
   const [logs, setLogs] = useState<EmailLogRow[]>([]);
   const [logsBusy, setLogsBusy] = useState(false);
-  const [logFilter, setLogFilter] = useState<'all' | 'sent' | 'failed' | 'dev' | 'test'>('all');
+  const [logFilter, setLogFilter] =
+    useState<'all' | 'problems' | 'sent' | 'failed' | 'bounced' | 'dev' | 'test'>('all');
   const [logQ, setLogQ] = useState('');
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -121,18 +135,38 @@ export function EmailAlertsManager({
   useEffect(() => { void loadLogs(orgId); }, [orgId, loadLogs]);
 
   const visibleLogs = useMemo(() => logs.filter((l) => {
+    // "Problems" is the one an operator actually wants: anything that failed
+    // to send, plus anything the provider later told us never landed.
+    const isProblem =
+      l.status === 'failed' ||
+      l.provider_status === 'bounced' ||
+      l.provider_status === 'complained';
+
     if (logFilter === 'test') {
       if (!l.is_test) return false;
+    } else if (logFilter === 'problems') {
+      if (!isProblem) return false;
+    } else if (logFilter === 'bounced') {
+      if (l.provider_status !== 'bounced' && l.provider_status !== 'complained') return false;
     } else if (logFilter !== 'all' && l.status !== logFilter) {
       return false;
     }
     const needle = logQ.trim().toLowerCase();
     if (needle) {
-      const hay = `${l.recipient_email} ${l.recipient_name ?? ''} ${l.subject} ${l.ob_number ?? ''}`.toLowerCase();
+      const hay = `${l.recipient_email} ${l.recipient_name ?? ''} ${l.subject} ${l.ob_number ?? ''} ${l.bounce_detail ?? ''} ${l.error ?? ''}`.toLowerCase();
       if (!hay.includes(needle)) return false;
     }
     return true;
   }), [logs, logFilter, logQ]);
+
+  // Anything that did not reach the recipient, for the chip badge.
+  const problemCount = useMemo(
+    () => logs.filter((l) =>
+      l.status === 'failed' ||
+      l.provider_status === 'bounced' ||
+      l.provider_status === 'complained').length,
+    [logs],
+  );
 
   const org = orgs.find((o) => o.id === orgId);
 
@@ -516,8 +550,10 @@ export function EmailAlertsManager({
                 <History className="h-4 w-4 text-brand" /> Delivery history
               </h2>
               <p className="text-xs text-[hsl(var(--muted))]">
-                Every email this organisation has sent (or tried to send) — one row per recipient,
-                with the Resend message ID as proof of hand-off. Latest 200 shown.
+                Every email this organisation has sent (or tried to send) — one row per recipient.
+                <b> Hand-off</b> is what happened when we passed it to the provider;
+                <b> Delivery</b> is what the provider reported afterwards, including bounces and
+                spam complaints. Latest 200 shown.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -533,7 +569,13 @@ export function EmailAlertsManager({
 
           <div className="flex flex-wrap items-center gap-2">
             {([
-              ['all', 'All'], ['sent', 'Sent'], ['failed', 'Failed'], ['dev', 'Dev'], ['test', 'Tests'],
+              ['all', 'All'],
+              ['problems', `Problems${problemCount ? ` (${problemCount})` : ''}`],
+              ['sent', 'Sent'],
+              ['failed', 'Failed to send'],
+              ['bounced', 'Bounced'],
+              ['dev', 'Dev'],
+              ['test', 'Previews'],
             ] as Array<[typeof logFilter, string]>).map(([key, label]) => (
               <button
                 key={key}
@@ -562,13 +604,14 @@ export function EmailAlertsManager({
             <THead>
               <TR>
                 <TH>Sent at</TH><TH>Event</TH><TH>Recipient</TH>
-                <TH>Subject</TH><TH>Ref</TH><TH>Status</TH>
+                <TH>Subject</TH><TH>Ref</TH><TH>Hand-off</TH><TH>Delivery</TH>
               </TR>
             </THead>
             <TBody>
               {visibleLogs.map((l) => {
                 const meta = TASK_EMAIL_EVENT_META[l.event as TaskEmailEvent];
                 const status = LOG_STATUS_META[l.status];
+                const delivery = l.provider_status ? DELIVERY_META[l.provider_status] : null;
                 return (
                   <TR key={l.id}>
                     <TD className="whitespace-nowrap text-xs text-[hsl(var(--muted))]">
@@ -601,11 +644,38 @@ export function EmailAlertsManager({
                         </span>
                       )}
                     </TD>
+                    <TD>
+                      {delivery ? (
+                        <>
+                          <Badge color={delivery.color}>{delivery.label}</Badge>
+                          {l.bounce_detail && (
+                            <span
+                              className="mt-0.5 block max-w-[18rem] truncate text-[10px] text-red-600"
+                              title={l.bounce_detail}
+                            >
+                              {l.bounce_type ? `${l.bounce_type}: ` : ''}{l.bounce_detail}
+                            </span>
+                          )}
+                          {l.provider_status_at && (
+                            <span className="block text-[10px] text-[hsl(var(--muted))]">
+                              {formatDateTime(l.provider_status_at)}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span
+                          className="text-xs text-[hsl(var(--muted))]"
+                          title="Accepted by the provider. Nothing further reported yet — connect the Resend webhook to see delivery and bounces."
+                        >
+                          —
+                        </span>
+                      )}
+                    </TD>
                   </TR>
                 );
               })}
               {visibleLogs.length === 0 && (
-                <TR><TD colSpan={6} className="py-8 text-center text-[hsl(var(--muted))]">
+                <TR><TD colSpan={7} className="py-8 text-center text-[hsl(var(--muted))]">
                   {logsBusy ? 'Loading…' : 'No deliveries recorded yet — the ledger starts with the next email sent.'}
                 </TD></TR>
               )}

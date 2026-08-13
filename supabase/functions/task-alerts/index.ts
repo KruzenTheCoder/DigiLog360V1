@@ -455,6 +455,13 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { /* empty body is fine */ }
 
   // ── Test mode: render + send a sample email to the caller (super only) ──
+  //
+  // Deliberately NOT subject-tagged. Nothing this platform sends should carry
+  // a "test" marker, so a preview is byte-identical to the real thing — which
+  // is the point of a preview. The distinction is kept in the ledger via
+  // email_log.is_test, not in the recipient's inbox. Note the consequence: a
+  // preview is indistinguishable from a live alert once delivered, so send
+  // them to your own address.
   if (body.mode === 'test') {
     if (internal || !caller || !isSuperUser(caller.profile)) {
       return json({ error: 'Test sends are super-user only' }, 403);
@@ -493,7 +500,7 @@ Deno.serve(async (req) => {
     }
     const { subject, html, text } = renderTaskEmail(event, data, settings);
     const res = await sendViaResend({
-      to, subject: `[TEST] ${subject}`, html, text,
+      to, subject, html, text,
       fromName: settings?.from_name, replyTo: settings?.reply_to,
     });
     if (orgId) {
@@ -503,7 +510,7 @@ Deno.serve(async (req) => {
         recipient_id: caller.profile?.id ?? null,
         recipient_name: caller.profile?.full_name ?? null,
         recipient_email: to,
-        subject: `[TEST] ${subject}`,
+        subject,
         status: res.ok ? (res.dev ? 'dev' : 'sent') : 'failed',
         provider_id: res.providerId ?? null,
         error: res.ok ? null : (res.error ?? 'send failed'),

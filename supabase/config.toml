@@ -40,3 +40,16 @@ double_confirm_changes = true
 [edge_runtime]
 enabled = true
 policy = "oneshot"
+
+# ---------------------------------------------------------------------------
+# Edge functions
+#
+# Resend signs its webhooks with Svix headers, not a Supabase JWT, so the
+# platform's own auth gate has to be off for that endpoint or every delivery
+# event is rejected with a 401 before the function runs. The endpoint is
+# therefore public by design and verifies the signature itself — see
+# supabase/functions/resend-webhook/index.ts, which fails closed when
+# RESEND_WEBHOOK_SECRET is missing.
+# ---------------------------------------------------------------------------
+[functions.resend-webhook]
+verify_jwt = false

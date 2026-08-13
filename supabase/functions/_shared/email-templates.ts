@@ -495,7 +495,7 @@ export function sampleTaskEmailData(orgName: string, appUrl?: string | null): Ta
     occurrenceId: 15481,
     title: 'Replace beam sensor — north perimeter',
     description:
-      'The IR beam on the north fence line is intermittently faulting and raising false alarms. Swap the unit, realign, and confirm three clean test triggers with the control room.',
+      'The IR beam on the north fence line is intermittently faulting and raising false alarms. Swap the unit, realign, and confirm three clean triggers with the control room.',
     priority: 'high',
     status: 'in_progress',
     dueAt: new Date(Date.now() + 26 * 3600_000).toISOString(),
@@ -503,7 +503,7 @@ export function sampleTaskEmailData(orgName: string, appUrl?: string | null): Ta
     assigneeName: 'Sipho Dlamini',
     assignedByName: 'Ayesha Khan',
     actorName: 'Sipho Dlamini',
-    notes: 'Unit swapped, waiting on control room to confirm the test triggers.',
+    notes: 'Unit swapped, waiting on control room to confirm the trigger checks.',
     orgName,
     appUrl: appUrl ?? 'https://digilog360.example',
     recipientName: 'Sipho',

@@ -38,7 +38,7 @@ npx supabase functions deploy `
   admin-delete-org admin-delete-user `
   admin-api-token admin-role-capability `
   send-email webhook-deliver `
-  patrol-watcher sla-monitor task-alerts `
+  patrol-watcher sla-monitor task-alerts resend-webhook `
   transcribe-audio health-check
 
 # 3. Seed a demo tenant + super user
@@ -629,6 +629,7 @@ Scheduled by `pg_cron` every 5 minutes. For each affected site:
 | `patrol-watcher` | Seeds expected_patrols + alerts overdue ones | Cron (service role) |
 | `sla-monitor` | Inbox + push + email for SLA events | Cron (service role) |
 | `task-alerts` | Drains the `email_outbox` through Resend — task assigned / updated / completed, occurrence assigned / updated, and overdue-task breach alerts; per-org config from `org_email_settings`; writes the `email_log` delivery ledger; `mode:'test'` sends a sample to any address (super only). Cron is self-scheduling: call `admin_schedule_task_alerts(url, service_key)` once via RPC | Signed-in (flush) · Cron (service role) · super_user (test) |
+| `resend-webhook` | Receives Resend delivery events (delivered / bounced / complained / delayed) and writes them onto the matching `email_log` row, so the Delivery history shows whether a message landed rather than merely left. Svix-signed, verified in-function, fails closed without `RESEND_WEBHOOK_SECRET` | Public (signature-verified) |
 | `transcribe-audio` | OpenAI Whisper proxy; attaches transcript as a comment on the occurrence | Bearer (signed-in) |
 | `health-check` | Public uptime probe (DB connectivity + counts) | None |
 
@@ -1075,7 +1076,7 @@ npx supabase functions deploy `
   admin-delete-org admin-delete-user `
   admin-api-token admin-role-capability `
   send-email webhook-deliver `
-  patrol-watcher sla-monitor task-alerts `
+  patrol-watcher sla-monitor task-alerts resend-webhook `
   transcribe-audio health-check
 
 # 6. Schedule cron jobs (in SQL editor, see supabase/schedule_sla_monitor.sql
