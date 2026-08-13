@@ -13,7 +13,7 @@ export function CategoryDonut({ data }: { data: { name: string; count: number }[
   const total = data.reduce((s, d) => s + d.count, 0);
   return (
     <Card className="h-full">
-      <CardHeader><CardTitle>Incident Breakdown by Category</CardTitle></CardHeader>
+      <CardHeader><CardTitle>Occurrence Breakdown by Category</CardTitle></CardHeader>
       <CardContent>
         <div className="flex flex-col items-center gap-6">
           {/* Large donut that scales with the container width (percentage

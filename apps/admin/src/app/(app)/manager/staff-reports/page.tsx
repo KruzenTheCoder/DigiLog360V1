@@ -440,8 +440,8 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
         <HeroKpi
           tone="blue"
           icon="ShieldAlert"
-          label="Highest Risk"
-          sublabel="Incident Type"
+          label="Most Common Occurrence"
+          sublabel="Occurrence Type"
           value={highestRisk.name}
           footer={`${highestRisk.count} incidents logged`}
         />
@@ -471,7 +471,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
 
       {/* Category breakdown + high-frequency incidents */}
       <div className="mb-5 grid gap-4 lg:grid-cols-2">
-        <GradientSection title="Incident Breakdown by Type" icon="PieChart" tone="brand">
+        <GradientSection title="Occurrence Breakdown by Type" icon="PieChart" tone="brand">
           <CategoryDonut data={typeBreakdown.slice(0, 7)} />
         </GradientSection>
         <GradientSection title="High-Frequency Incidents" icon="Flame" tone="red">

@@ -339,8 +339,8 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
         <HeroKpi
           tone="blue"
           icon="ShieldAlert"
-          label="Highest Risk"
-          sublabel="Incident Type"
+          label="Most Common Occurrence"
+          sublabel="Occurrence Type"
           value={typeBreakdown[0]?.name ?? '—'}
           href={typeBreakdown[0] ? drill({ type: typeBreakdown[0].name }) : undefined}
           footer={`${typeBreakdown[0]?.count ?? 0} incidents logged`}
@@ -408,7 +408,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
 
       {/* Category breakdown + high-frequency incidents */}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <GradientSection title="Incident Breakdown by Type" icon="PieChart" tone="brand">
+        <GradientSection title="Occurrence Breakdown by Type" icon="PieChart" tone="brand">
           <CategoryDonut data={typeBreakdown} />
         </GradientSection>
         <GradientSection title="High-Frequency Incidents" icon="Flame" tone="red">
