@@ -510,3 +510,308 @@ export function sampleTaskEmailData(orgName: string, appUrl?: string | null): Ta
     overdueBy: '3 h 20 m',
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Welcome pack
+//
+// Sent by a super user to onboard someone: where to sign in, the address that
+// doubles as their username, and how to get in the first time. Kept separate
+// from the task alerts above because it isn't tied to a task or an occurrence,
+// and because it can carry a credential — which is why it gets its own event
+// name ('user.welcome') in the delivery ledger and its own renderer.
+//
+// Two shapes, chosen by the caller:
+//   • password  — a one-time password is printed in the mail, to be changed
+//                 on first sign-in.
+//   • link      — nothing secret is printed; the recipient follows a
+//                 set-your-own-password link instead. Safer, and the default
+//                 we recommend where the recipient can receive mail reliably.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface WelcomeEmailData {
+  /** First name or full name; falls back to a plain "Hi," when absent. */
+  recipientName: string | null;
+  /** Sign-in address — this is also the username. */
+  email: string;
+  /** One-time password to print, or null when sending a set-password link. */
+  password: string | null;
+  /** Set-your-own-password link, used when `password` is null. */
+  setPasswordUrl?: string | null;
+  orgName: string;
+  appUrl?: string | null;
+  /** e.g. "Control Room", "Supervisor" — shown on the credentials card. */
+  roleLabel?: string | null;
+  /** Optional personal line from whoever is onboarding them. */
+  message?: string | null;
+  senderName?: string | null;
+}
+
+export const DEFAULT_WELCOME_SUBJECT = 'Welcome to DigiLog 360 — your {{org_name}} account is ready';
+
+export const DEFAULT_WELCOME_INTRO =
+  'Your DigiLog 360 account has been created. Everything you need to sign in for the first time is below.';
+
+/** Variables available in the welcome subject/intro overrides. */
+export const WELCOME_TEMPLATE_VARS = [
+  { key: '{{recipient_name}}', label: "Recipient's name" },
+  { key: '{{org_name}}', label: 'Organisation name' },
+  { key: '{{email}}', label: 'Sign-in address / username' },
+  { key: '{{role}}', label: 'Role label' },
+  { key: '{{app_url}}', label: 'Sign-in link' },
+  { key: '{{sender_name}}', label: 'Who sent the pack' },
+] as const;
+
+function welcomeVars(data: WelcomeEmailData): Record<string, string> {
+  const appUrl = (data.appUrl ?? '').replace(/\/+$/, '');
+  return {
+    recipient_name: data.recipientName ?? 'there',
+    org_name: data.orgName,
+    email: data.email,
+    role: data.roleLabel ?? 'Team member',
+    app_url: appUrl ? `${appUrl}/login` : '',
+    sender_name: data.senderName ?? '',
+  };
+}
+
+/**
+ * Render the welcome pack. Same shell as the task alerts so the two read as
+ * one family, but the body leads with the credentials card rather than a task.
+ */
+export function renderWelcomeEmail(
+  data: WelcomeEmailData,
+  settings?: Partial<OrgEmailSettingsRow> | null,
+): { subject: string; html: string; text: string } {
+  const vars = welcomeVars(data);
+  const accent = settings?.accent_color || BRAND_GRADIENT_FROM;
+
+  const subject = renderTemplateString(DEFAULT_WELCOME_SUBJECT, vars);
+  const intro = renderTemplateString(DEFAULT_WELCOME_INTRO, vars);
+
+  const appUrl = (data.appUrl ?? '').replace(/\/+$/, '');
+  const loginUrl = appUrl ? `${appUrl}/login` : '';
+  const greeting = data.recipientName ? `Hi ${escapeHtml(data.recipientName)},` : 'Hi,';
+  const usesLink = !data.password && !!data.setPasswordUrl;
+  const ctaUrl = usesLink ? (data.setPasswordUrl as string) : loginUrl;
+  const ctaLabel = usesLink ? 'Choose your password' : 'Sign in to DigiLog 360';
+
+  // The credential block. A monospaced, boxed value is far easier to retype
+  // off a phone than inline body text, and the label row matches the meta
+  // rows used by the task emails.
+  const secretHtml = data.password
+    ? `<tr>
+        <td style="padding:7px 0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;vertical-align:top;width:120px;">Password</td>
+        <td style="padding:7px 0;vertical-align:top;">
+          <span style="display:inline-block;padding:7px 14px;border-radius:8px;background:#0f172a;color:#ffffff;font-family:Consolas,'Courier New',monospace;font-size:16px;font-weight:700;letter-spacing:.06em;">${escapeHtml(data.password)}</span>
+        </td>
+      </tr>`
+    : `<tr>
+        <td style="padding:7px 0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;vertical-align:top;width:120px;">Password</td>
+        <td style="padding:7px 0;font-size:14px;color:#1e293b;vertical-align:top;">You'll choose your own — use the button below.</td>
+      </tr>`;
+
+  const credentialRows = [
+    metaRow(
+      'Sign-in link',
+      loginUrl
+        ? `<a href="${loginUrl}" target="_blank" style="font-weight:700;color:${accent};text-decoration:underline;">${escapeHtml(loginUrl)}</a>`
+        : '<span style="color:#94a3b8;">Provided separately</span>',
+    ),
+    metaRow('Username', `<strong style="font-family:Consolas,'Courier New',monospace;">${escapeHtml(data.email)}</strong>`),
+    secretHtml,
+    data.roleLabel ? metaRow('Your role', escapeHtml(data.roleLabel)) : '',
+  ].filter(Boolean).join('');
+
+  // Only shown when a password is printed — a link-based pack has no secret
+  // sitting in the mailbox to worry about.
+  const securityNote = data.password
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">
+        <tr><td style="border-left:3px solid #f59e0b;background:#fffbeb;border-radius:0 8px 8px 0;padding:11px 14px;">
+          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#b45309;">Please change this</p>
+          <p style="margin:4px 0 0;font-size:13px;line-height:1.6;color:#78350f;">
+            This is a one-time password. Change it as soon as you sign in, under <strong>Settings &rarr; Security</strong>, and don't share it with anyone.
+          </p>
+        </td></tr>
+      </table>`
+    : '';
+
+  const personalNote = (data.message ?? '').trim();
+  const noteHtml = personalNote
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">
+        <tr><td style="border-left:3px solid ${accent};background:#ffffff;border-radius:0 8px 8px 0;padding:10px 14px;">
+          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">Note${data.senderName ? ` from ${escapeHtml(data.senderName)}` : ''}</p>
+          <p style="margin:4px 0 0;font-size:14px;line-height:1.6;color:#334155;">${escapeHtml(personalNote)}</p>
+        </td></tr>
+      </table>`
+    : '';
+
+  const steps = [
+    'Open the sign-in link and enter the username and password above.',
+    'Set a password only you know, under Settings &rarr; Security.',
+    'Check Settings &rarr; My Preferences so alerts reach you the way you want them.',
+  ];
+  const stepsHtml = steps
+    .map((s, i) => `<tr>
+      <td style="padding:6px 12px 6px 0;vertical-align:top;width:26px;">
+        <span style="display:inline-block;width:22px;height:22px;border-radius:999px;background:${accent};color:#ffffff;font-size:12px;font-weight:700;text-align:center;line-height:22px;">${i + 1}</span>
+      </td>
+      <td style="padding:6px 0;font-size:14px;line-height:1.6;color:#475569;vertical-align:top;">${s}</td>
+    </tr>`)
+    .join('');
+
+  const ctaHtml = ctaUrl
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto 0;">
+        <tr><td style="border-radius:10px;background:${accent};background-image:linear-gradient(135deg,${accent},${BRAND_GRADIENT_TO});">
+          <a href="${ctaUrl}" target="_blank"
+             style="display:inline-block;padding:13px 34px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">
+            ${ctaLabel}&nbsp;&rarr;
+          </a>
+        </td></tr>
+      </table>
+      <p style="margin:14px 0 0;font-family:'Segoe UI',Arial,sans-serif;font-size:11px;line-height:1.6;color:#94a3b8;word-break:break-all;">
+        Button not working? Copy this link:<br>
+        <a href="${ctaUrl}" target="_blank" style="color:#94a3b8;text-decoration:underline;">${ctaUrl}</a>
+      </p>`
+    : '';
+
+  const footerNote = (settings?.footer_note ?? '').trim();
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background:#eef1f7;-webkit-text-size-adjust:100%;">
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
+    Your ${escapeHtml(data.orgName)} account on DigiLog 360 is ready — here is how to sign in.
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f7;padding:32px 12px;">
+    <tr><td align="center">
+
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+             style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,.08);">
+
+        <!-- Brand header -->
+        <tr>
+          <td bgcolor="${accent}" style="background-image:linear-gradient(135deg,${accent} 0%,${BRAND_GRADIENT_TO} 100%);padding:22px 32px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+              <td style="font-family:'Segoe UI',Arial,sans-serif;font-size:17px;font-weight:800;color:#ffffff;letter-spacing:.14em;">
+                DIGILOG&nbsp;360
+              </td>
+              <td align="right" style="font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);">
+                ${escapeHtml(data.orgName)}
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+
+        <!-- Event band -->
+        <tr>
+          <td style="padding:34px 32px 0;font-family:'Segoe UI',Arial,sans-serif;">
+            ${chip('WELCOME ABOARD', '#16a34a')}
+            <h1 style="margin:14px 0 0;font-size:24px;line-height:1.25;color:#0f172a;font-weight:800;">
+              Welcome to DigiLog&nbsp;360
+            </h1>
+          </td>
+        </tr>
+
+        <!-- Greeting + intro -->
+        <tr>
+          <td style="padding:18px 32px 0;font-family:'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.65;color:#334155;">
+            <p style="margin:0 0 6px;">${greeting}</p>
+            <p style="margin:0;">${escapeHtml(intro)}</p>
+          </td>
+        </tr>
+
+        <!-- Credentials card -->
+        <tr>
+          <td style="padding:24px 32px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                   style="border:1px solid #e2e8f0;border-left:4px solid ${accent};border-radius:12px;background:#f8fafc;">
+              <tr>
+                <td style="padding:20px 22px;font-family:'Segoe UI',Arial,sans-serif;">
+                  <p style="margin:0;font-size:17px;font-weight:700;color:#0f172a;">Your sign-in details</p>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:6px;">
+                    ${credentialRows}
+                  </table>
+                  ${securityNote}
+                  ${noteHtml}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- CTA -->
+        <tr><td style="padding:0 32px;" align="center">${ctaHtml}</td></tr>
+
+        <!-- Getting started -->
+        <tr>
+          <td style="padding:30px 32px 0;font-family:'Segoe UI',Arial,sans-serif;">
+            <p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">Getting started</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${stepsHtml}</table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:26px 32px 30px;font-family:'Segoe UI',Arial,sans-serif;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e2e8f0;">
+              <tr><td style="padding-top:18px;font-size:12px;line-height:1.7;color:#94a3b8;">
+                ${footerNote ? `<p style="margin:0 0 8px;color:#64748b;">${escapeHtml(footerNote)}</p>` : ''}
+                <p style="margin:0;">
+                  You are receiving this because an account was created for you in
+                  <strong style="color:#64748b;">${escapeHtml(data.orgName)}</strong> on DigiLog&nbsp;360.
+                  If you weren't expecting it, please tell your administrator and do not sign in.
+                </p>
+                <p style="margin:10px 0 0;">DigiLog 360 &middot; Security Operations Platform &middot; &copy; ${new Date().getFullYear()} Netstream Intergrated Solutions</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const textLines = [
+    'Welcome to DigiLog 360',
+    '',
+    intro,
+    '',
+    loginUrl ? `Sign in: ${loginUrl}` : '',
+    `Username: ${data.email}`,
+    data.password ? `Password: ${data.password}` : 'Password: choose your own using the link below.',
+    data.roleLabel ? `Role: ${data.roleLabel}` : '',
+    data.password
+      ? '\nThis is a one-time password. Please change it as soon as you sign in, under Settings > Security.'
+      : '',
+    usesLink ? `\nChoose your password: ${data.setPasswordUrl}` : '',
+    personalNote ? `\nNote${data.senderName ? ` from ${data.senderName}` : ''}: ${personalNote}` : '',
+    `\n— DigiLog 360 · ${data.orgName}`,
+  ].filter((l) => l !== '');
+
+  return { subject, html, text: textLines.join('\n') };
+}
+
+/** Sample payload for the preview pane and for test sends. */
+export function sampleWelcomeEmailData(orgName: string, appUrl?: string | null): WelcomeEmailData {
+  return {
+    recipientName: 'Sipho',
+    email: 'sipho.dlamini@example.com',
+    // Obviously-fake shape, so a preview can never be mistaken for a real
+    // credential if it's forwarded on.
+    password: 'Sample-Pass-0000',
+    orgName,
+    appUrl: appUrl ?? 'https://digilog360.example',
+    roleLabel: 'Control Room',
+    senderName: 'Ayesha Khan',
+    message: 'Great to have you on the team — shout if anything looks off on your first shift.',
+  };
+}

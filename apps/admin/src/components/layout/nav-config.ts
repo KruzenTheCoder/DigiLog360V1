@@ -92,6 +92,7 @@ export const NAV: NavSection[] = [
       { label: 'Occurrence Taxonomy', href: '/super/taxonomy', icon: 'ListTree', roles: ['super_user'] },
       { label: 'Form Builder', href: '/super/form-builder', icon: 'LayoutTemplate', roles: ['super_user'] },
       { label: 'Email Alerts', href: '/super/email-alerts', icon: 'Mail', roles: ['super_user'] },
+      { label: 'Welcome Packs', href: '/super/welcome-packs', icon: 'MailPlus', roles: ['super_user'] },
     ],
   },
 ];
