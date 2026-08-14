@@ -165,11 +165,27 @@ function Eyebrow({ children, tone, dark }: { children: string; tone: string; dar
 
 // ---------------------------------------------------------------------------
 
-export function LandingPage() {
+export type LandingSection =
+  | 'hero' | 'problem' | 'solution' | 'what' | 'story' | 'targets' | 'console'
+  | 'realtime' | 'field' | 'who' | 'underneath' | 'outcome' | 'faq' | 'confidential';
+
+/**
+ * The marketing content, one section per key.
+ *
+ * The site is now several short pages rather than one long scroll, so each
+ * route renders the handful of sections it owns. Keeping them in one module
+ * means the shared helpers, palette and copy stay in one place — the split is
+ * about what a visitor is shown, not about splitting the source.
+ */
+export function LandingPage(
+  { sections, showFooter = true }: { sections?: LandingSection[]; showFooter?: boolean },
+) {
+  const show = (k: LandingSection) => !sections || sections.includes(k);
   return (
     <main className="w-full overflow-x-hidden bg-[hsl(var(--background))]">
 
       {/* ══ HERO ═══════════════════════════════════════════════════════ */}
+      {show('hero') && (
       <section className="relative isolate w-full overflow-hidden bg-brand-gradient text-white">
         <div
           aria-hidden
@@ -191,19 +207,9 @@ export function LandingPage() {
           }}
         />
 
-        <nav className="relative z-10 mx-auto flex w-full max-w-[92rem] items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-12">
-          <div className="min-w-0">
-            <Logo className="text-xl sm:text-2xl" onDark />
-            <p className="mt-0.5 truncate text-[0.7rem] text-white/75 sm:text-xs">{BRAND.tagline}</p>
-          </div>
-          <Link href="/login" className="shrink-0">
-            <Button variant="secondary" className="shadow-sm">
-              Sign in <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        </nav>
-
-        <div className="relative z-10 mx-auto w-full max-w-[92rem] px-5 pb-12 pt-4 sm:px-8 lg:px-12 lg:pb-16 lg:pt-8">
+        {/* The brand mark and Sign in live in the persistent site nav now, so
+            the hero no longer carries its own copy of both. */}
+        <div className="relative z-10 mx-auto w-full max-w-[92rem] px-5 pb-12 pt-10 sm:px-8 lg:px-12 lg:pb-16 lg:pt-14">
           <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-14">
             <div className="min-w-0">
               <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/[0.12] px-3.5 py-1.5 text-[0.68rem] font-bold uppercase tracking-[0.16em] backdrop-blur-sm">
@@ -303,8 +309,10 @@ export function LandingPage() {
           </dl>
         </div>
       </section>
+      )}
 
       {/* ══ PROBLEM ════════════════════════════════════════════════════ */}
+      {show('problem') && (
       <section
         id="problem"
         className="relative isolate w-full scroll-mt-2 overflow-hidden bg-slate-950 py-16 text-white lg:py-24"
@@ -375,8 +383,10 @@ export function LandingPage() {
           </Reveal>
         </div>
       </section>
+      )}
 
       {/* ══ SOLUTION ═══════════════════════════════════════════════════ */}
+      {show('solution') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
         <Ambient tone="brand" />
         <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
@@ -413,8 +423,10 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ══ MODULES ════════════════════════════════════════════════════ */}
+      {show('what') && (
       <section className="w-full border-y bg-[hsl(var(--surface))] py-16 lg:py-24">
         <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
@@ -446,8 +458,10 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ══ STORY ══════════════════════════════════════════════════════ */}
+      {show('story') && (
       <section className="relative isolate w-full overflow-hidden bg-slate-950 py-16 text-white lg:py-24">
         <Ambient tone="amber" scheme="dark" />
         {/* A slow sweep centred on the timeline — the watch being kept, and
@@ -545,8 +559,10 @@ export function LandingPage() {
           </Reveal>
         </div>
       </section>
+      )}
 
       {/* ══ RESPONSE TARGETS ═══════════════════════════════════════════ */}
+      {show('targets') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
         <Ambient tone="sky" />
         <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
@@ -627,8 +643,10 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ══ CONSOLE SHOWCASE ═══════════════════════════════════════════ */}
+      {show('console') && (
       <section id="console" className="relative w-full scroll-mt-2 overflow-hidden bg-slate-900 py-16 text-white lg:py-24">
         <div
           aria-hidden
@@ -677,8 +695,10 @@ export function LandingPage() {
           </Reveal>
         </div>
       </section>
+      )}
 
       {/* ══ CAPABILITIES ═══════════════════════════════════════════════ */}
+      {show('realtime') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
         <Ambient tone="sky" />
         <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
@@ -713,8 +733,10 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ══ THE FIELD APP ══════════════════════════════════════════════ */}
+      {show('field') && (
       <section className="w-full border-y bg-[hsl(var(--surface))] py-16 lg:py-24">
         <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
@@ -749,8 +771,10 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ══ ROLES ══════════════════════════════════════════════════════ */}
+      {show('who') && (
       <section className="relative isolate w-full overflow-hidden bg-slate-950 py-16 text-white lg:py-24">
         <Ambient tone="brand" scheme="dark" />
         <Constellation />
@@ -790,8 +814,10 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ══ PLATFORM ═══════════════════════════════════════════════════ */}
+      {show('underneath') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
         <Ambient tone="brand" />
         <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
@@ -825,8 +851,10 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ══ OUTCOME ════════════════════════════════════════════════════ */}
+      {show('outcome') && (
       <section className="w-full border-t bg-[hsl(var(--surface))] py-16 lg:py-24">
         <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
@@ -870,8 +898,10 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ══ FAQ ════════════════════════════════════════════════════════ */}
+      {show('faq') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
         <Ambient tone="emerald" />
         <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
@@ -894,8 +924,10 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ══ CLOSE ══════════════════════════════════════════════════════ */}
+      {show('confidential') && (
       <section className="relative w-full overflow-hidden bg-brand-gradient py-16 text-white lg:py-24">
         <div
           aria-hidden
@@ -926,7 +958,9 @@ export function LandingPage() {
           </Link>
         </div>
       </section>
+      )}
 
+      {showFooter && (
       <footer className="w-full bg-slate-950 py-8 text-slate-500">
         <div className="mx-auto flex w-full max-w-[92rem] flex-wrap items-center justify-between gap-3 px-5 text-sm sm:px-8 lg:px-12">
           <span className="flex items-center gap-2">
@@ -936,6 +970,7 @@ export function LandingPage() {
           <span>Proprietary &amp; confidential</span>
         </div>
       </footer>
+      )}
     </main>
   );
 }
