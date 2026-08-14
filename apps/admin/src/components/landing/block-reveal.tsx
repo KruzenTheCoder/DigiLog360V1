@@ -19,10 +19,11 @@
 // only held back once JS has armed the effect and an observer exists to
 // release it. A no-JS visitor reads the heading normally.
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 type Tone = 'brand' | 'dark' | 'light' | 'red' | 'green' | 'violet' | 'amber';
 
+/** The wipe block is an element, so it can take a utility class. */
 const BLOCK: Record<Tone, string> = {
   brand: 'bg-[hsl(var(--brand))]',
   dark: 'bg-slate-900',
@@ -31,6 +32,17 @@ const BLOCK: Record<Tone, string> = {
   green: 'bg-emerald-500',
   violet: 'bg-violet-500',
   amber: 'bg-amber-500',
+};
+
+/** The marker fill is a background image, so it needs a colour value. */
+const FILL: Record<Tone, string> = {
+  brand: 'hsl(var(--brand))',
+  dark: '#0f172a',
+  light: '#ffffff',
+  red: '#ef4444',
+  green: '#10b981',
+  violet: '#8b5cf6',
+  amber: '#f59e0b',
 };
 
 /** Shared scroll trigger: fires once, the first time the element is seen. */
@@ -96,9 +108,14 @@ export function Mark({
   const { ref, run } = usePlayOnce(0);
 
   return (
-    <span ref={ref} className={`mark ${run ? 'mark-run' : ''} ${className ?? ''}`}>
+    <span
+      ref={ref}
+      className={`mark ${run ? 'mark-run' : ''} ${className ?? ''}`}
+      // The fill is a background on the text itself so the phrase can wrap;
+      // the colour travels as a custom property rather than a utility class.
+      style={{ '--mark-fill': FILL[tone] } as CSSProperties}
+    >
       <span className="mark-ink">{children}</span>
-      <span aria-hidden className={`mark-fill ${BLOCK[tone]}`} />
     </span>
   );
 }

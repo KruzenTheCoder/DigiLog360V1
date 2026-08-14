@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/brand/logo';
 import { BRAND, SLA_CONFIG, SEVERITY_LABELS, SEVERITY_COLORS, SEVERITIES } from '@digilog/shared';
 import { HeroBoard } from './hero-board';
+import { TiltStage, Depth } from './tilt-stage';
 import { LiveBoard } from './live-board';
 import { Reveal } from './reveal';
 import { SiteCard, CardDeck } from './site-card';
@@ -262,11 +263,14 @@ export function LandingPage(
               </ul>
             </div>
 
-            {/* Two stacked panels: what is happening, and who is out there */}
+            {/* Two stacked panels: what is happening, and who is out there.
+                They share one 3-D stage, so the pair leans together as a
+                single object rather than as two cards that happen to move. */}
+            <TiltStage className="min-w-0">
             <div className="grid min-w-0 gap-4">
-              <HeroBoard />
+              <Depth z={36}><HeroBoard /></Depth>
 
-              <div className="rounded-2xl border border-white/25 bg-white/[0.08] p-4 backdrop-blur-md">
+              <div className="rounded-2xl border border-white/25 bg-white/[0.08] p-4 backdrop-blur-md" style={{ transform: 'translateZ(14px)' }}>
                 <div className="mb-3 flex items-center gap-2">
                   <Route className="h-4 w-4 text-white/70" />
                   <span className="font-mono text-[0.64rem] font-bold uppercase tracking-[0.16em] text-white/70">
@@ -292,6 +296,7 @@ export function LandingPage(
                 </ul>
               </div>
             </div>
+            </TiltStage>
           </div>
         </div>
 
