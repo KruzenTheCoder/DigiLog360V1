@@ -146,6 +146,65 @@ html {
 .deck-delay-2 { animation-delay: 140ms; }
 .deck-delay-3 { animation-delay: 210ms; }
 
+/* ── Block-wipe reveal ────────────────────────────────────────────────────
+   A solid block sweeps across the words and leaves them behind it: it grows
+   from the left edge, then retreats off the right, and the text becomes
+   visible under it at the halfway point. Both halves are one scaleX on the
+   compositor — no width animation, no layout, no repaint.
+
+   The text is visible by default and only hidden once JS has armed the
+   effect, so no-JS and reduced-motion visitors read the heading normally. */
+@keyframes wipe-block {
+  0%   { transform: scaleX(0); transform-origin: left center; }
+  48%  { transform: scaleX(1); transform-origin: left center; }
+  52%  { transform: scaleX(1); transform-origin: right center; }
+  100% { transform: scaleX(0); transform-origin: right center; }
+}
+@keyframes wipe-text {
+  0%, 47%   { opacity: 0; }
+  48%, 100% { opacity: 1; }
+}
+
+.wipe { position: relative; display: inline-block; }
+.wipe > .wipe-ink { display: inline-block; }
+.wipe > .wipe-block {
+  position: absolute;
+  inset: -0.08em -0.16em;
+  transform: scaleX(0);
+  transform-origin: left center;
+  pointer-events: none;
+  border-radius: 0.15em;
+}
+/* Armed but not yet played: hold the text back so the block arrives first. */
+.wipe-armed > .wipe-ink { opacity: 0; }
+.wipe-run > .wipe-ink {
+  animation: wipe-text 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.wipe-run > .wipe-block {
+  animation: wipe-block 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Keyword highlight ────────────────────────────────────────────────────
+   A filled block grows in behind one word, the way a marker pen would. */
+@keyframes mark-in {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.mark { position: relative; display: inline-block; white-space: nowrap; }
+.mark > .mark-ink { position: relative; z-index: 1; }
+.mark > .mark-fill {
+  position: absolute;
+  inset: 0.06em -0.22em 0.04em -0.22em;
+  z-index: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  border-radius: 0.16em;
+}
+.mark-run > .mark-fill {
+  animation: mark-in 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 220ms;
+}
+
 /* A slow shimmer along a card's top edge — the "lit" feel, at zero cost:
    one transform on a pseudo-element, no repaint. */
 @keyframes edge-sheen {
@@ -173,4 +232,13 @@ html {
     transform: none;
   }
   .card-sheen::before { animation: none; opacity: 0; }
+
+  /* The wipe is decoration; the heading is the content. Show the words and
+     drop the block entirely rather than leaving a swipe nobody asked for. */
+  .wipe-armed > .wipe-ink,
+  .wipe-run > .wipe-ink { opacity: 1; animation: none; }
+  .wipe > .wipe-block { display: none; }
+  /* The marker fill is not decoration — it is emphasis, and the heading
+     reads differently without it — so it stays, it just does not travel. */
+  .mark > .mark-fill { transform: scaleX(1); animation: none; }
 }

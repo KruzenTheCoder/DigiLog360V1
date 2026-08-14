@@ -143,15 +143,28 @@ export function CardDeck({
   children,
   className,
   step = 70,
+  offset = false,
 }: {
   children: ReactNode[];
   className?: string;
   step?: number;
+  /**
+   * Drop every other card a little, so the row reads as an arrangement
+   * rather than a table. Only above `lg` — on a phone the grid is one column
+   * and an offset would just look like inconsistent spacing.
+   */
+  offset?: boolean;
 }) {
   return (
     <div className={className}>
       {children.map((child, i) => (
-        <DealtCard key={i} delay={Math.min(i, 9) * step}>{child}</DealtCard>
+        <DealtCard
+          key={i}
+          delay={Math.min(i, 9) * step}
+          offsetY={offset && i % 2 === 1 ? 32 : 0}
+        >
+          {child}
+        </DealtCard>
       ))}
     </div>
   );
@@ -165,13 +178,30 @@ export function CardDeck({
  * visitors get the content immediately rather than an invisible page.
  */
 export function DealtCard({
-  children, delay = 0, className,
+  children, delay = 0, className, offsetY = 0,
 }: {
   children: ReactNode; delay?: number; className?: string;
+  /**
+   * A resting vertical offset, in pixels, applied above `lg`. It has to be
+   * part of the same transform as the entrance — a translate-y utility class
+   * would simply be overwritten by the inline transform below.
+   */
+  offsetY?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [armed, setArmed] = useState(false);
   const [shown, setShown] = useState(false);
+  const [wide, setWide] = useState(false);
+
+  useEffect(() => {
+    // The offset is a large-screen device: on one column it reads as sloppy
+    // spacing rather than as an arrangement.
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const sync = () => setWide(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -199,16 +229,22 @@ export function DealtCard({
     <div
       ref={ref}
       className={[
-        'min-w-0 transition-all duration-[620ms] motion-reduce:transition-none',
-        '[transition-timing-function:cubic-bezier(0.22,1,0.36,1)]',
-        hidden ? 'translate-y-6 scale-[0.97] opacity-0' : 'translate-y-0 scale-100 opacity-100',
+        'min-w-0 transition-all duration-[760ms] motion-reduce:transition-none',
+        // A slower, more settled curve than the default ease-out — the
+        // difference between a card arriving and a card being flicked in.
+        '[transition-timing-function:cubic-bezier(0.16,1,0.3,1)]',
+        hidden ? 'opacity-0' : 'opacity-100',
         className ?? '',
       ].join(' ')}
       // The perspective lives on the child so a tilted card has depth without
-      // the parent grid needing a 3-D context of its own.
-      style={hidden
-        ? { transform: 'perspective(900px) rotateX(7deg) translate3d(0,24px,0) scale(0.97)' }
-        : { transform: 'perspective(900px) rotateX(0deg) translate3d(0,0,0) scale(1)' }}
+      // the parent grid needing a 3-D context of its own. The resting offset
+      // is folded in here rather than applied as a class, which this inline
+      // transform would otherwise override.
+      style={{
+        transform: hidden
+          ? `perspective(900px) rotateX(7deg) translate3d(0,${(wide ? offsetY : 0) + 24}px,0) scale(0.97)`
+          : `perspective(900px) rotateX(0deg) translate3d(0,${wide ? offsetY : 0}px,0) scale(1)`,
+      }}
     >
       {children}
     </div>

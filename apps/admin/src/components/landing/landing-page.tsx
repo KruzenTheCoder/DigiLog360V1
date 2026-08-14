@@ -13,6 +13,7 @@ import { HeroBoard } from './hero-board';
 import { LiveBoard } from './live-board';
 import { Reveal } from './reveal';
 import { SiteCard, CardDeck } from './site-card';
+import { BlockReveal, Mark } from './block-reveal';
 import { Ambient } from './ambient';
 import { Constellation } from './constellation';
 
@@ -223,7 +224,7 @@ export function LandingPage(
               </p>
 
               <h1 className="max-w-[16ch] text-[clamp(2.25rem,5.4vw,4.25rem)] font-extrabold leading-[1.02] tracking-[-0.035em]">
-                Know what happened.
+                <BlockReveal tone="light">Know what happened.</BlockReveal>
                 <span className="block font-light text-white/85">While it is still</span>
                 happening.
               </h1>
@@ -317,17 +318,17 @@ export function LandingPage(
       {/* ══ PROBLEM ════════════════════════════════════════════════════ */}
       {show('problem') && (
       <section id="problem" className="w-full scroll-mt-24 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
 
 
 
         <Ambient tone="red" scheme="dark" />
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
                 <Eyebrow tone="text-red-400" dark>The problem</Eyebrow>
                 <h2 className="mt-5 max-w-[17ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
-                  A paper book cannot raise the alarm.
+                  <BlockReveal tone="red">A paper book <Mark tone="red" className="text-white">cannot</Mark> raise the alarm.</BlockReveal>
                 </h2>
               </div>
               <p className="min-w-0 text-base leading-relaxed text-slate-400 lg:text-lg">
@@ -389,14 +390,14 @@ export function LandingPage(
       {/* ══ SOLUTION ═══════════════════════════════════════════════════ */}
       {show('solution') && (
       <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <Ambient tone="brand" />
         <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+        <Ambient tone="brand" />
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
                 <Eyebrow tone="text-brand">The solution</Eyebrow>
                 <h2 className="mt-5 max-w-[19ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
-                  Capture it at the source. Everything else follows.
+                  <BlockReveal tone="brand">Capture it <Mark tone="brand" className="text-white">at the source</Mark>. Everything else follows.</BlockReveal>
                 </h2>
               </div>
               <p className="min-w-0 text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
@@ -406,7 +407,7 @@ export function LandingPage(
             </div>
           </Reveal>
 
-          <CardDeck className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
+          <CardDeck offset className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
             {PILLARS.map((p) => (
               <SiteCard key={p.n} tone="brand" className="h-full">
                 <div className="flex items-center justify-between">
@@ -431,7 +432,7 @@ export function LandingPage(
           <Reveal>
             <Eyebrow tone="text-violet-600">What you get</Eyebrow>
             <h2 className="mt-5 max-w-[24ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
-              Eight registers, one system, no double entry.
+              <BlockReveal tone="violet">Eight registers, <Mark tone="violet" className="text-white">one system</Mark>, no double entry.</BlockReveal>
             </h2>
             <p className="mt-5 max-w-[68ch] text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
               Each of these replaces a book, a clipboard or a spreadsheet — and because they share one
@@ -460,6 +461,7 @@ export function LandingPage(
       {/* ══ STORY ══════════════════════════════════════════════════════ */}
       {show('story') && (
       <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
         <Ambient tone="amber" scheme="dark" />
         {/* A slow sweep centred on the timeline — the watch being kept, and
             something in the wide gutters either side of the frames. */}
@@ -472,13 +474,12 @@ export function LandingPage(
             animationDuration: '48s',
           }}
         />
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
                 <Eyebrow tone="text-amber-400" dark>One night, minute by minute</Eyebrow>
                 <h2 className="mt-5 max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
-                  A perimeter breach, end to end.
+                  <BlockReveal tone="amber">A perimeter breach, <Mark tone="amber" className="text-slate-950">end to end</Mark>.</BlockReveal>
                 </h2>
               </div>
               <p className="min-w-0 text-base leading-relaxed text-slate-400 lg:text-lg">
@@ -561,8 +562,8 @@ export function LandingPage(
       {/* ══ RESPONSE TARGETS ═══════════════════════════════════════════ */}
       {show('targets') && (
       <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <Ambient tone="sky" />
         <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+        <Ambient tone="sky" />
           <div className="grid gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16">
             {/* min-w-0 on both tracks: grid items default to min-width:auto and
                 refuse to shrink below their content, so the table's min-w-[30rem]
@@ -571,7 +572,7 @@ export function LandingPage(
               <div>
                 <Eyebrow tone="text-orange-600">Response targets</Eyebrow>
                 <h2 className="mt-5 max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
-                  Every incident gets a clock.
+                  <BlockReveal tone="brand">Every incident gets <Mark tone="brand" className="text-white">a clock</Mark>.</BlockReveal>
                 </h2>
                 <p className="mt-5 max-w-[52ch] text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
                   Severity is chosen once, at the scene. From that moment the platform knows when the
@@ -645,11 +646,11 @@ export function LandingPage(
       {/* ══ CONSOLE SHOWCASE ═══════════════════════════════════════════ */}
       {show('console') && (
       <section id="console" className="w-full scroll-mt-24 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-900 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
         <div
           aria-hidden
           className="animate-breathe pointer-events-none absolute inset-0 bg-[radial-gradient(1000px_500px_at_50%_0%,rgba(102,126,234,0.25),transparent_65%)] motion-reduce:animate-none"
         />
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-900 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <div className="mx-auto max-w-[48rem] text-center">
               <p className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-indigo-300">The console</p>
@@ -697,14 +698,14 @@ export function LandingPage(
       {/* ══ CAPABILITIES ═══════════════════════════════════════════════ */}
       {show('realtime') && (
       <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <Ambient tone="sky" />
         <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+        <Ambient tone="sky" />
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
                 <Eyebrow tone="text-sky-500">Realtime, meant literally</Eyebrow>
                 <h2 className="mt-5 max-w-[16ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
-                  Nothing here waits to be asked.
+                  <BlockReveal tone="green">Nothing here <Mark tone="green" className="text-white">waits</Mark> to be asked.</BlockReveal>
                 </h2>
               </div>
               <p className="min-w-0 text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
@@ -714,7 +715,7 @@ export function LandingPage(
             </div>
           </Reveal>
 
-          <CardDeck className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
+          <CardDeck offset className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
             {CAPABILITIES.map((c) => (
               <SiteCard key={c.tag} tone="green" className="h-full">
                 <div className="flex items-center gap-2.5">
@@ -739,7 +740,7 @@ export function LandingPage(
               <div className="min-w-0">
                 <Eyebrow tone="text-emerald-600">In the field</Eyebrow>
                 <h2 className="mt-5 max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
-                  The whole shift, from one handset.
+                  <BlockReveal tone="green">The whole shift, from <Mark tone="green" className="text-white">one handset</Mark>.</BlockReveal>
                 </h2>
               </div>
               <p className="min-w-0 text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
@@ -769,15 +770,15 @@ export function LandingPage(
       {/* ══ ROLES ══════════════════════════════════════════════════════ */}
       {show('who') && (
       <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
         <Ambient tone="brand" scheme="dark" />
         <Constellation />
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
                 <Eyebrow tone="text-indigo-300" dark>Who it is for</Eyebrow>
                 <h2 className="mt-5 max-w-[16ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
-                  Six roles, one version of the truth.
+                  <BlockReveal tone="brand">Six roles, <Mark tone="brand" className="text-white">one version</Mark> of the truth.</BlockReveal>
                 </h2>
               </div>
               <p className="min-w-0 text-base leading-relaxed text-slate-400 lg:text-lg">
@@ -787,7 +788,7 @@ export function LandingPage(
             </div>
           </Reveal>
 
-          <CardDeck className="mt-10 grid gap-5 md:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
+          <CardDeck offset className="mt-10 grid gap-5 md:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
             {ROLES.map((r) => (
               <SiteCard key={r.role} tone="brand" surface="dark" className="h-full">
                 <div className="flex items-center gap-3">
@@ -810,14 +811,14 @@ export function LandingPage(
       {/* ══ PLATFORM ═══════════════════════════════════════════════════ */}
       {show('underneath') && (
       <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <Ambient tone="brand" />
         <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+        <Ambient tone="brand" />
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
                 <Eyebrow tone="text-slate-500">Underneath</Eyebrow>
                 <h2 className="mt-5 max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
-                  Built to hold up in a dispute.
+                  <BlockReveal tone="violet">Built to <Mark tone="violet" className="text-white">hold up</Mark> in a dispute.</BlockReveal>
                 </h2>
               </div>
               <p className="min-w-0 text-base leading-relaxed text-[hsl(var(--muted))] lg:text-lg">
@@ -849,7 +850,7 @@ export function LandingPage(
           <Reveal>
             <Eyebrow tone="text-emerald-600">The outcome</Eyebrow>
             <h2 className="mt-5 max-w-[22ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
-              From a book nobody reads to a record nobody can dispute.
+              <BlockReveal tone="brand">From a book nobody reads to a record <Mark tone="brand" className="text-white">nobody can dispute</Mark>.</BlockReveal>
             </h2>
           </Reveal>
 
@@ -892,12 +893,12 @@ export function LandingPage(
       {/* ══ FAQ ════════════════════════════════════════════════════════ */}
       {show('faq') && (
       <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <Ambient tone="emerald" />
         <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+        <Ambient tone="emerald" />
           <Reveal>
             <Eyebrow tone="text-brand">Questions</Eyebrow>
             <h2 className="mt-5 max-w-[20ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
-              The things operations managers ask first.
+              <BlockReveal tone="brand">The things operations managers <Mark tone="brand" className="text-white">ask first</Mark>.</BlockReveal>
             </h2>
           </Reveal>
 
@@ -916,6 +917,7 @@ export function LandingPage(
       {/* ══ CLOSE ══════════════════════════════════════════════════════ */}
       {show('confidential') && (
       <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-transparent bg-brand-gradient px-5 py-14 text-center text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.45)] sm:px-8 lg:py-20">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_450px_at_50%_-20%,rgba(255,255,255,0.25),transparent_60%)]"
@@ -930,7 +932,6 @@ export function LandingPage(
             animationDuration: '22s',
           }}
         />
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-transparent bg-brand-gradient px-5 py-14 text-center text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.45)] sm:px-8 lg:py-20">
         <div className="mx-auto w-full max-w-[60rem]">
           <h2 className="text-[clamp(1.9rem,4.4vw,3.25rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
             Make every incident answerable.
