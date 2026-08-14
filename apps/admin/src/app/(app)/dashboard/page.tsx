@@ -45,6 +45,16 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   const params = await searchParams;
   const siteParam = typeof params.site === 'string' ? params.site : undefined;
 
+  // Which tenant this page is answering for. A super user's RLS spans every
+  // organisation — that is what makes cross-tenant administration possible and
+  // also what made this dashboard show PMI's occurrences while the header said
+  // Netstream. Every query below is filtered on it explicitly.
+  const orgId = await activeOrgId(profile);
+  // org_id is missing from the generated types on these tables even though the
+  // columns exist — same escape hatch used elsewhere in the app.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb: any = supabase;
+
   const now = new Date();
   const last30 = new Date(now.getTime() - 30 * 864e5);
   const last60 = new Date(now.getTime() - 60 * 864e5);
@@ -62,7 +72,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   // pulling `select('*')` was returning ~25 KB per row × thousands of rows.
   // Visible sites in the chip row mirror the user's scope — admin/super_user
   // see every site in the org; everyone else sees only their assigned sites.
-  let sitesQ = supabase.from('sites').select('id, name').order('name');
+  let sitesQ = sb.from('sites').select('id, name').eq('org_id', orgId).order('name');
   if (!isUnscoped && ownSites.length > 0) sitesQ = sitesQ.in('id', ownSites);
 
   // PostgREST caps EVERY response at `max_rows` (1000 — see supabase/config.toml).
@@ -101,9 +111,10 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
     return scope.op === 'in' ? b.in(scope.col, scope.val as string[]) : b.eq(scope.col, scope.val as string);
   }
 
-  const occurrenceRowsQuery = () => supabase
+  const occurrenceRowsQuery = () => sb
     .from('occurrences')
     .select('id, status, severity, occurrence_type, site_name, site_id, incident_at, sla_due_at, last_sla_update_at, sla_hours, closed_at')
+    .eq('org_id', orgId)
     .gte('incident_at', sixMonthsAgo.toISOString())
     .order('incident_at', { ascending: false });
 
@@ -124,9 +135,10 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   // regardless of how many rows were transferred.
   const countBetween = async (from: Date, to?: Date) => {
     let q = withScope(
-      supabase
+      sb
         .from('occurrences')
         .select('id', { count: 'exact', head: true })
+        .eq('org_id', orgId)
         .gte('incident_at', from.toISOString()),
     );
     if (to) q = q.lt('incident_at', to.toISOString());
@@ -140,11 +152,10 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   // A super user is a platform account, so "which tenant" comes from the
   // header picker rather than from whichever org their profile happens to
   // carry. Everyone else resolves to their own.
-  const aiOrgId = await activeOrgId(profile);
-  const { data: aiOrg } = await (supabase as any)
+  const { data: aiOrg } = await sb
     .from('organizations')
     .select('ai_insights_enabled')
-    .eq('id', aiOrgId)
+    .eq('id', orgId)
     .maybeSingle();
   const aiEnabled = aiOrg?.ai_insights_enabled !== false;
 
@@ -154,7 +165,10 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
     countBetween(last30),          // "Total Occurrences" hero — last 30 days
     countBetween(last60, last30),  // previous window, for the trend delta
   ]);
-  const activeSite = siteParam ? (allSites ?? []).find((s) => s.id === siteParam) : null;
+  // The sites query is cast to any above, so name its shape once here rather
+  // than letting  leak into the JSX below.
+  const siteList = (allSites ?? []) as Array<{ id: string; name: string }>;
+  const activeSite = siteParam ? siteList.find((s) => s.id === siteParam) : null;
 
   // Every KPI links into the All Occurrences list, pre-filtered to match what
   // the number represents. The current site scope (if any) is carried through
@@ -309,7 +323,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           days={30}
           role={String(profile.role)}
           enabled={aiEnabled}
-          orgId={aiOrgId ?? ''}
+          orgId={orgId ?? ''}
         />
       </div>
 
@@ -334,7 +348,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           >
             All sites
           </a>
-          {(allSites ?? []).map((s) => (
+          {siteList.map((s) => (
             <a
               key={s.id}
               href={`/dashboard?site=${s.id}`}

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
+import { activeOrgId } from '@/lib/active-org';
 import { siteScope } from '@/lib/site-scope';
 import { PageHeader } from '@/components/page-header';
 import { OccurrencesExplorer } from '@/components/occurrences/occurrences-explorer';
@@ -16,6 +17,9 @@ interface PageProps {
 
 export default async function AllOccurrencesPage({ searchParams }: PageProps) {
   const profile = await requireProfile();
+  // Scoped to the tenant the header selects. A super user's RLS spans every
+  // organisation, so without this the page answers for the wrong one.
+  const orgId = await activeOrgId(profile);
   const params = await searchParams;
 
   const filter = parseOccurrencesFilter(params);
@@ -34,9 +38,11 @@ export default async function AllOccurrencesPage({ searchParams }: PageProps) {
   // ---------- build the query ----------
   const fetchAllOccurrences = async () => {
     const base = () => {
-      let b = supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let b = (supabase as any)
         .from('occurrences')
         .select('*', { count: 'exact' })
+        .eq('org_id', orgId)
         .order(sort, { ascending: dir === 'asc' });
 
       if (filter.q) {
@@ -110,17 +116,17 @@ export default async function AllOccurrencesPage({ searchParams }: PageProps) {
     views,
   ] = await Promise.all([
     fetchAllOccurrences(),
-    supabase.from('sites').select('id, name').order('name'),
+    (supabase as any).from('sites').select('id, name').eq('org_id', orgId).order('name'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
-      .from('profiles').select('id, full_name, email, role')
+      .from('profiles').select('id, full_name, email, role').eq('org_id', orgId)
       .in('role', ['admin', 'manager', 'control_room', 'supervisor'])
       .order('full_name'),
     // PostgREST has no DISTINCT — sample a window and unique client-side.
     // Scoped the same way as the main list: an unfiltered sample forces a
     // full-table RLS scan for non-admins, which times out.
     (() => {
-      let tq = supabase.from('occurrences').select('occurrence_type').limit(2000);
+      let tq = (supabase as any).from('occurrences').select('occurrence_type').eq('org_id', orgId).limit(2000);
       if (!isUnscoped) {
         tq = ownSites.length > 0 ? tq.in('site_id', ownSites) : tq.eq('logged_by', profile.id);
       }
