@@ -49,6 +49,7 @@ export const NAV: NavSection[] = [
       { label: 'Key Register', href: '/keys', icon: 'KeyRound', capability: 'keys.manage' },
       { label: 'Shifts', href: '/shifts', icon: 'Clock', roles: REVIEWERS, capability: 'shifts.view_all' },
       { label: 'Patrol Schedules', href: '/patrols/schedules', icon: 'CalendarClock', roles: REVIEWERS, capability: 'patrols.schedule_manage' },
+      { label: 'Site Inspections', href: '/inspections', icon: 'ClipboardCheck' },
       { label: 'Guard Map', href: '/guards-map', icon: 'Map', roles: REVIEWERS, capability: 'guards.map_view' },
     ],
   },
