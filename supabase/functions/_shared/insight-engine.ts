@@ -42,8 +42,18 @@ export interface EngineFacts {
     by_site: Record<string, number>;
     by_severity: Record<string, number>;
     by_status: Record<string, number>;
+    // Ordered in SQL. Reading Object.entries(by_type)[0] is WRONG: jsonb sorts
+    // its keys by length, not by count, so it returns the shortest name.
+    top_type: { name: string; count: number } | null;
+    top_site: { name: string; count: number } | null;
   };
-  routine: { total: number; by_type: Record<string, number>; by_site: Record<string, number> };
+  routine: {
+    total: number;
+    by_type: Record<string, number>;
+    by_site: Record<string, number>;
+    top_type: { name: string; count: number } | null;
+    sites: number;
+  };
   routine_anomalies: number;
   unknown_types: string[];
   incident_trend: Array<{ week: string; incidents: number }>;

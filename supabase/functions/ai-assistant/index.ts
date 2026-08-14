@@ -118,12 +118,11 @@ function buildKpisFromFacts(facts: EngineFacts) {
   const inc = facts.incident;
   const total = inc.total;
   const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
-  const top = (obj: Record<string, number>) => {
-    const e = Object.entries(obj ?? {});
-    return e.length ? e[0] : null;
-  };
-  const topSite = top(inc.by_site);
-  const topType = top(inc.by_type);
+  // Ordered in SQL. Reading Object.entries(by_site)[0] returned the shortest
+  // key rather than the largest count, which is how a site with six incidents
+  // lost the "busiest" tile to an unnamed one with a single record.
+  const topSite = inc.top_site;
+  const topType = inc.top_type;
 
   return [
     {
@@ -149,14 +148,14 @@ function buildKpisFromFacts(facts: EngineFacts) {
       note: 'Across every incident closed in the window',
     },
     {
-      label: 'Busiest site', value: topSite ? String(topSite[1]) : '—',
-      unit: topSite ? `${pct(Number(topSite[1]))}% at ${topSite[0]}` : 'no data',
-      tone: topSite && pct(Number(topSite[1])) > 60 ? 'warn' : 'neutral',
+      label: 'Busiest site', value: topSite ? String(topSite.count) : '—',
+      unit: topSite ? `${pct(topSite.count)}% at ${topSite.name}` : 'no data',
+      tone: topSite && pct(topSite.count) > 60 ? 'warn' : 'neutral',
       note: 'Where incidents concentrate',
     },
     {
-      label: 'Most common type', value: topType ? String(topType[1]) : '—',
-      unit: topType ? String(topType[0]) : 'no data',
+      label: 'Most common type', value: topType ? String(topType.count) : '—',
+      unit: topType ? topType.name : 'no data',
       tone: 'neutral', note: 'Largest incident category',
     },
     {
@@ -171,16 +170,16 @@ function buildKpisFromFacts(facts: EngineFacts) {
 /** Routine activity is coverage evidence, not risk — reported separately. */
 function routineKpisFromFacts(facts: EngineFacts) {
   if (facts.routine.total === 0) return [];
-  const topRoutine = Object.entries(facts.routine.by_type)[0];
+  const topRoutine = facts.routine.top_type;
   const share = Math.round((facts.routine.total / Math.max(1, facts.total)) * 100);
   const tiles = [
     { label: 'Routine logs', value: String(facts.routine.total),
       unit: `${share}% of all activity`, tone: 'neutral',
       note: 'Gate, warehouse and access operations — the job being done' },
-    { label: 'Most logged', value: topRoutine ? String(topRoutine[1]) : '—',
-      unit: topRoutine ? String(topRoutine[0]) : 'none', tone: 'neutral',
+    { label: 'Most logged', value: topRoutine ? String(topRoutine.count) : '—',
+      unit: topRoutine ? topRoutine.name : 'none', tone: 'neutral',
       note: 'Highest-volume routine task' },
-    { label: 'Sites covered', value: String(Object.keys(facts.routine.by_site).length),
+    { label: 'Sites covered', value: String(facts.routine.sites ?? 0),
       unit: 'logging routine activity', tone: 'neutral',
       note: 'A site missing here may not be logging' },
   ];
@@ -837,7 +836,7 @@ async function runWeeklyDigest(admin: Sb, body: Record<string, unknown>) {
       // The figures come from the engine's facts, not from the model and not
       // from a re-derived split, so the email and the dashboard agree.
       const inc = orgFacts.incident;
-      const topSite = Object.entries(inc.by_site)[0];
+      const topSite = inc.top_site;
 
       const kpis = [
         { label: 'Incidents', value: String(inc.total), unit: 'in the last 7 days' },
@@ -845,8 +844,8 @@ async function runWeeklyDigest(admin: Sb, body: Record<string, unknown>) {
         { label: 'SLA breached', value: String(inc.sla_breached), unit: 'past due, not closed' },
         {
           label: 'Busiest site',
-          value: topSite ? String(topSite[1]) : '—',
-          unit: topSite ? String(topSite[0]) : 'no data',
+          value: topSite ? String(topSite.count) : '—',
+          unit: topSite ? topSite.name : 'no data',
         },
       ];
       const headline = String(parsed.headline ?? 'Your week ahead').trim();
