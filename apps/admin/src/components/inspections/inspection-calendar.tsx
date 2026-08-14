@@ -94,7 +94,7 @@ export function InspectionCalendar({
   const today = new Date().toDateString();
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1.6fr_1fr]">
+    <div className="grid gap-5 xl:grid-cols-[1.6fr_1fr] [&>*]:min-w-0">
       <Card>
         <CardContent className="py-5">
           <div className="mb-4 flex items-center justify-between">

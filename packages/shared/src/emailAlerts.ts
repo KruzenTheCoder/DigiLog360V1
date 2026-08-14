@@ -296,17 +296,29 @@ function renderShell(opts: {
       <table role="presentation" width="600" cellpadding="0" cellspacing="0"
              style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,.08);">
 
-        <!-- Brand header -->
+        <!-- Brand header.
+             The wordmark sits on WHITE, as it does on the sign-in screen, so
+             the two brand colours actually read — metallic blue "DigiLog" and
+             silver "360". The app renders those as clipped gradients, which no
+             mail client supports, so these are the midpoints of each gradient:
+             close enough to be the same mark, and legible everywhere.
+             The gradient survives as the rule beneath, and the coloured event
+             band directly below still carries the tone of the message. -->
         <tr>
-          <td bgcolor="${opts.accent}" style="background-image:linear-gradient(135deg,${opts.accent} 0%,${BRAND_GRADIENT_TO} 100%);padding:22px 32px;">
+          <td bgcolor="#ffffff" style="background:#ffffff;padding:20px 32px 16px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-              <td style="font-family:'Segoe UI',Arial,sans-serif;font-size:17px;font-weight:800;color:#ffffff;letter-spacing:.14em;">
-                DIGILOG360
+              <td style="font-family:'Segoe UI',Arial,sans-serif;font-size:22px;font-weight:800;letter-spacing:-.02em;white-space:nowrap;">
+                <span style="color:#2f6fb0;">DigiLog</span><span style="color:#94a3b8;">360</span>
               </td>
-              <td align="right" style="font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);">
+              <td align="right" style="font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:600;color:#64748b;">
                 ${escapeHtml(opts.orgName)}
               </td>
             </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="height:4px;line-height:4px;font-size:0;" bgcolor="${opts.accent}">
+            <div style="height:4px;background-image:linear-gradient(90deg,${opts.accent} 0%,${BRAND_GRADIENT_TO} 100%);">&nbsp;</div>
           </td>
         </tr>
 
@@ -344,7 +356,10 @@ function renderShell(opts: {
               <tr><td style="padding-top:18px;font-size:12px;line-height:1.7;color:#94a3b8;">
                 ${opts.footerNote ? `<p style="margin:0 0 8px;color:#64748b;">${escapeHtml(opts.footerNote)}</p>` : ''}
                 <p style="margin:0;">${opts.footerReason}</p>
-                <p style="margin:10px 0 0;">Digilog360 &middot; Security Operations Platform &middot; &copy; ${new Date().getFullYear()} Netstream Intergrated Solutions</p>
+                <p style="margin:10px 0 0;">
+                  <span style="font-weight:800;color:#2f6fb0;">DigiLog</span><span style="font-weight:800;color:#94a3b8;">360</span>
+                  &middot; Security Operations Platform &middot; &copy; ${new Date().getFullYear()} Netstream Intergrated Solutions
+                </p>
               </td></tr>
             </table>
           </td>

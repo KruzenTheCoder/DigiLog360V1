@@ -261,18 +261,18 @@ export function OccurrencesExplorer(props: ExplorerProps) {
               : `Showing ${from1.toLocaleString()}–${to1.toLocaleString()} of ${total.toLocaleString()}`
           )}
         </p>
-        <div className="flex items-center gap-2">
-          <Label className="text-xs">Sort</Label>
+        <div className="flex min-w-0 items-center gap-2">
+          <Label className="shrink-0 text-xs">Sort</Label>
           <Select
-            className="w-auto"
+            className="w-auto min-w-0 max-w-[12rem]"
             value={`${sort}:${dir}`}
             onChange={(e) => {
               const [s, d] = e.target.value.split(':');
               navigate({ sort: s, dir: d });
             }}
           >
-            <option value="incident_at:desc">Incident · newest</option>
-            <option value="incident_at:asc">Incident · oldest</option>
+            <option value="incident_at:desc">Occurrence · newest</option>
+            <option value="incident_at:asc">Occurrence · oldest</option>
             <option value="created_at:desc">Logged · newest</option>
             <option value="created_at:asc">Logged · oldest</option>
             <option value="ob_number:desc">OB # · highest</option>

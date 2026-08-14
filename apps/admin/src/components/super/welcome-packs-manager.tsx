@@ -249,7 +249,10 @@ export function WelcomePacksManager({
         </div>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
+      {/* [&>*]:min-w-0 — grid tracks default to min-width:auto, so the user
+          table would size its column to its own content and push the whole
+          page sideways on a phone. */}
+      <div className="grid gap-5 xl:grid-cols-[1.35fr_1fr] [&>*]:min-w-0">
         {/* ── Left: who + how ─────────────────────────────────────────── */}
         <div className="space-y-5">
           <GradientSection title="Send a preview first" icon="SendHorizonal" tone="sky">

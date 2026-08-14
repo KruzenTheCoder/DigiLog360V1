@@ -25,9 +25,9 @@ export default async function NewReportPage({
   if (!occ) notFound();
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <>
       <PageHeader title="Occurrence Report" description={`Detailed report for ${occ.ob_number}`} />
       <ReportForm occurrence={occ as Occurrence} profile={profile} existingReport={report as OccurrenceReport | null} />
-    </div>
+    </>
   );
 }

@@ -54,7 +54,7 @@ export default function GuardMapInner({ initial }: { initial: Position[] }) {
     : [-26.1, 28.05];
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+    <div className="grid gap-4 lg:grid-cols-[1fr_320px] [&>*]:min-w-0">
       <Card className="overflow-hidden p-0" style={{ height: 520 }}>
         <MapContainer
           center={centre}
