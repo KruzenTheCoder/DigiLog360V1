@@ -12,6 +12,7 @@ import { BRAND, SLA_CONFIG, SEVERITY_LABELS, SEVERITY_COLORS, SEVERITIES } from 
 import { HeroBoard } from './hero-board';
 import { LiveBoard } from './live-board';
 import { Reveal } from './reveal';
+import { SiteCard, CardDeck } from './site-card';
 import { Ambient } from './ambient';
 import { Constellation } from './constellation';
 
@@ -186,7 +187,8 @@ export function LandingPage(
 
       {/* ══ HERO ═══════════════════════════════════════════════════════ */}
       {show('hero') && (
-      <section className="relative isolate w-full overflow-hidden bg-brand-gradient text-white">
+      <section className="w-full px-4 pb-3 pt-3 sm:px-6 lg:px-8">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl bg-brand-gradient text-white shadow-[0_30px_70px_-32px_rgba(2,6,23,0.5)]">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(1200px_600px_at_78%_-15%,rgba(255,255,255,0.30),transparent_60%),radial-gradient(900px_500px_at_5%_110%,rgba(2,6,23,0.45),transparent_60%)]"
@@ -308,17 +310,18 @@ export function LandingPage(
             ))}
           </dl>
         </div>
+        </div>
       </section>
       )}
 
       {/* ══ PROBLEM ════════════════════════════════════════════════════ */}
       {show('problem') && (
-      <section
-        id="problem"
-        className="relative isolate w-full scroll-mt-2 overflow-hidden bg-slate-950 py-16 text-white lg:py-24"
-      >
+      <section id="problem" className="w-full scroll-mt-24 px-4 py-3 sm:px-6 lg:px-8">
+
+
+
         <Ambient tone="red" scheme="dark" />
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -357,22 +360,20 @@ export function LandingPage(
             </div>
           </Reveal>
 
-          <div className="mt-8 grid gap-px overflow-hidden rounded-2xl bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
-            {PROBLEMS.map((p, i) => (
-              <Reveal key={p.k} delay={i * 80}>
-                <div className="h-full bg-slate-950 p-6 lg:p-7">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/10 text-red-400">
-                      <p.icon className="h-[18px] w-[18px]" />
-                    </span>
-                    <span className="font-mono text-xs font-bold tracking-widest text-red-400/70">{p.k}</span>
-                  </div>
-                  <h3 className="mb-2 mt-4 text-lg font-bold tracking-tight">{p.title}</h3>
-                  <p className="text-sm leading-relaxed text-slate-400">{p.body}</p>
+          <CardDeck className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {PROBLEMS.map((p) => (
+              <SiteCard key={p.k} tone="red" surface="dark" className="h-full">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/10 text-red-400">
+                    <p.icon className="h-[18px] w-[18px]" />
+                  </span>
+                  <span className="font-mono text-xs font-bold tracking-widest text-red-400/70">{p.k}</span>
                 </div>
-              </Reveal>
+                <h3 className="mb-2 mt-4 text-lg font-bold tracking-tight">{p.title}</h3>
+                <p className="text-sm leading-relaxed text-slate-400">{p.body}</p>
+              </SiteCard>
             ))}
-          </div>
+          </CardDeck>
 
           <Reveal>
             <p className="mt-10 max-w-[74ch] border-l-2 border-red-500 pl-5 text-base leading-relaxed text-slate-300 lg:text-lg">
@@ -387,9 +388,9 @@ export function LandingPage(
 
       {/* ══ SOLUTION ═══════════════════════════════════════════════════ */}
       {show('solution') && (
-      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
+      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
         <Ambient tone="brand" />
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -405,30 +406,28 @@ export function LandingPage(
             </div>
           </Reveal>
 
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
-            {PILLARS.map((p, i) => (
-              <Reveal key={p.n} delay={i * 60}>
-                <div className="group h-full rounded-2xl border bg-[hsl(var(--surface))] p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-brand/30 hover:shadow-xl">
-                  <div className="flex items-center justify-between">
-                    <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${p.tint}`}>
-                      <p.icon className="h-5 w-5" />
-                    </span>
-                    <span className="font-mono text-xs font-bold tracking-widest text-[hsl(var(--muted))]">{p.n}</span>
-                  </div>
-                  <h3 className="mb-2 mt-5 text-lg font-bold tracking-tight">{p.title}</h3>
-                  <p className="text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]">{p.body}</p>
+          <CardDeck className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
+            {PILLARS.map((p) => (
+              <SiteCard key={p.n} tone="brand" className="h-full">
+                <div className="flex items-center justify-between">
+                  <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${p.tint}`}>
+                    <p.icon className="h-5 w-5" />
+                  </span>
+                  <span className="font-mono text-xs font-bold tracking-widest text-[hsl(var(--muted))]">{p.n}</span>
                 </div>
-              </Reveal>
+                <h3 className="mb-2 mt-5 text-lg font-bold tracking-tight">{p.title}</h3>
+                <p className="text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]">{p.body}</p>
+              </SiteCard>
             ))}
-          </div>
+          </CardDeck>
         </div>
       </section>
       )}
 
       {/* ══ MODULES ════════════════════════════════════════════════════ */}
       {show('what') && (
-      <section className="w-full border-y bg-[hsl(var(--surface))] py-16 lg:py-24">
-        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <Eyebrow tone="text-violet-600">What you get</Eyebrow>
             <h2 className="mt-5 max-w-[24ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
@@ -440,29 +439,27 @@ export function LandingPage(
             </p>
           </Reveal>
 
-          <div className="mt-10 grid gap-px overflow-hidden rounded-2xl border bg-[hsl(var(--border))] sm:grid-cols-2 lg:mt-14 lg:grid-cols-4">
-            {MODULES.map((m, i) => (
-              <Reveal key={m.name} delay={i * 45}>
-                <div className="group h-full bg-[hsl(var(--surface))] p-6 transition-colors duration-300 hover:bg-[hsl(var(--background))]">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                    <m.icon className="h-5 w-5" />
-                  </span>
-                  <h3 className="mt-4 text-base font-bold tracking-tight">{m.name}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-[hsl(var(--muted))]">{m.body}</p>
-                  <p className="mt-3 font-mono text-[0.68rem] uppercase tracking-wider text-[hsl(var(--muted))]/70">
-                    {m.meta}
-                  </p>
-                </div>
-              </Reveal>
+          <CardDeck className="mt-10 grid gap-4 sm:grid-cols-2 lg:mt-14 lg:grid-cols-4" step={50}>
+            {MODULES.map((m) => (
+              <SiteCard key={m.name} tone="violet" className="h-full">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                  <m.icon className="h-5 w-5" />
+                </span>
+                <h3 className="mt-4 text-base font-bold tracking-tight">{m.name}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-[hsl(var(--muted))]">{m.body}</p>
+                <p className="mt-3 font-mono text-[0.68rem] uppercase tracking-wider text-[hsl(var(--muted))]/70">
+                  {m.meta}
+                </p>
+              </SiteCard>
             ))}
-          </div>
+          </CardDeck>
         </div>
       </section>
       )}
 
       {/* ══ STORY ══════════════════════════════════════════════════════ */}
       {show('story') && (
-      <section className="relative isolate w-full overflow-hidden bg-slate-950 py-16 text-white lg:py-24">
+      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
         <Ambient tone="amber" scheme="dark" />
         {/* A slow sweep centred on the timeline — the watch being kept, and
             something in the wide gutters either side of the frames. */}
@@ -475,7 +472,7 @@ export function LandingPage(
             animationDuration: '48s',
           }}
         />
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -563,9 +560,9 @@ export function LandingPage(
 
       {/* ══ RESPONSE TARGETS ═══════════════════════════════════════════ */}
       {show('targets') && (
-      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
+      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
         <Ambient tone="sky" />
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
           <div className="grid gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16">
             {/* min-w-0 on both tracks: grid items default to min-width:auto and
                 refuse to shrink below their content, so the table's min-w-[30rem]
@@ -647,12 +644,12 @@ export function LandingPage(
 
       {/* ══ CONSOLE SHOWCASE ═══════════════════════════════════════════ */}
       {show('console') && (
-      <section id="console" className="relative w-full scroll-mt-2 overflow-hidden bg-slate-900 py-16 text-white lg:py-24">
+      <section id="console" className="w-full scroll-mt-24 px-4 py-3 sm:px-6 lg:px-8">
         <div
           aria-hidden
           className="animate-breathe pointer-events-none absolute inset-0 bg-[radial-gradient(1000px_500px_at_50%_0%,rgba(102,126,234,0.25),transparent_65%)] motion-reduce:animate-none"
         />
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-900 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <div className="mx-auto max-w-[48rem] text-center">
               <p className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-indigo-300">The console</p>
@@ -699,9 +696,9 @@ export function LandingPage(
 
       {/* ══ CAPABILITIES ═══════════════════════════════════════════════ */}
       {show('realtime') && (
-      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
+      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
         <Ambient tone="sky" />
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -717,28 +714,26 @@ export function LandingPage(
             </div>
           </Reveal>
 
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
-            {CAPABILITIES.map((c, i) => (
-              <Reveal key={c.tag} delay={i * 60}>
-                <div className="h-full rounded-2xl border bg-[hsl(var(--surface))] p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                  <div className="flex items-center gap-2.5">
-                    <c.icon className={`h-[18px] w-[18px] ${c.accent}`} />
-                    <p className={`text-[0.68rem] font-bold uppercase tracking-[0.16em] ${c.accent}`}>{c.tag}</p>
-                  </div>
-                  <h3 className="mb-2 mt-4 text-lg font-bold leading-snug tracking-tight">{c.title}</h3>
-                  <p className="text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]">{c.body}</p>
+          <CardDeck className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
+            {CAPABILITIES.map((c) => (
+              <SiteCard key={c.tag} tone="green" className="h-full">
+                <div className="flex items-center gap-2.5">
+                  <c.icon className={`h-[18px] w-[18px] ${c.accent}`} />
+                  <p className={`text-[0.68rem] font-bold uppercase tracking-[0.16em] ${c.accent}`}>{c.tag}</p>
                 </div>
-              </Reveal>
+                <h3 className="mb-2 mt-4 text-lg font-bold leading-snug tracking-tight">{c.title}</h3>
+                <p className="text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]">{c.body}</p>
+              </SiteCard>
             ))}
-          </div>
+          </CardDeck>
         </div>
       </section>
       )}
 
       {/* ══ THE FIELD APP ══════════════════════════════════════════════ */}
       {show('field') && (
-      <section className="w-full border-y bg-[hsl(var(--surface))] py-16 lg:py-24">
-        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -754,31 +749,29 @@ export function LandingPage(
             </div>
           </Reveal>
 
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
-            {FIELD_APP.map((f, i) => (
-              <Reveal key={f.title} delay={i * 55}>
-                <div className="flex h-full gap-4 rounded-2xl border bg-[hsl(var(--background))] p-5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
-                    <f.icon className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <h3 className="text-base font-bold tracking-tight">{f.title}</h3>
-                    <p className="mt-1.5 text-sm leading-relaxed text-[hsl(var(--muted))]">{f.body}</p>
-                  </div>
+          <CardDeck className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
+            {FIELD_APP.map((f) => (
+              <SiteCard key={f.title} tone="green" className="flex h-full gap-4 !p-5">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                  <f.icon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold tracking-tight">{f.title}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-[hsl(var(--muted))]">{f.body}</p>
                 </div>
-              </Reveal>
+              </SiteCard>
             ))}
-          </div>
+          </CardDeck>
         </div>
       </section>
       )}
 
       {/* ══ ROLES ══════════════════════════════════════════════════════ */}
       {show('who') && (
-      <section className="relative isolate w-full overflow-hidden bg-slate-950 py-16 text-white lg:py-24">
+      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
         <Ambient tone="brand" scheme="dark" />
         <Constellation />
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -794,33 +787,31 @@ export function LandingPage(
             </div>
           </Reveal>
 
-          <div className="mt-10 grid gap-5 md:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
-            {ROLES.map((r, i) => (
-              <Reveal key={r.role} delay={i * 50}>
-                <div className="h-full rounded-2xl border border-white/10 bg-white/[0.04] p-6 transition duration-300 hover:border-white/20 hover:bg-white/[0.07]">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
-                      <r.icon className={`h-5 w-5 ${r.accent.split(' ')[0]}`} />
-                    </span>
-                    <span className={`inline-block rounded-full border px-3 py-0.5 text-[0.7rem] font-bold uppercase tracking-[0.1em] ${r.accent}`}>
-                      {r.role}
-                    </span>
-                  </div>
-                  <p className="mt-4 text-base font-bold leading-snug">{r.lead}</p>
-                  <p className="mt-1.5 text-[0.95rem] leading-relaxed text-slate-400">{r.body}</p>
+          <CardDeck className="mt-10 grid gap-5 md:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
+            {ROLES.map((r) => (
+              <SiteCard key={r.role} tone="brand" surface="dark" className="h-full">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
+                    <r.icon className={`h-5 w-5 ${r.accent.split(' ')[0]}`} />
+                  </span>
+                  <span className={`inline-block rounded-full border px-3 py-0.5 text-[0.7rem] font-bold uppercase tracking-[0.1em] ${r.accent}`}>
+                    {r.role}
+                  </span>
                 </div>
-              </Reveal>
+                <p className="mt-4 text-base font-bold leading-snug">{r.lead}</p>
+                <p className="mt-1.5 text-[0.95rem] leading-relaxed text-slate-400">{r.body}</p>
+              </SiteCard>
             ))}
-          </div>
+          </CardDeck>
         </div>
       </section>
       )}
 
       {/* ══ PLATFORM ═══════════════════════════════════════════════════ */}
       {show('underneath') && (
-      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
+      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
         <Ambient tone="brand" />
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -836,27 +827,25 @@ export function LandingPage(
             </div>
           </Reveal>
 
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
-            {PLATFORM.map((p, i) => (
-              <Reveal key={p.title} delay={i * 55}>
-                <div className="h-full rounded-2xl border bg-[hsl(var(--surface))] p-6 shadow-sm">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500">
-                    <p.icon className="h-5 w-5" />
-                  </span>
-                  <h3 className="mt-4 text-lg font-bold tracking-tight">{p.title}</h3>
-                  <p className="mt-2 text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]">{p.body}</p>
-                </div>
-              </Reveal>
+          <CardDeck className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3 lg:gap-6">
+            {PLATFORM.map((p) => (
+              <SiteCard key={p.title} tone="default" className="h-full">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500">
+                  <p.icon className="h-5 w-5" />
+                </span>
+                <h3 className="mt-4 text-lg font-bold tracking-tight">{p.title}</h3>
+                <p className="mt-2 text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]">{p.body}</p>
+              </SiteCard>
             ))}
-          </div>
+          </CardDeck>
         </div>
       </section>
       )}
 
       {/* ══ OUTCOME ════════════════════════════════════════════════════ */}
       {show('outcome') && (
-      <section className="w-full border-t bg-[hsl(var(--surface))] py-16 lg:py-24">
-        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <Eyebrow tone="text-emerald-600">The outcome</Eyebrow>
             <h2 className="mt-5 max-w-[22ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
@@ -902,9 +891,9 @@ export function LandingPage(
 
       {/* ══ FAQ ════════════════════════════════════════════════════════ */}
       {show('faq') && (
-      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-16 lg:py-24">
+      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
         <Ambient tone="emerald" />
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
           <Reveal>
             <Eyebrow tone="text-brand">Questions</Eyebrow>
             <h2 className="mt-5 max-w-[20ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
@@ -912,23 +901,21 @@ export function LandingPage(
             </h2>
           </Reveal>
 
-          <div className="mt-10 grid gap-5 lg:mt-14 lg:grid-cols-2 lg:gap-x-10 lg:gap-y-6">
-            {FAQ.map((f, i) => (
-              <Reveal key={f.q} delay={i * 45}>
-                <div className="h-full rounded-2xl border bg-[hsl(var(--surface))] p-6 shadow-sm">
-                  <h3 className="text-base font-bold tracking-tight">{f.q}</h3>
-                  <p className="mt-2.5 text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]">{f.a}</p>
-                </div>
-              </Reveal>
+          <CardDeck className="mt-10 grid gap-5 lg:mt-14 lg:grid-cols-2 lg:gap-x-6 lg:gap-y-5" step={45}>
+            {FAQ.map((f) => (
+              <SiteCard key={f.q} tone="brand" className="h-full">
+                <h3 className="text-base font-bold tracking-tight">{f.q}</h3>
+                <p className="mt-2.5 text-[0.95rem] leading-relaxed text-[hsl(var(--muted))]">{f.a}</p>
+              </SiteCard>
             ))}
-          </div>
+          </CardDeck>
         </div>
       </section>
       )}
 
       {/* ══ CLOSE ══════════════════════════════════════════════════════ */}
       {show('confidential') && (
-      <section className="relative w-full overflow-hidden bg-brand-gradient py-16 text-white lg:py-24">
+      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_450px_at_50%_-20%,rgba(255,255,255,0.25),transparent_60%)]"
@@ -943,7 +930,8 @@ export function LandingPage(
             animationDuration: '22s',
           }}
         />
-        <div className="relative mx-auto w-full max-w-[60rem] px-5 text-center sm:px-8">
+        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-transparent bg-brand-gradient px-5 py-14 text-center text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.45)] sm:px-8 lg:py-20">
+        <div className="mx-auto w-full max-w-[60rem]">
           <h2 className="text-[clamp(1.9rem,4.4vw,3.25rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
             Make every incident answerable.
           </h2>
@@ -956,6 +944,7 @@ export function LandingPage(
               Sign in to the console <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
+        </div>
         </div>
       </section>
       )}

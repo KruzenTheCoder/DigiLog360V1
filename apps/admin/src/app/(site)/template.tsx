@@ -7,11 +7,14 @@ import type { ReactNode } from 'react';
  * what a page transition needs — the animation replays each time instead of
  * running once and never again.
  *
- * The slide is short and travels left-to-right, so the eye follows the
- * content in rather than being asked to re-read a page that simply appeared.
- * Anyone who has asked for reduced motion gets the fade only; the keyframe
- * itself is neutralised in globals.css.
+ * The page now arrives as a card rather than as a slab: it rises slightly,
+ * un-tilts and settles, which reads as the deck dealing the next page out.
+ * The cards further down the page have their own scroll-triggered entrances,
+ * so this only has to handle what is already on screen.
+ *
+ * Anyone who has asked for reduced motion gets the content with none of the
+ * travel; the keyframe is neutralised in globals.css.
  */
 export default function SiteTemplate({ children }: { children: ReactNode }) {
-  return <div className="animate-page-in">{children}</div>;
+  return <div className="animate-deck-in">{children}</div>;
 }
