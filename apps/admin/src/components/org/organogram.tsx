@@ -40,11 +40,13 @@ const COL_GAP = 30;
 const ROW_GAP = 110;
 
 export function Organogram({
-  people: initial, positions: savedPositions, canEdit,
+  people: initial, positions: savedPositions, canEdit, orgId,
 }: {
   people: Person[];
   positions: Array<{ profile_id: string; x: number; y: number }>;
   canEdit: boolean;
+  /** Tenant these people belong to — saved positions are scoped to it. */
+  orgId: string;
 }) {
   const [people, setPeople] = useState<Person[]>(initial);
   const [pos, setPos] = useState<Record<string, Pos>>({});
@@ -149,9 +151,8 @@ export function Organogram({
     const supabase = createClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb: any = supabase;
-    const orgId = (initial as unknown as Array<{ org_id?: string }>)[0]?.org_id;
     await sb.from('org_chart_positions').upsert(
-      { profile_id: id, x: Math.round(p.x), y: Math.round(p.y), ...(orgId ? { org_id: orgId } : {}), updated_at: new Date().toISOString() },
+      { profile_id: id, x: Math.round(p.x), y: Math.round(p.y), org_id: orgId, updated_at: new Date().toISOString() },
       { onConflict: 'profile_id' },
     );
   }
@@ -281,11 +282,10 @@ export function Organogram({
     const supabase = createClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb: any = supabase;
-    const orgId = (initial as unknown as Array<{ org_id?: string }>)[0]?.org_id;
     await sb.from('org_chart_positions').upsert(
       people.map((p) => ({
         profile_id: p.id, x: Math.round(computed[p.id]?.x ?? 40), y: Math.round(computed[p.id]?.y ?? 40),
-        ...(orgId ? { org_id: orgId } : {}), updated_at: new Date().toISOString(),
+        org_id: orgId, updated_at: new Date().toISOString(),
       })),
       { onConflict: 'profile_id' },
     );

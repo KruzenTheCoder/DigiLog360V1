@@ -9,6 +9,7 @@ import { cn, initials } from '@/lib/utils';
 import { visibleSections } from './nav-config';
 import { Logo } from '@/components/brand/logo';
 import { NetstreamLogo } from '@/components/brand/netstream-logo';
+import { TenantSwitcher } from './tenant-switcher';
 import { TaskAssignmentToast } from '@/components/tasks/task-assignment-toast';
 import { invalidateCache } from '@/lib/use-cached-query';
 import { BRAND, ROLE_LABELS, type Profile } from '@digilog/shared';
@@ -16,6 +17,7 @@ import { BRAND, ROLE_LABELS, type Profile } from '@digilog/shared';
 export function AppShell({
   profile, siteName, children, capabilities = [],
   showNetstreamLogo = true, netstreamLogoUrl = null, siteCount = 0,
+  tenants = [], activeOrg = null,
 }: {
   profile: Profile;
   siteName: string | null;
@@ -28,6 +30,9 @@ export function AppShell({
   netstreamLogoUrl?: string | null;
   /** Number of sites assigned (0 = unscoped / all sites). */
   siteCount?: number;
+  /** Organisations a super user may switch between. Empty for everyone else. */
+  tenants?: Array<{ id: string; name: string }>;
+  activeOrg?: string | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -228,6 +233,9 @@ export function AppShell({
               <span className="rounded-full bg-white/25 px-1.5 text-[10px] font-bold">{siteCount}</span>
             )}
           </div>
+          {/* Super users only — everyone else is pinned to their org by RLS. */}
+          <TenantSwitcher orgs={tenants} activeId={activeOrg} />
+
           <div className="ml-auto flex items-center gap-2">
             <Link
               href="/notifications"

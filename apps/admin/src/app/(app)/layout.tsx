@@ -2,6 +2,7 @@ import { requireProfile, loadMyCapabilities } from '@/lib/auth';
 import { siteScope } from '@/lib/site-scope';
 import { createClient } from '@/lib/supabase/server';
 import { AppShell } from '@/components/layout/app-shell';
+import { activeOrgId } from '@/lib/active-org';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // requireProfile must resolve first because we need site_id; but capabilities
@@ -35,6 +36,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ? 'Multi-site'
       : siteList[0]?.name ?? 'All sites';
 
+  // Tenant picker — super users only. Everyone else is pinned to their own
+  // organisation by RLS, so the switcher would be a control with one option.
+  const isSuper = profile.role === 'super_user';
+  const tenants = isSuper
+    ? (((await sb.from('organizations').select('id, name').order('name')).data) ?? []) as Array<{ id: string; name: string }>
+    : [];
+  const activeOrg = isSuper ? await activeOrgId(profile) : null;
+
   return (
     <AppShell
       profile={profile}
@@ -43,6 +52,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       capabilities={Array.from(capsSet)}
       showNetstreamLogo={orgRow.data?.show_netstream_logo !== false}
       netstreamLogoUrl={orgRow.data?.netstream_logo_url ?? null}
+      tenants={tenants}
+      activeOrg={activeOrg}
     >
       {children}
     </AppShell>
