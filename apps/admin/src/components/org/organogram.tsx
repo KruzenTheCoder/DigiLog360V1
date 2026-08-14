@@ -83,7 +83,10 @@ export function Organogram({
     }
     const out: Record<string, Pos> = {};
     let cursor = 0;
+    let deepest = 0;
+
     const place = (person: Person, depth: number) => {
+      deepest = Math.max(deepest, depth);
       const children = kids.get(person.id) ?? [];
       if (children.length === 0) {
         out[person.id] = { x: cursor * (CARD_W + COL_GAP) + 40, y: depth * ROW_GAP + 40 };
@@ -98,7 +101,37 @@ export function Organogram({
       out[person.id] = { x: (first + last) / 2, y: depth * ROW_GAP + 40 };
       if (cursor === before) cursor += 1;
     };
-    (kids.get(null) ?? []).forEach((r) => place(r, 0));
+
+    // The reporting structure is the point of this page, so it is laid out
+    // FIRST and on its own. Previously every unconnected person was treated as
+    // an equal root, which strung 46 lone cards across the top row and buried
+    // the actual hierarchy among them.
+    const roots = kids.get(null) ?? [];
+    const descendants = (p: Person): number => {
+      const cs = kids.get(p.id) ?? [];
+      return cs.length + cs.reduce((n, c) => n + descendants(c), 0);
+    };
+    const trees = roots.filter((r) => (kids.get(r.id) ?? []).length > 0)
+      // Biggest tree first — the main chain of command leads.
+      .sort((a, b) => descendants(b) - descendants(a));
+    const unattached = roots.filter((r) => (kids.get(r.id) ?? []).length === 0);
+
+    trees.forEach((r) => {
+      place(r, 0);
+      cursor += 1; // a clear gap between separate trees
+    });
+
+    // Everyone with no reporting line sits in a compact block underneath,
+    // clearly below the structure rather than pretending to be part of it.
+    const bandY = (deepest + 1) * ROW_GAP + 90;
+    const perRow = Math.max(4, Math.ceil(Math.sqrt(unattached.length * 1.8)));
+    unattached.forEach((p, i) => {
+      out[p.id] = {
+        x: (i % perRow) * (CARD_W + COL_GAP) + 40,
+        y: bandY + Math.floor(i / perRow) * (CARD_H + 26),
+      };
+    });
+
     return out;
   }, []);
 
@@ -283,6 +316,18 @@ export function Organogram({
     return out;
   }, [people, pos]);
 
+  // Where the "no reporting line" block starts, so it can be labelled and
+  // ruled off. Derived from the positions rather than tracked separately, so
+  // it stays correct after a card is dragged.
+  const unattachedBand = useMemo(() => {
+    const hasChild = new Set(people.map((p) => p.reports_to).filter(Boolean) as string[]);
+    const loose = people.filter((p) => !p.reports_to && !hasChild.has(p.id));
+    if (loose.length === 0) return null;
+    const ys = loose.map((p) => pos[p.id]?.y).filter((y): y is number => typeof y === 'number');
+    if (ys.length === 0) return null;
+    return { y: Math.min(...ys) - 34, count: loose.length };
+  }, [people, pos]);
+
   const extent = useMemo(() => {
     const xs = Object.values(pos).map((p) => p.x);
     const ys = Object.values(pos).map((p) => p.y);
@@ -379,6 +424,19 @@ export function Organogram({
               />
             )}
           </svg>
+
+          {/* Divider for the people with no reporting line */}
+          {unattachedBand && (
+            <div
+              className="pointer-events-none absolute left-0 flex items-center gap-3"
+              style={{ top: unattachedBand.y, width: extent.w - 40 }}
+            >
+              <span className="whitespace-nowrap rounded-full border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
+                No reporting line · {unattachedBand.count}
+              </span>
+              <span className="h-px flex-1 bg-[hsl(var(--border))]" />
+            </div>
+          )}
 
           {/* People */}
           {people.map((p) => {
