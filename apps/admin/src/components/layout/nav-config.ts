@@ -24,6 +24,7 @@ export const NAV: NavSection[] = [
       { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
       { label: 'Live Occurrences', href: '/occurrences', icon: 'Radio' },
       { label: 'Notifications', href: '/notifications', icon: 'Bell' },
+      { label: 'AI Assistant', href: '/assistant', icon: 'Sparkles' },
     ],
   },
   {

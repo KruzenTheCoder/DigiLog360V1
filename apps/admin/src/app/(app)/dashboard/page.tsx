@@ -9,6 +9,7 @@ import { HeroKpi } from '@/components/dashboard/hero-kpi';
 import { SeverityCards } from '@/components/dashboard/severity-cards';
 import { SlaComplianceReport } from '@/components/dashboard/sla-compliance';
 import { RealtimeRefresh } from '@/components/realtime/realtime-refresh';
+import { AiInsightPanel } from '@/components/ai/ai-insight-panel';
 import {
   isSlaBreached, isSlaUpdateDue, SEVERITIES, SEVERITY_LABELS,
   OCCURRENCE_STATUSES, STATUS_LABELS, STATUS_COLORS, TERMINAL_STATUSES,
@@ -285,6 +286,11 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
         title="Control Room Performance Dashboard"
         description={`Real-time analytics & key performance indicators — last 30 days${activeSite ? ` · ${activeSite.name}` : isUnscoped ? ' · all sites' : ''}`}
       />
+
+      {/* Written read of everything below — generated on request, not on load. */}
+      <div className="mb-5">
+        <AiInsightPanel siteId={siteParam ?? null} days={30} />
+      </div>
 
       {(breached > 0 || updateDue > 0) && (
         <div className="mb-5 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 text-sm shadow-sm dark:border-amber-900 dark:from-amber-950/40 dark:to-yellow-950/40">
