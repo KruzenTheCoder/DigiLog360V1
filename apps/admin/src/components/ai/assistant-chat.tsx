@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Loader2, SendHorizonal, Sparkles, Trash2, User } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { functionErrorMessage } from '@/lib/fn-error';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
@@ -62,7 +63,7 @@ export function AssistantChat() {
 
     const d = data as { ok?: boolean; reply?: string; error?: string } | null;
     if (err || !d?.ok || !d.reply) {
-      setError(d?.error ?? err?.message ?? 'The assistant could not answer that.');
+      setError(await functionErrorMessage(err, d, 'The assistant could not answer that.'));
       // Roll the unanswered question back off the transcript — the server
       // never stored it, so leaving it would misrepresent the history.
       setMessages((m) => m.slice(0, -1));

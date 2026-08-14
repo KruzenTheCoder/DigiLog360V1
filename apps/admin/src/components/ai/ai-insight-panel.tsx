@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { functionErrorMessage } from '@/lib/fn-error';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -38,7 +39,7 @@ export function AiInsightPanel({ siteId, days = 30 }: { siteId?: string | null; 
     setBusy(false);
     const d = data as (Insight & { ok?: boolean; error?: string }) | null;
     if (err || !d?.ok) {
-      setError(d?.error ?? err?.message ?? 'Could not generate the briefing.');
+      setError(await functionErrorMessage(err, d, 'Could not generate the briefing.'));
       return;
     }
     setInsight(d);

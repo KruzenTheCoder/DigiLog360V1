@@ -12,7 +12,7 @@
 // the corner.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Check, Link2Off, Loader2, RotateCcw, Users2 } from 'lucide-react';
+import { AlertCircle, Check, Link2Off, Loader2, Maximize2, Minus, Plus, RotateCcw, Users2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 
@@ -62,6 +62,9 @@ export function Organogram({
   const [linkFrom, setLinkFrom] = useState<string | null>(null);
   const [ghost, setGhost] = useState<Pos | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
+  // Canvas zoom. Sixty cards across is far wider than any screen, so being
+  // able to pull back and see the whole shape matters more than card detail.
+  const [zoom, setZoom] = useState(1);
 
   // ── Initial layout ───────────────────────────────────────────────────────
   // Saved positions win; anyone without one is placed by walking the tree, so
@@ -147,11 +150,13 @@ export function Organogram({
   }
 
   // ── Pointer handling ─────────────────────────────────────────────────────
+  // Canvas coordinates from a screen event. Dividing by the zoom keeps a
+  // dragged card under the pointer instead of drifting away from it.
   const pointFromEvent = (e: PointerEvent | React.PointerEvent): Pos => {
     const rect = canvasRef.current?.getBoundingClientRect();
     return {
-      x: e.clientX - (rect?.left ?? 0) + (canvasRef.current?.scrollLeft ?? 0),
-      y: e.clientY - (rect?.top ?? 0) + (canvasRef.current?.scrollTop ?? 0),
+      x: (e.clientX - (rect?.left ?? 0) + (canvasRef.current?.scrollLeft ?? 0)) / zoom,
+      y: (e.clientY - (rect?.top ?? 0) + (canvasRef.current?.scrollTop ?? 0)) / zoom,
     };
   };
 
@@ -219,6 +224,21 @@ export function Organogram({
     dragRef.current = { kind: 'link', from: id };
     setLinkFrom(id);
     setGhost(pointFromEvent(e));
+  }
+
+  // Shrink until the whole chart fits the visible area. With sixty people the
+  // arrangement is far wider than any screen, so "show me the shape" is the
+  // most common thing to want.
+  function fitToView() {
+    const el = canvasRef.current;
+    if (!el) return;
+    const xs = Object.values(pos);
+    if (xs.length === 0) return;
+    const w = Math.max(...xs.map((p) => p.x)) + CARD_W + 40;
+    const h = Math.max(...xs.map((p) => p.y)) + CARD_H + 40;
+    const next = Math.min(1, el.clientWidth / w, el.clientHeight / h);
+    setZoom(Math.max(0.2, +next.toFixed(2)));
+    el.scrollTo({ left: 0, top: 0 });
   }
 
   async function autoArrange() {
@@ -295,11 +315,27 @@ export function Organogram({
             : 'Reporting structure — read only.'}
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
         </p>
-        {canEdit && (
-          <Button variant="secondary" size="sm" onClick={autoArrange}>
-            <RotateCcw className="h-4 w-4" /> Tidy up
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" title="Zoom out"
+            onClick={() => setZoom((z) => Math.max(0.2, +(z - 0.15).toFixed(2)))}>
+            <Minus className="h-4 w-4" />
           </Button>
-        )}
+          <span className="w-12 text-center text-xs tabular-nums text-[hsl(var(--muted))]">
+            {Math.round(zoom * 100)}%
+          </span>
+          <Button variant="ghost" size="sm" title="Zoom in"
+            onClick={() => setZoom((z) => Math.min(1.5, +(z + 0.15).toFixed(2)))}>
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={fitToView} title="Fit the whole chart on screen">
+            <Maximize2 className="h-4 w-4" /> Fit
+          </Button>
+          {canEdit && (
+            <Button variant="secondary" size="sm" onClick={autoArrange}>
+              <RotateCcw className="h-4 w-4" /> Tidy up
+            </Button>
+          )}
+        </div>
       </div>
 
       <div
@@ -307,7 +343,14 @@ export function Organogram({
         className="relative overflow-auto rounded-xl border bg-[hsl(var(--surface))]"
         style={{ height: '70vh' }}
       >
-        <div className="relative" style={{ width: extent.w, height: extent.h }}>
+        {/* Scaled surface. The wrapper reserves the SCALED footprint so the
+            scrollbars match what is actually on screen — without it, zooming
+            out leaves a large dead area and zooming in clips the right edge. */}
+        <div style={{ width: extent.w * zoom, height: extent.h * zoom }}>
+        <div
+          className="relative origin-top-left"
+          style={{ width: extent.w, height: extent.h, transform: `scale(${zoom})` }}
+        >
           {/* Connections */}
           <svg className="pointer-events-none absolute inset-0" width={extent.w} height={extent.h}>
             {edges.map((e) => (
@@ -373,6 +416,7 @@ export function Organogram({
               </div>
             );
           })}
+        </div>
         </div>
       </div>
 
