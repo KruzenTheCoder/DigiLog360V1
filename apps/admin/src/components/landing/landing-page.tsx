@@ -187,9 +187,10 @@ export function LandingPage(
     <main className="w-full overflow-x-hidden bg-[hsl(var(--background))]">
 
       {/* ══ HERO ═══════════════════════════════════════════════════════ */}
+      {/* The hero owns its own vertical rhythm and runs under the floating
+          nav, so it takes no section padding of its own. */}
       {show('hero') && (
-      <section className="w-full px-4 pb-3 pt-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl bg-brand-gradient text-white shadow-[0_30px_70px_-32px_rgba(2,6,23,0.5)]">
+      <section className="relative isolate w-full overflow-hidden bg-brand-gradient text-white">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(1200px_600px_at_78%_-15%,rgba(255,255,255,0.30),transparent_60%),radial-gradient(900px_500px_at_5%_110%,rgba(2,6,23,0.45),transparent_60%)]"
@@ -212,7 +213,9 @@ export function LandingPage(
 
         {/* The brand mark and Sign in live in the persistent site nav now, so
             the hero no longer carries its own copy of both. */}
-        <div className="relative z-10 mx-auto w-full max-w-[92rem] px-5 pb-12 pt-2 sm:px-8 lg:px-12 lg:pb-16 lg:pt-4">
+        {/* Top padding clears the floating nav, which sits over this rather
+            than above it — that overlap is what makes the nav read as free. */}
+        <div className="relative z-10 mx-auto w-full max-w-[92rem] px-5 pb-14 pt-24 sm:px-8 lg:px-12 lg:pb-20 lg:pt-28">
           <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-14">
             <div className="min-w-0">
               <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/[0.12] px-3.5 py-1.5 text-[0.68rem] font-bold uppercase tracking-[0.16em] backdrop-blur-sm">
@@ -311,14 +314,13 @@ export function LandingPage(
             ))}
           </dl>
         </div>
-        </div>
       </section>
       )}
 
       {/* ══ PROBLEM ════════════════════════════════════════════════════ */}
       {show('problem') && (
-      <section id="problem" className="w-full scroll-mt-24 px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
+      <section id="problem" className="relative isolate w-full scroll-mt-16 overflow-hidden bg-slate-950 text-white py-20 lg:py-28">
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
 
 
 
@@ -389,8 +391,8 @@ export function LandingPage(
 
       {/* ══ SOLUTION ═══════════════════════════════════════════════════ */}
       {show('solution') && (
-      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
         <Ambient tone="brand" />
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
@@ -427,8 +429,8 @@ export function LandingPage(
 
       {/* ══ MODULES ════════════════════════════════════════════════════ */}
       {show('what') && (
-      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <Eyebrow tone="text-violet-600">What you get</Eyebrow>
             <h2 className="mt-5 max-w-[24ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
@@ -460,8 +462,8 @@ export function LandingPage(
 
       {/* ══ STORY ══════════════════════════════════════════════════════ */}
       {show('story') && (
-      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
+      <section className="relative isolate w-full overflow-hidden bg-slate-950 text-white py-20 lg:py-28">
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
         <Ambient tone="amber" scheme="dark" />
         {/* A slow sweep centred on the timeline — the watch being kept, and
             something in the wide gutters either side of the frames. */}
@@ -561,8 +563,8 @@ export function LandingPage(
 
       {/* ══ RESPONSE TARGETS ═══════════════════════════════════════════ */}
       {show('targets') && (
-      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
         <Ambient tone="sky" />
           <div className="grid gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16">
             {/* min-w-0 on both tracks: grid items default to min-width:auto and
@@ -645,8 +647,8 @@ export function LandingPage(
 
       {/* ══ CONSOLE SHOWCASE ═══════════════════════════════════════════ */}
       {show('console') && (
-      <section id="console" className="w-full scroll-mt-24 px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-900 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
+      <section id="console" className="relative isolate w-full scroll-mt-16 overflow-hidden bg-slate-900 text-white py-20 lg:py-28">
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
         <div
           aria-hidden
           className="animate-breathe pointer-events-none absolute inset-0 bg-[radial-gradient(1000px_500px_at_50%_0%,rgba(102,126,234,0.25),transparent_65%)] motion-reduce:animate-none"
@@ -697,8 +699,8 @@ export function LandingPage(
 
       {/* ══ CAPABILITIES ═══════════════════════════════════════════════ */}
       {show('realtime') && (
-      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
         <Ambient tone="sky" />
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
@@ -733,8 +735,8 @@ export function LandingPage(
 
       {/* ══ THE FIELD APP ══════════════════════════════════════════════ */}
       {show('field') && (
-      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -769,8 +771,8 @@ export function LandingPage(
 
       {/* ══ ROLES ══════════════════════════════════════════════════════ */}
       {show('who') && (
-      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950 px-5 py-12 text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.6)] sm:px-8 lg:px-12 lg:py-16">
+      <section className="relative isolate w-full overflow-hidden bg-slate-950 text-white py-20 lg:py-28">
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
         <Ambient tone="brand" scheme="dark" />
         <Constellation />
           <Reveal>
@@ -810,8 +812,8 @@ export function LandingPage(
 
       {/* ══ PLATFORM ═══════════════════════════════════════════════════ */}
       {show('underneath') && (
-      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
         <Ambient tone="brand" />
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
@@ -845,8 +847,8 @@ export function LandingPage(
 
       {/* ══ OUTCOME ════════════════════════════════════════════════════ */}
       {show('outcome') && (
-      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
           <Reveal>
             <Eyebrow tone="text-emerald-600">The outcome</Eyebrow>
             <h2 className="mt-5 max-w-[22ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
@@ -892,8 +894,8 @@ export function LandingPage(
 
       {/* ══ FAQ ════════════════════════════════════════════════════════ */}
       {show('faq') && (
-      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+      <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
+        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
         <Ambient tone="emerald" />
           <Reveal>
             <Eyebrow tone="text-brand">Questions</Eyebrow>
@@ -916,8 +918,7 @@ export function LandingPage(
 
       {/* ══ CLOSE ══════════════════════════════════════════════════════ */}
       {show('confidential') && (
-      <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-        <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-transparent bg-brand-gradient px-5 py-14 text-center text-white shadow-[0_24px_60px_-30px_rgba(2,6,23,0.45)] sm:px-8 lg:py-20">
+      <section className="relative isolate w-full overflow-hidden bg-brand-gradient py-24 text-center text-white lg:py-32">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_450px_at_50%_-20%,rgba(255,255,255,0.25),transparent_60%)]"
@@ -945,7 +946,6 @@ export function LandingPage(
               Sign in to the console <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
-        </div>
         </div>
       </section>
       )}

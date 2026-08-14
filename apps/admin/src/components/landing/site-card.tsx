@@ -251,36 +251,7 @@ export function DealtCard({
   );
 }
 
-/**
- * The page-level panel. Each section sits on its own raised surface, which is
- * what turns a run of full-bleed bands into a stack of cards.
- */
-export function SitePanel({
-  children, className, tone = 'light', id,
-}: {
-  children: ReactNode;
-  className?: string;
-  tone?: 'light' | 'dark' | 'gradient';
-  id?: string;
-}) {
-  const surface = tone === 'dark'
-    ? 'bg-slate-950 text-white border-white/10'
-    : tone === 'gradient'
-      ? 'bg-brand-gradient text-white border-transparent'
-      : 'bg-[hsl(var(--surface))] border-[hsl(var(--border))]';
-
-  return (
-    <section
-      id={id}
-      className={[
-        'relative isolate mx-auto w-full max-w-[92rem] scroll-mt-24 overflow-hidden',
-        'rounded-3xl border shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)]',
-        surface,
-        'px-5 py-12 sm:px-8 lg:px-12 lg:py-16',
-        className ?? '',
-      ].join(' ')}
-    >
-      {children}
-    </section>
-  );
-}
+// SitePanel — the raised per-section surface — has been removed. Wrapping
+// every section in one made the page read as a stack of tiles with seams
+// between them, which is the opposite of seamless. The sections paint
+// themselves edge to edge again; cards are for things that are cards.

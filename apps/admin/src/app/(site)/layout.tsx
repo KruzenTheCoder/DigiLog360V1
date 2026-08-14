@@ -6,10 +6,9 @@ import { SiteNav } from '@/components/landing/site-nav';
 // like one site rather than a series of full reloads.
 export default function SiteLayout({ children }: { children: ReactNode }) {
   return (
-    // A recessed ground so the panels above it read as raised. The two surface
-    // tokens are only two points of lightness apart, which is not enough to
-    // separate three layers, so the ground goes a step deeper than either.
-    <div className="min-h-screen bg-slate-200/70 dark:bg-slate-950">
+    // The sections paint themselves edge to edge, so this only shows through
+    // where a page is shorter than the viewport.
+    <div className="min-h-screen bg-[hsl(var(--background))]">
       <SiteNav />
       {children}
     </div>

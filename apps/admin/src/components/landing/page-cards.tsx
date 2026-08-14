@@ -42,8 +42,8 @@ const CARDS = [
 
 export function PageCards() {
   return (
-    <section className="w-full px-4 py-3 sm:px-6 lg:px-8">
-      <div className="relative isolate mx-auto w-full max-w-[92rem] overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-5 py-12 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.28)] sm:px-8 lg:px-12 lg:py-16">
+    <section className="relative w-full bg-[hsl(var(--background))] py-20 lg:py-28">
+      <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
         <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[hsl(var(--brand))]">
           Explore
         </p>
