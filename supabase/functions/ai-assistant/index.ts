@@ -249,6 +249,17 @@ Deno.serve(async (req) => {
   const userId = (caller as { id: string }).id;
   const callerOrg = (caller as { org_id?: string }).org_id ?? '';
 
+  // ── Week-ahead forecast ──────────────────────────────────────────────────
+  // Emails a named recipient, so it is restricted to the roles that already
+  // decide who hears from the platform.
+  if (body.mode === 'forecast') {
+    const role = String((caller as { role?: string }).role ?? '');
+    if (!['super_user', 'admin', 'manager'].includes(role)) {
+      return json({ error: 'Not authorised to run a forecast' }, 403);
+    }
+    return await runForecast(admin, body);
+  }
+
   // A super user is a PLATFORM account: it administers every tenant and is not
   // really a member of the one its profile happens to carry. So it may name the
   // organisation it is acting for — that is what the tenant picker in the
@@ -552,6 +563,166 @@ Every action must address an INCIDENT pattern, never routine volume. Give betwee
 
   return json({ error: `Unknown mode "${mode}"` }, 400);
 });
+
+/**
+ * The week-ahead forecast.
+ *
+ * Distinct from the weekly digest, which looks backwards. This one answers
+ * "what is likely to land on the team next week, and what can be pre-empted"
+ * — and every projection in it is arithmetic from ai_forecast_facts: an
+ * eight-week trend, the open backlog by age, the SLA clock, and which types
+ * recur week after week. The model explains the projection; it never invents
+ * one, because a number a model guesses is not a forecast.
+ */
+async function runForecast(admin: Sb, body: Record<string, unknown>) {
+  const appUrl = (Deno.env.get('PUBLIC_APP_URL') ?? '').replace(/\/+$/, '') || null;
+  const orgId = String(body.org_id ?? '');
+  if (!orgId) return json({ error: 'org_id is required' }, 400);
+  const overrideTo = typeof body.to === 'string' && body.to ? body.to : null;
+  const audience = String(body.role ?? 'manager');
+  const started = Date.now();
+
+  const { data: org } = await admin
+    .from('organizations').select('id, name, ai_insights_enabled').eq('id', orgId).maybeSingle();
+  if (!org) return json({ error: 'No such organisation' }, 404);
+  if (org.ai_insights_enabled === false) {
+    return json({ error: 'AI insights are switched off for this organisation.' }, 403);
+  }
+
+  const { data: settings } = await admin
+    .from('org_email_settings').select('*').eq('org_id', orgId).maybeSingle();
+
+  // Learn the vocabulary first, or the forecast counts gate-openings as
+  // incidents and projects a thousand a week.
+  let facts = await loadFacts(admin, orgId, 28, null, null);
+  if (facts.unknown_types.length > 0) {
+    const learned = await learnUnknownTypes(admin, orgId, facts.unknown_types, callGroq);
+    if (learned.learned > 0) {
+      await recordUsage(admin, {
+        orgId, mode: 'classify', model: MODEL, totalTokens: learned.tokens, source: 'live',
+      });
+      facts = await loadFacts(admin, orgId, 28, null, null);
+    }
+  }
+
+  const { data: fc } = await admin.rpc('ai_forecast_facts', { p_org: orgId });
+  if (!fc) return json({ error: 'Could not compute forecast facts' }, 500);
+
+  const rows = await loadIncidents(admin, orgId, 14, null, null, 40);
+  const nameOf = await loadNames(admin, orgId);
+  const brief = ROLE_BRIEF[audience] ?? ROLE_BRIEF.manager;
+
+  const ask = [
+    buildPrompt(facts, rows, nameOf, 'All sites'),
+    '',
+    'FORWARD-LOOKING FIGURES — these are computed, not estimated. Use them; do not recompute or contradict them.',
+    JSON.stringify(fc, null, 2),
+    '',
+    'Write the WEEK AHEAD FORECAST. This is not a summary of what happened — it is what to expect and what to do before it happens.',
+    '',
+    'Ground every claim in the figures above:',
+    '- projected_next_week is the four-week mean, so describe it as a run rate, not a certainty.',
+    '- open_backlog is work already on the books. It does not need forecasting; it is arriving regardless.',
+    '- sla_clock.due_next_7_days is what will breach next week if nobody acts.',
+    '- recurring_types are what will recur. site_movement shows where it is shifting.',
+    '',
+    'Reply with JSON only:',
+    '{',
+    '  "headline": "one sentence on what next week most likely brings",',
+    '  "summary": "2-3 short paragraphs: expected volume and why, what the backlog means for capacity, where risk concentrates, and what is most likely to go wrong. Separate paragraphs with a blank line.",',
+    '  "routine_note": "one sentence on routine operations volume expected next week",',
+    '  "actions": [{"title":"pre-emptive, doable before the week starts","why":"tied to a figure above","priority":"high|medium|low","owner":"","measure":""}]',
+    '}',
+    '',
+    'Three to four actions. Every one must be PRE-EMPTIVE — something done now to stop a predicted problem, not a response to one that already happened.',
+  ].join('\n');
+
+  const res = await callGroq([
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: `WHO YOU ARE BRIEFING: a ${brief.label}. ${brief.focus}` },
+    { role: 'user', content: ask },
+  ], true);
+
+  if (!res.ok) {
+    await recordUsage(admin, {
+      orgId, mode: 'forecast', model: MODEL, source: 'live',
+      latencyMs: Date.now() - started, ok: false, error: res.error,
+    });
+    return json({ error: res.error }, 502);
+  }
+  await recordUsage(admin, {
+    orgId, mode: 'forecast', model: MODEL, totalTokens: res.tokens ?? 0,
+    source: 'live', latencyMs: Date.now() - started,
+  });
+
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(res.content.trim().replace(/^```(?:json)?\s*|\s*```$/g, ''));
+  } catch {
+    return json({ error: 'The model did not return usable JSON.', raw: res.content.slice(0, 400) }, 502);
+  }
+
+  // deno-lint-ignore no-explicit-any
+  const f = fc as any;
+  const kpis = [
+    { label: 'Projected incidents', value: String(f.projected_next_week ?? '—'),
+      unit: `next week · trend ${f.trend_direction ?? '—'}` },
+    { label: 'Already open', value: String(f.open_backlog?.open_total ?? 0),
+      unit: `${f.open_backlog?.unassigned ?? 0} unassigned` },
+    { label: 'Will breach', value: String(f.sla_clock?.due_next_7_days ?? 0),
+      unit: 'SLA due within 7 days' },
+    { label: 'Ageing over 30 days', value: String(f.open_backlog?.age_30_plus ?? 0),
+      unit: 'still open from last month' },
+  ];
+
+  const actions = Array.isArray(parsed.actions)
+    ? (parsed.actions as Record<string, unknown>[]).slice(0, 4).map((a) => ({
+        title: String(a.title ?? ''), why: String(a.why ?? ''),
+        owner: String(a.owner ?? ''), measure: String(a.measure ?? ''),
+        priority: (['high', 'medium', 'low'].includes(String(a.priority))
+          ? String(a.priority) : 'medium') as 'high' | 'medium' | 'low',
+      })).filter((a) => a.title)
+    : [];
+
+  const weekLabel = (() => {
+    const d = new Date();
+    const end = new Date(d.getTime() + 6 * 864e5);
+    const fmt = (x: Date) => x.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    return `${fmt(d)} – ${fmt(end)}`;
+  })();
+
+  const mail = renderDigestEmail({
+    orgName: org.name, appUrl,
+    recipientName: typeof body.recipient_name === 'string' ? body.recipient_name : null,
+    audienceLabel: `${brief.label} · forecast`,
+    headline: String(parsed.headline ?? 'The week ahead'),
+    summary: String(parsed.summary ?? ''),
+    kpis, actions,
+    routineNote: String(parsed.routine_note ?? '').trim() || null,
+    weekLabel,
+  }, settings);
+
+  if (body.dry_run === true || !overrideTo) {
+    return json({ ok: true, dry_run: true, facts: fc, ...parsed, kpis, actions, html: mail.html });
+  }
+
+  const send = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-email`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`,
+      apikey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      'x-internal-key': Deno.env.get('INTERNAL_FN_KEY') ?? '',
+    },
+    body: JSON.stringify({ to: overrideTo, subject: `The week ahead — ${org.name}`, html: mail.html, text: mail.text }),
+  });
+
+  return json({
+    ok: send.ok, sent_to: overrideTo,
+    send_error: send.ok ? null : (await send.text().catch(() => '')).slice(0, 200),
+    headline: parsed.headline, kpis, actions, facts: fc,
+  });
+}
 
 /**
  * The Monday "week ahead" mail.
