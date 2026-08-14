@@ -58,14 +58,17 @@ interface OccRow {
   logged_by: string | null;
 }
 
-async function callGroq(messages: Array<{ role: string; content: string }>) {
+async function callGroq(messages: Array<{ role: string; content: string }>, asJson = false) {
   const key = Deno.env.get('GROQ_API_KEY');
   if (!key) return { ok: false as const, error: 'GROQ_API_KEY is not configured on this project.' };
 
   const resp = await fetch(GROQ_URL, {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, messages, temperature: 0.3, max_tokens: 1400 }),
+    body: JSON.stringify({
+      model: MODEL, messages, temperature: 0.3, max_tokens: 2000,
+      ...(asJson ? { response_format: { type: 'json_object' } } : {}),
+    }),
   });
   if (!resp.ok) {
     const body = await resp.text().catch(() => '');
@@ -168,6 +171,66 @@ ${records || '(no occurrences in this window)'}`;
   return { facts, prompt, count: rows.length };
 }
 
+/**
+ * The measured half of the briefing. Every figure here is arithmetic on the
+ * same facts handed to the model, so a tile can never contradict the prose —
+ * and a wrong number can be traced to a query rather than to a hallucination.
+ */
+// deno-lint-ignore no-explicit-any
+function buildKpis(f: any) {
+  const total = Number(f.total ?? 0);
+  const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
+  const topEntry = (obj: Record<string, number> | undefined) => {
+    const e = Object.entries(obj ?? {});
+    return e.length ? e[0] : null;
+  };
+  const topSite = topEntry(f.by_site);
+  const topType = topEntry(f.by_type);
+  const unassigned = total - Object.values<number>(f.by_assignee ?? {}).reduce((s, n) => s + Number(n), 0);
+
+  return [
+    {
+      label: 'Occurrences', value: String(total), unit: `in ${f.window_days} days`,
+      tone: 'neutral',
+      note: f.truncated ? 'Capped at the most recent 200 for analysis' : 'All records in the window',
+    },
+    {
+      label: 'Still open', value: String(f.open ?? 0), unit: `${pct(Number(f.open ?? 0))}% of total`,
+      tone: pct(Number(f.open ?? 0)) > 40 ? 'bad' : 'good',
+      note: `${f.resolved ?? 0} resolved or closed`,
+    },
+    {
+      label: 'SLA breached', value: String(f.sla_breached ?? 0),
+      unit: `${pct(Number(f.sla_breached ?? 0))}% of total`,
+      tone: Number(f.sla_breached ?? 0) > 0 ? 'bad' : 'good',
+      note: Number(f.sla_breached ?? 0) > 0 ? 'Past due and not closed' : 'Nothing past due',
+    },
+    {
+      label: 'Avg resolution',
+      value: f.avg_resolution_hours == null ? '—' : String(f.avg_resolution_hours),
+      unit: 'hours to close', tone: 'neutral',
+      note: 'Across everything closed in the window',
+    },
+    {
+      label: 'Busiest site', value: topSite ? String(topSite[1]) : '—',
+      unit: topSite ? `${pct(Number(topSite[1]))}% at ${topSite[0]}` : 'no data',
+      tone: topSite && pct(Number(topSite[1])) > 60 ? 'warn' : 'neutral',
+      note: 'Concentration of workload',
+    },
+    {
+      label: 'Most common type', value: topType ? String(topType[1]) : '—',
+      unit: topType ? String(topType[0]) : 'no data',
+      tone: 'neutral', note: 'Single largest occurrence category',
+    },
+    {
+      label: 'Unassigned', value: String(Math.max(0, unassigned)),
+      unit: `${pct(Math.max(0, unassigned))}% of total`,
+      tone: pct(Math.max(0, unassigned)) > 50 ? 'bad' : 'warn',
+      note: 'Nobody accountable for these yet',
+    },
+  ];
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -212,7 +275,7 @@ Deno.serve(async (req) => {
     if (!body.refresh) {
       const { data: cached } = await admin
         .from('ai_insights')
-        .select('headline, body, facts, model, created_at')
+        .select('headline, body, facts, kpis, actions, model, created_at')
         .eq('org_id', orgId).eq('scope_key', scopeKey)
         .maybeSingle();
       // An hour old is still a fair read of a 30-day window, and it keeps the
@@ -232,30 +295,72 @@ Deno.serve(async (req) => {
       });
     }
 
+    // KPIs come from the data, never from the model. A headline number an LLM
+    // invented is worse than no number — these are arithmetic on the same
+    // facts the model is shown, so the tiles and the prose cannot disagree.
+    const kpis = buildKpis(ctx.facts);
+
     const res = await callGroq([
       { role: 'system', content: SYSTEM_PROMPT },
       {
         role: 'user',
         content: `${ctx.prompt}
 
-Write a briefing on this performance dashboard for the manager who owns it.
+Brief the manager who owns this dashboard, and tell them what to DO.
 
-Start with a single headline sentence on its own first line, prefixed exactly "HEADLINE: ". Then a blank line, then three or four short paragraphs covering: what stands out, where the risk is concentrated, anything trending the wrong way, and what you would do about it this week. Reference specific sites, types and numbers.`,
+Reply with JSON only, in exactly this shape:
+{
+  "headline": "one sentence naming the single most important thing",
+  "summary": "2-3 short paragraphs: what stands out, where risk is concentrated, what is trending wrong. Separate paragraphs with a blank line. Cite real sites, types and counts.",
+  "actions": [
+    {
+      "title": "imperative, specific, doable this week",
+      "why": "one sentence tying it to the numbers above",
+      "priority": "high" | "medium" | "low",
+      "owner": "a role or a named person from the data",
+      "measure": "the number that tells you it worked, with a target"
+    }
+  ]
+}
+
+Give between 3 and 5 actions, ordered most important first. Every action must be something a security manager can actually start this week — not "review procedures" but what to review, where, and what the outcome should be. Every "measure" must be a number that can be checked against this dashboard next month.`,
       },
-    ]);
+    ], true);
     if (!res.ok) return json({ error: res.error }, 502);
 
-    const match = res.content.match(/^HEADLINE:\s*(.+?)\s*\n/);
-    const headline = (match?.[1] ?? 'Operations briefing').trim();
-    const text = match ? res.content.slice(match[0].length).trim() : res.content.trim();
+    // Parse defensively: a model asked for JSON can still return it fenced or
+    // with a stray preamble, and a briefing is not worth failing over.
+    let parsed: { headline?: string; summary?: string; actions?: unknown[] } = {};
+    try {
+      const raw = res.content.trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = { headline: 'Operations briefing', summary: res.content.trim(), actions: [] };
+    }
+
+    const headline = String(parsed.headline ?? 'Operations briefing').trim();
+    const text = String(parsed.summary ?? '').trim();
+    const actions = Array.isArray(parsed.actions)
+      ? parsed.actions.slice(0, 6).map((a) => {
+          const x = a as Record<string, unknown>;
+          return {
+            title: String(x.title ?? '').trim(),
+            why: String(x.why ?? '').trim(),
+            priority: ['high', 'medium', 'low'].includes(String(x.priority)) ? String(x.priority) : 'medium',
+            owner: String(x.owner ?? '').trim(),
+            measure: String(x.measure ?? '').trim(),
+          };
+        }).filter((a) => a.title)
+      : [];
 
     await admin.from('ai_insights').upsert({
       org_id: orgId, scope_key: scopeKey, site_id: siteId, days,
-      headline, body: text, facts: ctx.facts, model: MODEL, generated_by: userId,
+      headline, body: text, facts: ctx.facts, kpis, actions,
+      model: MODEL, generated_by: userId,
       created_at: new Date().toISOString(),
     }, { onConflict: 'org_id,scope_key' });
 
-    return json({ ok: true, cached: false, headline, body: text, facts: ctx.facts, model: MODEL });
+    return json({ ok: true, cached: false, headline, body: text, facts: ctx.facts, kpis, actions, model: MODEL });
   }
 
   // ── Chat ─────────────────────────────────────────────────────────────────

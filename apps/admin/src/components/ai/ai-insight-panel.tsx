@@ -9,19 +9,42 @@
 // until the cache ages out.
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertCircle, ListChecks, RefreshCw, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { functionErrorMessage } from '@/lib/fn-error';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
+interface Kpi {
+  label: string; value: string; unit?: string;
+  tone?: 'good' | 'warn' | 'bad' | 'neutral'; note?: string;
+}
+interface Action {
+  title: string; why?: string;
+  priority?: 'high' | 'medium' | 'low';
+  owner?: string; measure?: string;
+}
 interface Insight {
   headline: string;
   body: string;
+  kpis?: Kpi[];
+  actions?: Action[];
   cached?: boolean;
   model?: string;
   created_at?: string;
 }
+
+const TONE: Record<string, string> = {
+  good: 'text-emerald-600 dark:text-emerald-400',
+  warn: 'text-amber-600 dark:text-amber-400',
+  bad: 'text-red-600 dark:text-red-400',
+  neutral: 'text-[hsl(var(--foreground))]',
+};
+const PRIORITY: Record<string, { label: string; cls: string }> = {
+  high: { label: 'High', cls: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300' },
+  medium: { label: 'Medium', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' },
+  low: { label: 'Low', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
+};
 
 export function AiInsightPanel({ siteId, days = 30 }: { siteId?: string | null; days?: number }) {
   const [insight, setInsight] = useState<Insight | null>(null);
@@ -57,7 +80,7 @@ export function AiInsightPanel({ siteId, days = 30 }: { siteId?: string | null; 
       const sb: any = supabase;
       const { data } = await sb
         .from('ai_insights')
-        .select('headline, body, created_at')
+        .select('headline, body, kpis, actions, created_at')
         .eq('scope_key', `${siteId ?? 'all'}:${days}`)
         .maybeSingle();
       if (!cancelled) {
@@ -107,13 +130,71 @@ export function AiInsightPanel({ siteId, days = 30 }: { siteId?: string | null; 
         {insight && !error && (
           <div>
             <p className="text-base font-semibold leading-snug">{insight.headline}</p>
-            <div className="mt-3 space-y-3 text-sm leading-relaxed text-[hsl(var(--muted))]">
-              {insight.body.split(/\n{2,}/).map((para, i) => (
-                <p key={i}>{para.trim()}</p>
-              ))}
-            </div>
+
+            {/* Measured figures — computed from the data, not written by the model. */}
+            {!!insight.kpis?.length && (
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {insight.kpis.map((k) => (
+                  <div key={k.label} className="rounded-xl border px-3 py-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
+                      {k.label}
+                    </p>
+                    <p className={`mt-0.5 text-2xl font-bold leading-none ${TONE[k.tone ?? 'neutral']}`}>
+                      {k.value}
+                    </p>
+                    {k.unit && <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">{k.unit}</p>}
+                    {k.note && <p className="mt-0.5 text-[10px] text-[hsl(var(--muted))]">{k.note}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {insight.body && (
+              <div className="mt-4 space-y-3 text-sm leading-relaxed text-[hsl(var(--muted))]">
+                {insight.body.split(/\n{2,}/).map((para, i) => (
+                  <p key={i}>{para.trim()}</p>
+                ))}
+              </div>
+            )}
+
+            {!!insight.actions?.length && (
+              <div className="mt-5">
+                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
+                  <ListChecks className="h-3.5 w-3.5" /> Do this week
+                </p>
+                <ol className="space-y-2">
+                  {insight.actions.map((a, i) => (
+                    <li key={i} className="rounded-xl border p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="text-sm font-semibold">{i + 1}. {a.title}</p>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                          PRIORITY[a.priority ?? 'medium'].cls
+                        }`}>
+                          {PRIORITY[a.priority ?? 'medium'].label}
+                        </span>
+                      </div>
+                      {a.why && <p className="mt-1 text-xs leading-relaxed text-[hsl(var(--muted))]">{a.why}</p>}
+                      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[11px]">
+                        {a.owner && (
+                          <span className="text-[hsl(var(--muted))]">
+                            Owner: <strong className="text-[hsl(var(--foreground))]">{a.owner}</strong>
+                          </span>
+                        )}
+                        {a.measure && (
+                          <span className="text-[hsl(var(--muted))]">
+                            Measure: <strong className="text-[hsl(var(--foreground))]">{a.measure}</strong>
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+
             <p className="mt-4 text-[11px] text-[hsl(var(--muted))]">
-              Generated by AI from your occurrence data — check anything you plan to act on.
+              Figures are calculated from your occurrence data. The narrative and actions are
+              AI-generated — check anything you plan to act on.
               {insight.created_at && ` Last updated ${new Date(insight.created_at).toLocaleString()}.`}
             </p>
           </div>
