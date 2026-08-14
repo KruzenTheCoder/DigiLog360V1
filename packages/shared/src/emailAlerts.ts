@@ -249,6 +249,115 @@ function chip(label: string, color: string): string {
   return `<span style="display:inline-block;padding:3px 12px;border-radius:999px;background:${color};color:#ffffff;font-size:11px;font-weight:700;letter-spacing:.04em;">${escapeHtml(label)}</span>`;
 }
 
+/**
+ * The one and only email chrome: brand header, event band, greeting, body
+ * slot, call to action, footer.
+ *
+ * Every email Digilog360 sends goes through here. It exists because the shell
+ * had been copied per template, which is how the SLA breach alert ended up as
+ * bare `<p>` and `<ul>` tags with no branding at all while the task alerts
+ * were fully designed. A single shell makes divergence impossible rather than
+ * merely discouraged.
+ */
+function renderShell(opts: {
+  subject: string;
+  preheader: string;
+  accent: string;
+  orgName: string;
+  pillHtml: string;
+  headline: string;
+  greeting?: string;
+  intro?: string;
+  /** The card between the intro and the CTA. */
+  bodyHtml: string;
+  ctaHtml?: string;
+  /** Optional extra block below the CTA (e.g. the getting-started steps). */
+  afterCtaHtml?: string;
+  footerNote?: string;
+  footerReason: string;
+}): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>${escapeHtml(opts.subject)}</title>
+</head>
+<body style="margin:0;padding:0;background:#eef1f7;-webkit-text-size-adjust:100%;">
+  <!-- Preheader (hidden preview text) -->
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
+    ${escapeHtml(opts.preheader)}
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f7;padding:32px 12px;">
+    <tr><td align="center">
+
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+             style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,.08);">
+
+        <!-- Brand header -->
+        <tr>
+          <td bgcolor="${opts.accent}" style="background-image:linear-gradient(135deg,${opts.accent} 0%,${BRAND_GRADIENT_TO} 100%);padding:22px 32px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+              <td style="font-family:'Segoe UI',Arial,sans-serif;font-size:17px;font-weight:800;color:#ffffff;letter-spacing:.14em;">
+                DIGILOG360
+              </td>
+              <td align="right" style="font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);">
+                ${escapeHtml(opts.orgName)}
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+
+        <!-- Event band -->
+        <tr>
+          <td style="padding:34px 32px 0;font-family:'Segoe UI',Arial,sans-serif;">
+            ${opts.pillHtml}
+            <h1 style="margin:14px 0 0;font-size:24px;line-height:1.25;color:#0f172a;font-weight:800;">
+              ${escapeHtml(opts.headline)}
+            </h1>
+          </td>
+        </tr>
+
+        ${opts.greeting || opts.intro ? `
+        <!-- Greeting + intro -->
+        <tr>
+          <td style="padding:18px 32px 0;font-family:'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.65;color:#334155;">
+            ${opts.greeting ? `<p style="margin:0 0 6px;">${opts.greeting}</p>` : ''}
+            ${opts.intro ? `<p style="margin:0;">${escapeHtml(opts.intro)}</p>` : ''}
+          </td>
+        </tr>` : ''}
+
+        <!-- Body -->
+        <tr><td style="padding:24px 32px 0;">${opts.bodyHtml}</td></tr>
+
+        <!-- CTA -->
+        <tr><td style="padding:0 32px;" align="center">${opts.ctaHtml ?? ''}</td></tr>
+
+        ${opts.afterCtaHtml ?? ''}
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:26px 32px 30px;font-family:'Segoe UI',Arial,sans-serif;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e2e8f0;">
+              <tr><td style="padding-top:18px;font-size:12px;line-height:1.7;color:#94a3b8;">
+                ${opts.footerNote ? `<p style="margin:0 0 8px;color:#64748b;">${escapeHtml(opts.footerNote)}</p>` : ''}
+                <p style="margin:0;">${opts.footerReason}</p>
+                <p style="margin:10px 0 0;">Digilog360 &middot; Security Operations Platform &middot; &copy; ${new Date().getFullYear()} Netstream Intergrated Solutions</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 function metaRow(label: string, valueHtml: string): string {
   return `<tr>
     <td style="padding:7px 0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;vertical-align:top;width:120px;">${escapeHtml(label)}</td>
@@ -372,62 +481,16 @@ export function renderTaskEmail(
 
   const footerNote = (settings?.footer_note ?? '').trim();
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
-<title>${escapeHtml(subject)}</title>
-</head>
-<body style="margin:0;padding:0;background:#eef1f7;-webkit-text-size-adjust:100%;">
-  <!-- Preheader (hidden preview text) -->
-  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
-    ${escapeHtml(renderTemplateString(DEFAULT_EMAIL_SUBJECTS[event], vars))} — ${escapeHtml(data.orgName)}
-  </div>
-
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f7;padding:32px 12px;">
-    <tr><td align="center">
-
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0"
-             style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,.08);">
-
-        <!-- Brand header -->
-        <tr>
-          <td bgcolor="${accent}" style="background-image:linear-gradient(135deg,${accent} 0%,${BRAND_GRADIENT_TO} 100%);padding:22px 32px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-              <td style="font-family:'Segoe UI',Arial,sans-serif;font-size:17px;font-weight:800;color:#ffffff;letter-spacing:.14em;">
-                DIGILOG360
-              </td>
-              <td align="right" style="font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);">
-                ${escapeHtml(data.orgName)}
-              </td>
-            </tr></table>
-          </td>
-        </tr>
-
-        <!-- Event band -->
-        <tr>
-          <td style="padding:34px 32px 0;font-family:'Segoe UI',Arial,sans-serif;">
-            ${chip(meta.pill, eventColor)}
-            <h1 style="margin:14px 0 0;font-size:24px;line-height:1.25;color:#0f172a;font-weight:800;">
-              ${escapeHtml(headline[event])}
-            </h1>
-          </td>
-        </tr>
-
-        <!-- Greeting + intro -->
-        <tr>
-          <td style="padding:18px 32px 0;font-family:'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.65;color:#334155;">
-            <p style="margin:0 0 6px;">${greeting}</p>
-            <p style="margin:0;">${escapeHtml(intro)}</p>
-          </td>
-        </tr>
-
-        <!-- Task card -->
-        <tr>
-          <td style="padding:24px 32px 0;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+  const html = renderShell({
+    subject,
+    preheader: `${renderTemplateString(DEFAULT_EMAIL_SUBJECTS[event], vars)} — ${data.orgName}`,
+    accent,
+    orgName: data.orgName,
+    pillHtml: chip(meta.pill, eventColor),
+    headline: headline[event],
+    greeting,
+    intro,
+    bodyHtml: `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
                    style="border:1px solid #e2e8f0;border-left:4px solid ${isOverdue ? '#dc2626' : (PRIORITY_COLORS[data.priority] ?? accent)};border-radius:12px;background:#f8fafc;">
               <tr>
                 <td style="padding:20px 22px;font-family:'Segoe UI',Arial,sans-serif;">
@@ -445,36 +508,12 @@ export function renderTaskEmail(
                   </table>` : ''}
                 </td>
               </tr>
-            </table>
-          </td>
-        </tr>
-
-        <!-- CTA -->
-        <tr><td style="padding:0 32px;" align="center">${ctaHtml}</td></tr>
-
-        <!-- Footer -->
-        <tr>
-          <td style="padding:26px 32px 30px;font-family:'Segoe UI',Arial,sans-serif;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e2e8f0;">
-              <tr><td style="padding-top:18px;font-size:12px;line-height:1.7;color:#94a3b8;">
-                ${footerNote ? `<p style="margin:0 0 8px;color:#64748b;">${escapeHtml(footerNote)}</p>` : ''}
-                <p style="margin:0;">
-                  You are receiving this because you are involved in this task in <strong style="color:#64748b;">${escapeHtml(data.orgName)}</strong> on Digilog360.
-                  ${prefsUrl ? `Manage your alerts under <a href="${prefsUrl}" style="color:${accent};text-decoration:none;font-weight:600;">Settings &rarr; My Preferences</a>.` : ''}
-                </p>
-                <p style="margin:10px 0 0;">Digilog360 &middot; Security Operations Platform &middot; &copy; ${new Date().getFullYear()} Netstream Intergrated Solutions</p>
-              </td></tr>
-            </table>
-          </td>
-        </tr>
-
-      </table>
-
-    </td></tr>
-  </table>
-</body>
-</html>`;
-
+            </table>`,
+    ctaHtml,
+    footerNote,
+    footerReason: `You are receiving this because you are involved in this task in <strong style="color:#64748b;">${escapeHtml(data.orgName)}</strong> on Digilog360.
+                  ${prefsUrl ? `Manage your alerts under <a href="${prefsUrl}" style="color:${accent};text-decoration:none;font-weight:600;">Settings &rarr; My Preferences</a>.` : ''}`,
+  });
   const textLines = [
     headline[event],
     '',
@@ -770,61 +809,16 @@ export function renderWelcomeEmail(
 
   const footerNote = (settings?.footer_note ?? '').trim();
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
-<title>${escapeHtml(subject)}</title>
-</head>
-<body style="margin:0;padding:0;background:#eef1f7;-webkit-text-size-adjust:100%;">
-  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
-    Your ${escapeHtml(data.orgName)} account on Digilog360 is ready — here is how to sign in.
-  </div>
-
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f7;padding:32px 12px;">
-    <tr><td align="center">
-
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0"
-             style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,.08);">
-
-        <!-- Brand header -->
-        <tr>
-          <td bgcolor="${accent}" style="background-image:linear-gradient(135deg,${accent} 0%,${BRAND_GRADIENT_TO} 100%);padding:22px 32px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-              <td style="font-family:'Segoe UI',Arial,sans-serif;font-size:17px;font-weight:800;color:#ffffff;letter-spacing:.14em;">
-                DIGILOG360
-              </td>
-              <td align="right" style="font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);">
-                ${escapeHtml(data.orgName)}
-              </td>
-            </tr></table>
-          </td>
-        </tr>
-
-        <!-- Event band -->
-        <tr>
-          <td style="padding:34px 32px 0;font-family:'Segoe UI',Arial,sans-serif;">
-            ${isExisting ? chip('USERNAME UPDATED', '#0ea5e9') : chip('WELCOME ABOARD', '#16a34a')}
-            <h1 style="margin:14px 0 0;font-size:24px;line-height:1.25;color:#0f172a;font-weight:800;">
-              ${isExisting ? 'Your username has been updated' : 'Welcome to Digilog360'}
-            </h1>
-          </td>
-        </tr>
-
-        <!-- Greeting + intro -->
-        <tr>
-          <td style="padding:18px 32px 0;font-family:'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.65;color:#334155;">
-            <p style="margin:0 0 6px;">${greeting}</p>
-            <p style="margin:0;">${escapeHtml(intro)}</p>
-          </td>
-        </tr>
-
-        <!-- Credentials card -->
-        <tr>
-          <td style="padding:24px 32px 0;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+  const html = renderShell({
+    subject,
+    preheader: `Your ${data.orgName} account on Digilog360 is ready — here is how to sign in.`,
+    accent,
+    orgName: data.orgName,
+    pillHtml: isExisting ? chip('USERNAME UPDATED', '#0ea5e9') : chip('WELCOME ABOARD', '#16a34a'),
+    headline: isExisting ? 'Your username has been updated' : 'Welcome to Digilog360',
+    greeting,
+    intro,
+    bodyHtml: `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
                    style="border:1px solid #e2e8f0;border-left:4px solid ${accent};border-radius:12px;background:#f8fafc;">
               <tr>
                 <td style="padding:20px 22px;font-family:'Segoe UI',Arial,sans-serif;">
@@ -838,44 +832,20 @@ export function renderWelcomeEmail(
                   ${noteHtml}
                 </td>
               </tr>
-            </table>
-          </td>
-        </tr>
-
-        <!-- CTA -->
-        <tr><td style="padding:0 32px;" align="center">${ctaHtml}</td></tr>
-
-        <!-- Getting started -->
+            </table>`,
+    ctaHtml,
+    afterCtaHtml: `
         <tr>
           <td style="padding:30px 32px 0;font-family:'Segoe UI',Arial,sans-serif;">
             <p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">Getting started</p>
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${stepsHtml}</table>
           </td>
-        </tr>
-
-        <!-- Footer -->
-        <tr>
-          <td style="padding:26px 32px 30px;font-family:'Segoe UI',Arial,sans-serif;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e2e8f0;">
-              <tr><td style="padding-top:18px;font-size:12px;line-height:1.7;color:#94a3b8;">
-                ${footerNote ? `<p style="margin:0 0 8px;color:#64748b;">${escapeHtml(footerNote)}</p>` : ''}
-                <p style="margin:0;">
-                  You are receiving this because ${isExisting ? 'your account details were updated' : 'an account was created for you'} in
+        </tr>`,
+    footerNote,
+    footerReason: `You are receiving this because ${isExisting ? 'your account details were updated' : 'an account was created for you'} in
                   <strong style="color:#64748b;">${escapeHtml(data.orgName)}</strong> on Digilog360.
-                  If you weren't expecting it, please tell your administrator and do not sign in.
-                </p>
-                <p style="margin:10px 0 0;">Digilog360 &middot; Security Operations Platform &middot; &copy; ${new Date().getFullYear()} Netstream Intergrated Solutions</p>
-              </td></tr>
-            </table>
-          </td>
-        </tr>
-
-      </table>
-
-    </td></tr>
-  </table>
-</body>
-</html>`;
+                  If you weren't expecting it, please tell your administrator and do not sign in.`,
+  });
 
   const textLines = [
     isExisting ? 'Your Digilog360 username has been updated' : 'Welcome to Digilog360',
@@ -928,4 +898,110 @@ export function sampleWelcomeEmailData(
     audience,
     previousEmail: audience === 'existing' ? 's.dlamini@oldcompany.example' : null,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// System alerts
+//
+// Anything the platform sends that isn't a task or an onboarding pack — SLA
+// breach digests today, more later. Before this existed the SLA alert was
+// assembled inline as bare <p> and <ul> tags with no header, no branding and
+// no footer, so the one email that fires when something is going WRONG looked
+// the least trustworthy of the set. It now shares the exact shell.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface SystemEmailItem {
+  /** Bold leading text, e.g. an OB number. */
+  label: string;
+  /** Muted trailing detail, e.g. "Perimeter breach (critical)". */
+  detail?: string | null;
+  /** Optional link for the label. */
+  url?: string | null;
+}
+
+export interface SystemEmailData {
+  orgName: string;
+  appUrl?: string | null;
+  recipientName?: string | null;
+  /** Uppercase pill, e.g. "SLA BREACH". */
+  pill: string;
+  pillColor?: string;
+  headline: string;
+  intro: string;
+  items?: SystemEmailItem[];
+  itemsTitle?: string;
+  ctaUrl?: string | null;
+  ctaLabel?: string;
+  footerReason?: string;
+}
+
+export function renderSystemEmail(
+  data: SystemEmailData,
+  settings?: Partial<OrgEmailSettingsRow> | null,
+): { subject: string; html: string; text: string } {
+  const accent = settings?.accent_color || BRAND_GRADIENT_FROM;
+  const pillColor = data.pillColor || '#dc2626';
+  const subject = `${data.headline} — ${data.orgName}`;
+  const greeting = data.recipientName ? `Hi ${escapeHtml(data.recipientName)},` : 'Hi,';
+
+  const rows = (data.items ?? []).map((it) => `
+    <tr>
+      <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-family:'Segoe UI',Arial,sans-serif;font-size:14px;color:#1e293b;">
+        ${it.url
+          ? `<a href="${it.url}" target="_blank" style="font-weight:700;color:${accent};text-decoration:underline;">${escapeHtml(it.label)}</a>`
+          : `<strong>${escapeHtml(it.label)}</strong>`}
+        ${it.detail ? `<span style="color:#64748b;"> &middot; ${escapeHtml(it.detail)}</span>` : ''}
+      </td>
+    </tr>`).join('');
+
+  const bodyHtml = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+       style="border:1px solid #e2e8f0;border-left:4px solid ${pillColor};border-radius:12px;background:#f8fafc;">
+    <tr>
+      <td style="padding:20px 22px;font-family:'Segoe UI',Arial,sans-serif;">
+        ${data.itemsTitle ? `<p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">${escapeHtml(data.itemsTitle)}</p>` : ''}
+        ${rows
+          ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>`
+          : '<p style="margin:0;font-size:14px;color:#475569;">No detail to list.</p>'}
+      </td>
+    </tr>
+  </table>`;
+
+  const ctaHtml = data.ctaUrl
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto 0;">
+        <tr><td style="border-radius:10px;background:${accent};background-image:linear-gradient(135deg,${accent},${BRAND_GRADIENT_TO});">
+          <a href="${data.ctaUrl}" target="_blank"
+             style="display:inline-block;padding:13px 34px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">
+            ${escapeHtml(data.ctaLabel ?? 'Open Digilog360')}&nbsp;&rarr;
+          </a>
+        </td></tr>
+      </table>`
+    : '';
+
+  const html = renderShell({
+    subject,
+    preheader: `${data.headline} — ${data.orgName}`,
+    accent,
+    orgName: data.orgName,
+    pillHtml: chip(data.pill, pillColor),
+    headline: data.headline,
+    greeting,
+    intro: data.intro,
+    bodyHtml,
+    ctaHtml,
+    footerNote: (settings?.footer_note ?? '').trim() || undefined,
+    footerReason: data.footerReason
+      ?? `You are receiving this because you monitor operations for <strong style="color:#64748b;">${escapeHtml(data.orgName)}</strong> on Digilog360.`,
+  });
+
+  const text = [
+    data.headline,
+    '',
+    data.intro,
+    '',
+    ...(data.items ?? []).map((i) => `- ${i.label}${i.detail ? ` · ${i.detail}` : ''}`),
+    data.ctaUrl ? `\n${data.ctaLabel ?? 'Open Digilog360'}: ${data.ctaUrl}` : '',
+    `\n— Digilog360 · ${data.orgName}`,
+  ].filter((l) => l !== '').join('\n');
+
+  return { subject, html, text };
 }

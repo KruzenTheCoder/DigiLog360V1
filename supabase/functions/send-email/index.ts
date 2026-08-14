@@ -11,7 +11,7 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { serviceClient, requireUser, isSuperUser } from '../_shared/auth.ts';
 
 const RESEND_URL = 'https://api.resend.com/emails';
-const FROM = Deno.env.get('EMAIL_FROM') ?? 'DigiLog 360 <no-reply@digilog360.local>';
+const FROM = Deno.env.get('EMAIL_FROM') ?? 'Digilog360 <no-reply@digilog360.local>';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });

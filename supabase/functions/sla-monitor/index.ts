@@ -4,6 +4,7 @@
 // insert a row in public.notifications so the in-app inbox shows it too.
 // Schedule via pg_cron or an external scheduler hitting this endpoint.
 import { corsHeaders, json } from '../_shared/cors.ts';
+import { renderSystemEmail } from '../_shared/email-templates.ts';
 import { serviceClient } from '../_shared/auth.ts';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
@@ -45,15 +46,26 @@ Deno.serve(async (req) => {
 
   let emailsSent = 0;
 
+  // Org names for the email header — one lookup for the run rather than one
+  // per recipient.
+  const orgNames = new Map<string, string>();
+  {
+    const ids = [...new Set(liveItems.map((o) => o.org_id).filter(Boolean))];
+    if (ids.length > 0) {
+      const { data: orgs } = await admin.from('organizations').select('id, name').in('id', ids);
+      for (const o of (orgs ?? []) as Array<{ id: string; name: string }>) orgNames.set(o.id, o.name);
+    }
+  }
+
   if (affectedSites.size > 0) {
     const { data: recipients } = await admin
       .from('profiles')
-      .select('id, email, expo_push_token, site_id, role, org_id, email_notifications, push_notifications, notify_on_sla_breach')
+      .select('id, full_name, email, expo_push_token, site_id, role, org_id, email_notifications, push_notifications, notify_on_sla_breach')
       .in('site_id', Array.from(affectedSites))
       .in('role', ['control_room', 'supervisor', 'admin', 'manager']);
 
     type Recipient = {
-      id: string; email: string | null; expo_push_token: string | null;
+      id: string; full_name: string | null; email: string | null; expo_push_token: string | null;
       site_id: string | null; role: string; org_id: string;
       email_notifications: boolean | null;
       push_notifications: boolean | null;
@@ -107,6 +119,29 @@ Deno.serve(async (req) => {
 
       if (wantsSla && (r.email_notifications ?? true) && r.email && siteBreached.length > 0) {
         try {
+          const appUrl = (Deno.env.get('PUBLIC_APP_URL') ?? '').replace(/\/+$/, '');
+          // Same shell as every other Digilog360 email — this one fires when
+          // something is going wrong, so it should look the most trustworthy,
+          // not the least.
+          const mail = renderSystemEmail({
+            orgName: orgNames.get(r.org_id) ?? 'Digilog360',
+            appUrl,
+            recipientName: (r.full_name ?? '').split(' ')[0] || null,
+            pill: 'SLA BREACH',
+            pillColor: '#dc2626',
+            headline: `${siteBreached.length} occurrence${siteBreached.length === 1 ? '' : 's'} breached SLA`,
+            intro: siteDue.length > 0
+              ? `${siteBreached.length} past their deadline, and ${siteDue.length} more need an update before they follow.`
+              : 'These are past their response deadline and still open.',
+            itemsTitle: 'Breached',
+            items: siteBreached.map((o) => ({
+              label: o.ob_number ?? `#${o.id}`,
+              detail: `${o.occurrence_type}${o.severity ? ` (${o.severity})` : ''}`,
+              url: appUrl ? `${appUrl}/occurrences/${o.id}` : null,
+            })),
+            ctaUrl: appUrl ? `${appUrl}/occurrences` : null,
+            ctaLabel: 'Open the live board',
+          });
           const apiUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-email`;
           await fetch(apiUrl, {
             method: 'POST',
@@ -116,10 +151,9 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({
               to: r.email,
-              subject: `[DigiLog 360] ${siteBreached.length} SLA breach(es)`,
-              html: `<p>${siteBreached.length} occurrence(s) breached SLA${siteDue.length > 0 ? `; ${siteDue.length} need an update` : ''}.</p>` +
-                `<ul>${siteBreached.map((o) => `<li><strong>${o.ob_number}</strong> · ${o.occurrence_type} (${o.severity})</li>`).join('')}</ul>` +
-                `<p><a href="${Deno.env.get('PUBLIC_APP_URL') ?? ''}/occurrences">Open the live board</a></p>`,
+              subject: mail.subject,
+              html: mail.html,
+              text: mail.text,
             }),
           });
           emailsSent += 1;
