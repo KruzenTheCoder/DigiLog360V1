@@ -663,12 +663,22 @@ async function runWeeklyDigest(admin: Sb, body: Record<string, unknown>) {
         { role: 'system', content: `WHO YOU ARE BRIEFING: a ${brief.label}. ${brief.focus}` },
         { role: 'user', content: ask },
       ], true);
-      if (!res.ok) { failed += people.length; continue; }
+      // Keep the reason. A weekly job nobody watches must not fail silently —
+      // "failed: 3" with no cause is indistinguishable from a send problem.
+      if (!res.ok) {
+        failed += people.length;
+        results.push({ org: org.name, role, generate_error: res.error });
+        continue;
+      }
 
       let parsed: Record<string, unknown> = {};
       try {
         parsed = JSON.parse(res.content.trim().replace(/^```(?:json)?\s*|\s*```$/g, ''));
-      } catch { continue; }
+      } catch {
+        failed += people.length;
+        results.push({ org: org.name, role, parse_error: res.content.slice(0, 200) });
+        continue;
+      }
 
       const routineTypes = Array.isArray(parsed.routine_types)
         ? (parsed.routine_types as unknown[]).map(String) : [];
@@ -737,10 +747,14 @@ async function runWeeklyDigest(admin: Sb, body: Record<string, unknown>) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            // The gateway checks this before send-email runs; the internal key
-            // is what send-email itself checks.
+            // Both header slots carry the SAME key. The gateway rejects a
+            // request whose `apikey` and `Authorization` name different keys
+            // ("Conflicting API keys"), and the anon key is issued in the new
+            // sb_publishable_ format while the service key is still a JWT — so
+            // pairing them silently broke every weekly digest. The internal
+            // key is what send-email itself checks once past the gateway.
             Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`,
-            apikey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+            apikey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
             'x-internal-key': Deno.env.get('INTERNAL_FN_KEY') ?? '',
           },
           body: JSON.stringify({ to, subject: mail.subject, html: mail.html, text: mail.text }),

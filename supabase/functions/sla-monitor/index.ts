@@ -148,8 +148,11 @@ Deno.serve(async (req) => {
             headers: {
               'Content-Type': 'application/json',
               // Gateway auth, then the internal key send-email checks itself.
+              // Both slots must name the same key — mixing the sb_ anon key
+              // with the JWT service key trips "Conflicting API keys" at the
+              // gateway and the breach alert never leaves.
               Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`,
-              apikey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+              apikey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
               'x-internal-key': Deno.env.get('INTERNAL_FN_KEY') ?? '',
             },
             body: JSON.stringify({
