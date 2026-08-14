@@ -51,10 +51,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .from('org_feature_roles')
     .select('feature_key, roles')
     .eq('org_id', scopedOrg);
-  const featureRoles = Object.fromEntries(
+  const featureRoles: Record<string, string[]> = Object.fromEntries(
     ((featureRows ?? []) as Array<{ feature_key: string; roles: string[] | null }>)
       .map((r) => [r.feature_key, r.roles ?? []]),
   );
+
+  // The AI Assistant menu item follows the org's AI switch rather than a
+  // separate feature row. Switching AI off for a tenant should remove the way
+  // in, not leave a link that lands on a page which then refuses.
+  const { data: aiOrg } = await sb
+    .from('organizations')
+    .select('ai_chat_enabled')
+    .eq('id', scopedOrg)
+    .maybeSingle();
+  if (aiOrg && aiOrg.ai_chat_enabled === false) featureRoles.ai_assistant = [];
 
   return (
     <AppShell

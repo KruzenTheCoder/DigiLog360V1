@@ -36,10 +36,17 @@ export default async function MenuPage() {
     .from('org_feature_roles')
     .select('feature_key, roles')
     .eq('org_id', await activeOrgId(profile));
-  const featureRoles = Object.fromEntries(
+  const featureRoles: Record<string, string[]> = Object.fromEntries(
     ((featureRows ?? []) as Array<{ feature_key: string; roles: string[] | null }>)
       .map((r) => [r.feature_key, r.roles ?? []]),
   );
+  // Same rule as the sidebar — otherwise a hidden feature reappears as a card.
+  const { data: aiOrg } = await sb
+    .from('organizations')
+    .select('ai_chat_enabled')
+    .eq('id', await activeOrgId(profile))
+    .maybeSingle();
+  if (aiOrg && aiOrg.ai_chat_enabled === false) featureRoles.ai_assistant = [];
 
   // One menu per role the user holds, so multi-role users (e.g. Control Room +
   // Manager) get a pill switcher. The role filter differentiates the tabs;

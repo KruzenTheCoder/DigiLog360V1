@@ -59,8 +59,16 @@ const PRIORITY: Record<string, { label: string; bar: string; pill: string }> = {
 };
 
 export function AiInsightPanel(
-  { siteId, days = 30, role }: { siteId?: string | null; days?: number; role: string },
+  { siteId, days = 30, role, enabled = true }: {
+    siteId?: string | null; days?: number; role: string;
+    /** False when the org has the briefing switched off. */
+    enabled?: boolean;
+  },
 ) {
+  // Switched off means gone, not a panel explaining that it is off. A section
+  // that exists only to say it does not work is worse than no section.
+  if (!enabled) return null;
+
   const [insight, setInsight] = useState<Insight | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

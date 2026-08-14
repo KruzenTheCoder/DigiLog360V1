@@ -133,6 +133,16 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
     return count ?? 0;
   };
 
+  // Whether this tenant has the AI briefing switched on. Fetched here so the
+  // panel can be omitted entirely rather than rendered and then apologising.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: aiOrg } = await (supabase as any)
+    .from('organizations')
+    .select('ai_insights_enabled')
+    .eq('id', (profile as unknown as { org_id: string }).org_id)
+    .maybeSingle();
+  const aiEnabled = aiOrg?.ai_insights_enabled !== false;
+
   const [{ data: allSites }, data, total30, prevTotal] = await Promise.all([
     sitesQ,
     fetchDashboardOccurrences(),
@@ -289,7 +299,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
 
       {/* Written read of everything below — generated on request, not on load. */}
       <div className="mb-5">
-        <AiInsightPanel siteId={siteParam ?? null} days={30} role={String(profile.role)} />
+        <AiInsightPanel siteId={siteParam ?? null} days={30} role={String(profile.role)} enabled={aiEnabled} />
       </div>
 
       {(breached > 0 || updateDue > 0) && (

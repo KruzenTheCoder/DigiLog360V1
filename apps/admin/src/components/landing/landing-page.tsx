@@ -209,7 +209,7 @@ export function LandingPage(
 
         {/* The brand mark and Sign in live in the persistent site nav now, so
             the hero no longer carries its own copy of both. */}
-        <div className="relative z-10 mx-auto w-full max-w-[92rem] px-5 pb-12 pt-10 sm:px-8 lg:px-12 lg:pb-16 lg:pt-14">
+        <div className="relative z-10 mx-auto w-full max-w-[92rem] px-5 pb-12 pt-2 sm:px-8 lg:px-12 lg:pb-16 lg:pt-4">
           <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-14">
             <div className="min-w-0">
               <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/[0.12] px-3.5 py-1.5 text-[0.68rem] font-bold uppercase tracking-[0.16em] backdrop-blur-sm">
