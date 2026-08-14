@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, isManager } from '@/lib/auth';
+import { activeOrgId } from '@/lib/active-org';
 import { PageHeader } from '@/components/page-header';
 import { InspectionCalendar } from '@/components/inspections/inspection-calendar';
 import Link from 'next/link';
@@ -28,23 +29,26 @@ export interface VisitRow {
 
 export default async function InspectionsPage() {
   const profile = await requireProfile();
+  const orgId = await activeOrgId(profile);
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb: any = supabase;
 
   // A window either side of today so month navigation is instant and doesn't
-  // round-trip. RLS already limits this to the caller's own visits unless they
-  // supervise, so no extra filtering is needed here.
+  // round-trip. RLS limits this to the caller's own visits unless they
+  // supervise — except for a super user, whose reach spans every tenant, so
+  // the active organisation is applied explicitly.
   const from = new Date(Date.now() - 60 * 864e5).toISOString();
   const to = new Date(Date.now() + 120 * 864e5).toISOString();
 
   const [visitsRes, sitesRes, peopleRes] = await Promise.all([
     sb.from('inspection_visits')
       .select('id, schedule_id, site_id, assigned_to, title, instructions, due_at, window_end, status, check_in_at, check_in_distance_m, check_in_within_geofence, completed_at, checklist, findings, outcome')
+      .eq('org_id', orgId)
       .gte('due_at', from).lte('due_at', to)
       .order('due_at', { ascending: true }),
-    sb.from('sites').select('id, name, latitude, longitude, geofence_radius_m').order('name'),
-    sb.from('profiles').select('id, full_name'),
+    sb.from('sites').select('id, name, latitude, longitude, geofence_radius_m').eq('org_id', orgId).order('name'),
+    sb.from('profiles').select('id, full_name').eq('org_id', orgId),
   ]);
 
   return (

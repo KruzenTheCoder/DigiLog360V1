@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, isSuperUser } from '@/lib/auth';
+import { activeOrgId } from '@/lib/active-org';
 import { PageHeader } from '@/components/page-header';
 import { ManagementReportToggleForm } from '@/components/super/management-report-toggle-form';
 import type { AppRole } from '@digilog/shared';
@@ -23,6 +24,9 @@ interface ProfileRow {
 export default async function ManagementReportsPage() {
   const profile = await requireProfile();
   if (!isSuperUser(profile)) redirect('/dashboard');
+  // Per-tenant configuration, so it follows the header picker rather than
+  // listing every company's staff in one toggle list.
+  const orgId = await activeOrgId(profile);
 
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,13 +45,14 @@ export default async function ManagementReportsPage() {
   // Sites lookup is independent of the profiles query — start it now so it
   // runs in parallel rather than after.
   const sitesPromise = (async () => {
-    const { data } = await sb.from('sites').select('id, name');
+    const { data } = await sb.from('sites').select('id, name').eq('org_id', orgId);
     return (data ?? []) as Array<{ id: string; name: string }>;
   })();
 
   const { data: full, error: fullErr } = await sb
     .from('profiles')
     .select(FULL_COLS)
+    .eq('org_id', orgId)
     .order('full_name', { ascending: true, nullsFirst: false });
 
   if (!fullErr) {
@@ -57,6 +62,7 @@ export default async function ManagementReportsPage() {
     const { data: base, error: baseErr } = await sb
       .from('profiles')
       .select(BASE_COLS)
+      .eq('org_id', orgId)
       .order('full_name', { ascending: true, nullsFirst: false });
     if (baseErr) {
       schemaMissing = `Profiles query failed: ${baseErr.message}`;

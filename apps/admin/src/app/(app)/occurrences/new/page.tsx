@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, loadMyCapabilities, can } from '@/lib/auth';
+import { activeOrgId } from '@/lib/active-org';
 import { PageHeader } from '@/components/page-header';
 import { LogIncidentForm } from '@/components/occurrences/log-incident-form';
 import { profileSiteIds, type LogFormConfig, type Site } from '@digilog/shared';
@@ -10,6 +11,11 @@ export default async function NewOccurrencePage() {
   const profile = await requireProfile();
   const supabase = await createClient();
   const caps = await loadMyCapabilities();
+  // Which tenant this occurrence belongs to. Without it a super user was
+  // offered every tenant's sites in the same dropdown, and picking the wrong
+  // one filed the occurrence against another company's site — there are eight
+  // such records in the book already.
+  const orgId = await activeOrgId(profile);
 
   // Every site this user can act on — multi-site aware (site_ids[] ∪ legacy
   // site_id). A plain .eq(profile.site_id) hides sites from multi-site users.
@@ -22,7 +28,8 @@ export default async function NewOccurrencePage() {
 
   // RLS only lets non-admins log occurrences for their own site(s), so only offer those.
   const sitesQuery = (async (): Promise<Site[]> => {
-    let sq = supabase.from('sites').select('*').eq('is_active', true).order('name');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let sq = (supabase as any).from('sites').select('*').eq('org_id', orgId).eq('is_active', true).order('name');
     if (profile.role !== 'admin' && mySites.length > 0) sq = sq.in('id', mySites);
     const { data } = await sq;
     return (data ?? []) as Site[];
@@ -31,10 +38,12 @@ export default async function NewOccurrencePage() {
   // Same-site guards/supervisors who can be credited as the reporter.
   const reportersQuery = (async (): Promise<{ id: string; name: string }[]> => {
     if (!(mySites.length > 0 || profile.role === 'admin')) return [];
-    let query = supabase.from('profiles').select('id, full_name, email').in('role', ['guard', 'supervisor']);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = (supabase as any).from('profiles').select('id, full_name, email').eq('org_id', orgId).in('role', ['guard', 'supervisor']);
     if (profile.role !== 'admin' && mySites.length > 0) query = query.in('site_id', mySites);
     const { data } = await query;
-    return (data ?? []).map((r) => ({ id: r.id, name: r.full_name ?? r.email ?? 'Unknown' }));
+    const people = (data ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>;
+    return people.map((r) => ({ id: r.id, name: r.full_name ?? r.email ?? 'Unknown' }));
   })();
 
   // Assignable users — only fetched when the caller can actually assign.
@@ -54,6 +63,7 @@ export default async function NewOccurrencePage() {
     const { data: flagged } = await sb
       .from('profiles')
       .select('id, full_name, email, role, job_title, site_id')
+      .eq('org_id', orgId)
       .eq('is_active', true)
       .eq('is_assignable', true)
       .order('full_name', { ascending: true, nullsFirst: false });
@@ -65,6 +75,7 @@ export default async function NewOccurrencePage() {
       let q = sb
         .from('profiles')
         .select('id, full_name, email, role, job_title, site_id')
+        .eq('org_id', orgId)
         .eq('is_active', true)
         .in('role', ['guard', 'supervisor', 'control_room', 'manager', 'admin']);
       if (profile.role !== 'admin' && mySites.length > 0) q = q.in('site_id', mySites);
@@ -85,7 +96,7 @@ export default async function NewOccurrencePage() {
   const orgConfigQuery = (async (): Promise<LogFormConfig> => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: orgRow } = await (supabase as any)
-      .from('organizations').select('log_form_config').eq('id', profile.org_id).maybeSingle();
+      .from('organizations').select('log_form_config').eq('id', orgId).maybeSingle();
     return (orgRow?.log_form_config ?? {}) as LogFormConfig;
   })();
 
@@ -98,6 +109,7 @@ export default async function NewOccurrencePage() {
       <PageHeader title="Log New Occurrence" description="Record an occurrence in the security book." />
       <LogIncidentForm
         profile={profile}
+        orgId={orgId}
         sites={(sites ?? []) as Site[]}
         reporters={reporters}
         assignees={assignees}

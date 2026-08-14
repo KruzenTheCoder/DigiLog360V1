@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
+import { activeOrgId } from '@/lib/active-org';
 import { PageHeader } from '@/components/page-header';
 import { VisitorsBoard } from '@/components/visitors/visitors-board';
 import type { Site } from '@digilog/shared';
@@ -16,12 +17,14 @@ interface VisitorRow {
 
 export default async function VisitorsPage() {
   const profile = await requireProfile();
+  const orgId = await activeOrgId(profile);
   const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb: any = supabase;
 
   const [sitesRes, currentRes] = await Promise.all([
-    supabase.from('sites').select('*').order('name'),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('visitors').select('*')
+    sb.from('sites').select('*').eq('org_id', orgId).order('name'),
+    sb.from('visitors').select('*').eq('org_id', orgId)
       .order('signed_in_at', { ascending: false }).limit(200),
   ]);
 

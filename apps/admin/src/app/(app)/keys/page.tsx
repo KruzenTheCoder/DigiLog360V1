@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
+import { activeOrgId } from '@/lib/active-org';
 import { PageHeader } from '@/components/page-header';
 import { KeysBoard } from '@/components/keys/keys-board';
 import type { Site } from '@digilog/shared';
@@ -18,14 +19,15 @@ interface HandoverRow {
 
 export default async function KeysPage() {
   const profile = await requireProfile();
+  const orgId = await activeOrgId(profile);
   const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb: any = supabase;
 
   const [sitesRes, keysRes, handoversRes] = await Promise.all([
-    supabase.from('sites').select('*').order('name'),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('keys').select('*').order('code'),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('key_handovers').select('*').order('taken_at', { ascending: false }).limit(200),
+    sb.from('sites').select('*').eq('org_id', orgId).order('name'),
+    sb.from('keys').select('*').eq('org_id', orgId).order('code'),
+    sb.from('key_handovers').select('*').eq('org_id', orgId).order('taken_at', { ascending: false }).limit(200),
   ]);
 
   return (

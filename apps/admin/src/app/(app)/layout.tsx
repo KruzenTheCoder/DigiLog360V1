@@ -17,12 +17,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Union of the user's assigned sites (site_ids[] + legacy site_id).
   const { ownSites: ownSiteIds, isUnscoped } = siteScope(profile);
 
+  // The tenant this whole shell is dressed for. A super user is a platform
+  // account with no organisation of its own, so branding, feature gates and
+  // the AI switch all have to come from the tenant it is currently viewing —
+  // profile.org_id would be null and every lookup below would come back empty.
+  const scopedOrg = await activeOrgId(profile);
+
   const [capsSet, sitesRows, orgRow] = await Promise.all([
     loadMyCapabilities(),
     ownSiteIds.length > 0
       ? supabase.from('sites').select('id, name').in('id', ownSiteIds)
       : Promise.resolve({ data: [] }),
-    sb.from('organizations').select('show_netstream_logo, netstream_logo_url').eq('id', profile.org_id).maybeSingle(),
+    sb.from('organizations').select('show_netstream_logo, netstream_logo_url').eq('id', scopedOrg).maybeSingle(),
   ]);
 
   // Header site label:
@@ -42,11 +48,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const tenants = isSuper
     ? (((await sb.from('organizations').select('id, name').order('name')).data) ?? []) as Array<{ id: string; name: string }>
     : [];
-  const activeOrg = isSuper ? await activeOrgId(profile) : null;
+  const activeOrg = isSuper ? scopedOrg : null;
 
   // Which roles may see each gated feature in THIS tenant. Absent key = not
   // configured, so the item behaves as it always did.
-  const scopedOrg = await activeOrgId(profile);
   const { data: featureRows } = await sb
     .from('org_feature_roles')
     .select('feature_key, roles')

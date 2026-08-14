@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, isManager } from '@/lib/auth';
+import { activeOrgId } from '@/lib/active-org';
 import { siteScope } from '@/lib/site-scope';
 import { PageHeader } from '@/components/page-header';
 import { GradientSection } from '@/components/ui/gradient-section';
@@ -100,6 +101,9 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
   const days = Math.min(365, Math.max(1, Number(params.days) || 30));
 
   const supabase = await createClient();
+  // The tenant this report answers for. A super user's RLS spans every
+  // organisation, so without this the staff table mixes two companies.
+  const orgId = await activeOrgId(profile);
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const now = new Date();
 
@@ -117,6 +121,7 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
   let occQ = sb
     .from('occurrences')
     .select('id, status, severity, occurrence_type, site_id, site_name, incident_at, closed_at, sla_due_at, last_sla_update_at, sla_hours, logged_by, assigned_to')
+    .eq('org_id', orgId)
     .gte('incident_at', since)
     .order('incident_at', { ascending: false });
   if (scopeSites) occQ = occQ.in('site_id', scopeSites);
@@ -134,13 +139,13 @@ export default async function StaffReportsPage({ searchParams }: PageProps) {
     { data: tasksRaw },
   ] = await Promise.all([
     occQ,
-    sb.from('profiles').select('id, full_name, email, role, roles, site_id'),
-    sb.from('sites').select('id, name'),
+    sb.from('profiles').select('id, full_name, email, role, roles, site_id').eq('org_id', orgId),
+    sb.from('sites').select('id, name').eq('org_id', orgId),
     sb.from('manager_acknowledgements').select('reviewed_by, reviewed_at, occurrence_id').gte('reviewed_at', since),
-    sb.from('patrols').select('id, guard_id, duration_minutes, started_at').gte('started_at', since),
+    sb.from('patrols').select('id, guard_id, duration_minutes, started_at').eq('org_id', orgId).gte('started_at', since),
     sb.from('checkpoint_scans').select('id, guard_id, scanned_at').gte('scanned_at', since),
-    sb.from('shifts').select('id, user_id, duration_minutes, started_at').gte('started_at', since),
-    sb.from('tasks').select('id, assigned_to, status, created_at').gte('created_at', since),
+    sb.from('shifts').select('id, user_id, duration_minutes, started_at').eq('org_id', orgId).gte('started_at', since),
+    sb.from('tasks').select('id, assigned_to, status, created_at').eq('org_id', orgId).gte('created_at', since),
   ]);
 
   const occ = (occRaw ?? []) as unknown as DashboardOcc[];

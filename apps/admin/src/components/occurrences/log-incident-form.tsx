@@ -33,11 +33,18 @@ interface Assignee { id: string; name: string; role: string; jobTitle?: string |
 const EMERGENCY_OPTIONS = ['Police', 'Fire', 'Medical', 'Private Security', 'Other'] as const;
 
 export function LogIncidentForm({
-  profile, sites, reporters, assignees = [],
+  profile, orgId, sites, reporters, assignees = [],
   canAssign = false, canLogManagementReport = false,
   formConfig = {},
 }: {
   profile: Profile;
+  /**
+   * The tenant this occurrence is filed under. The column otherwise defaults
+   * to current_org_id() — the logger's own organisation — which filed a super
+   * user's occurrences under their home tenant no matter which company's site
+   * they picked.
+   */
+  orgId: string | null;
   sites: Site[];
   reporters: { id: string; name: string }[];
   assignees?: Assignee[];
@@ -197,6 +204,7 @@ export function LogIncidentForm({
     const assignee = assignees.find((a) => a.id === assignedTo) ?? null;
 
     const insertPayload: Record<string, unknown> = {
+      ...(orgId ? { org_id: orgId } : {}),
       occurrence_type: type,
       category,
       subcategory,
