@@ -8,6 +8,7 @@ import { ImageGallery } from '@/components/occurrences/image-gallery';
 import { VoiceNoteGallery } from '@/components/occurrences/voice-note-gallery';
 import { OccurrenceActions } from '@/components/occurrences/occurrence-actions';
 import { AssignmentCard } from '@/components/occurrences/assignment-card';
+import { EscalateCard } from '@/components/occurrences/escalate-card';
 import { CommentsThread } from '@/components/occurrences/comments-thread';
 import { formatDateTime } from '@/lib/utils';
 import {
@@ -62,6 +63,21 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
   const voiceNotes = (voiceRes?.data ?? []) as OccurrenceVoiceNote[];
   const comments = (commentsRes?.data ?? []) as OccurrenceComment[];
   const assignables = (assignablesRes.data ?? []) as { id: string; full_name: string | null; email: string | null; role: AppRole }[];
+
+  // Escalation trail + who currently holds it. Separate from the batch above
+  // because these columns arrived after this page was written.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sbEsc: any = supabase;
+  const { data: escRows } = await sbEsc
+    .from('occurrence_escalations')
+    .select('level, from_name, to_name, reason, created_at')
+    .eq('occurrence_id', Number(id))
+    .order('level', { ascending: true });
+  const escalations = (escRows ?? []) as Array<{
+    level: number; from_name: string | null; to_name: string | null;
+    reason: string | null; created_at: string;
+  }>;
+  const escalatedToName = escalations.length ? escalations[escalations.length - 1].to_name : null;
 
   // The whole detail view is themed to the occurrence's SEVERITY colour
   // (critical = red, high = orange, medium = amber, low = blue): a top accent
@@ -162,6 +178,15 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
             // @ts-expect-error column added by 20260603000005 migration
             currentAssigneeName={o.assigned_to_name ?? null}
             assignables={assignables}
+          />
+
+          <EscalateCard
+            occurrenceId={o.id}
+            status={String(o.status)}
+            escalatedToName={escalatedToName}
+            // @ts-expect-error columns added by 20260814000004 migration
+            escalationLevel={o.escalation_level ?? 0}
+            history={escalations}
           />
 
         <GradientSection title="Update Timeline" icon="History" tone={sevTone} className="h-fit">

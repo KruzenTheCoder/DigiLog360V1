@@ -45,6 +45,7 @@ export const NAV: NavSection[] = [
       { label: 'Patrols', href: '/patrols', icon: 'Footprints', capability: 'patrols.view' },
       { label: 'Checkpoints', href: '/checkpoints', icon: 'MapPin', roles: REVIEWERS, capability: 'checkpoints.manage' },
       { label: 'Team Status', href: '/team', icon: 'Users', roles: REVIEWERS, capability: 'team.view' },
+      { label: 'Organogram', href: '/organogram', icon: 'Network' },
       { label: 'Visitor Log', href: '/visitors', icon: 'LogIn', capability: 'visitors.manage' },
       { label: 'Key Register', href: '/keys', icon: 'KeyRound', capability: 'keys.manage' },
       { label: 'Shifts', href: '/shifts', icon: 'Clock', roles: REVIEWERS, capability: 'shifts.view_all' },
