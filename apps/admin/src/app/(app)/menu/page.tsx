@@ -1,4 +1,6 @@
 import { requireProfile, loadMyCapabilities } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
+import { activeOrgId } from '@/lib/active-org';
 import { siteScope } from '@/lib/site-scope';
 import { visibleSections } from '@/components/layout/nav-config';
 import { RoleMenu, type RoleMenuData } from '@/components/menu/role-menu';
@@ -26,6 +28,19 @@ export default async function MenuPage() {
   const profile = await requireProfile();
   const caps = await loadMyCapabilities();
 
+  // The launcher must honour the same per-tenant feature gates as the sidebar,
+  // or a hidden feature would simply reappear as a card here.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb: any = await createClient();
+  const { data: featureRows } = await sb
+    .from('org_feature_roles')
+    .select('feature_key, roles')
+    .eq('org_id', await activeOrgId(profile));
+  const featureRoles = Object.fromEntries(
+    ((featureRows ?? []) as Array<{ feature_key: string; roles: string[] | null }>)
+      .map((r) => [r.feature_key, r.roles ?? []]),
+  );
+
   // One menu per role the user holds, so multi-role users (e.g. Control Room +
   // Manager) get a pill switcher. The role filter differentiates the tabs;
   // shared items only appear under the highest-ranked role — see dedupe below.
@@ -43,7 +58,7 @@ export default async function MenuPage() {
   const seenHrefs = new Set<string>();
   const roleMenus: RoleMenuData[] = [];
   for (const role of rankedRoles) {
-    const sections = visibleSections([role], caps)
+    const sections = visibleSections([role], caps, featureRoles)
       .map((s) => ({
         ...s,
         items: s.items.filter((i) => {

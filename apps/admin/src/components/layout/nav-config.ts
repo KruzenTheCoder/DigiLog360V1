@@ -6,6 +6,13 @@ export interface NavItem {
   icon: string; // lucide icon name
   roles?: AppRole[];          // visible to these roles (undefined = all web roles)
   capability?: CapabilityKey | string;  // optional capability gate (and-ed with roles)
+  /**
+   * Optional per-tenant feature gate. When set, the item is shown only to
+   * roles listed in org_feature_roles for this organisation — a super user
+   * always sees it. Lets a new surface ship to one role at a time instead of
+   * appearing in everyone's menu the day it lands.
+   */
+  feature?: string;
 }
 
 export interface NavSection {
@@ -24,7 +31,7 @@ export const NAV: NavSection[] = [
       { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
       { label: 'Live Occurrences', href: '/occurrences', icon: 'Radio' },
       { label: 'Notifications', href: '/notifications', icon: 'Bell' },
-      { label: 'AI Assistant', href: '/assistant', icon: 'Sparkles' },
+      { label: 'AI Assistant', href: '/assistant', icon: 'Sparkles', feature: 'ai_assistant' },
     ],
   },
   {
@@ -45,12 +52,12 @@ export const NAV: NavSection[] = [
       { label: 'Patrols', href: '/patrols', icon: 'Footprints', capability: 'patrols.view' },
       { label: 'Checkpoints', href: '/checkpoints', icon: 'MapPin', roles: REVIEWERS, capability: 'checkpoints.manage' },
       { label: 'Team Status', href: '/team', icon: 'Users', roles: REVIEWERS, capability: 'team.view' },
-      { label: 'Organogram', href: '/organogram', icon: 'Network' },
+      { label: 'Organogram', href: '/organogram', icon: 'Network', feature: 'organogram' },
       { label: 'Visitor Log', href: '/visitors', icon: 'LogIn', capability: 'visitors.manage' },
       { label: 'Key Register', href: '/keys', icon: 'KeyRound', capability: 'keys.manage' },
       { label: 'Shifts', href: '/shifts', icon: 'Clock', roles: REVIEWERS, capability: 'shifts.view_all' },
       { label: 'Patrol Schedules', href: '/patrols/schedules', icon: 'CalendarClock', roles: REVIEWERS, capability: 'patrols.schedule_manage' },
-      { label: 'Site Inspections', href: '/inspections', icon: 'ClipboardCheck' },
+      { label: 'Site Inspections', href: '/inspections', icon: 'ClipboardCheck', feature: 'inspections' },
       { label: 'Guard Map', href: '/guards-map', icon: 'Map', roles: REVIEWERS, capability: 'guards.map_view' },
     ],
   },
@@ -95,7 +102,7 @@ export const NAV: NavSection[] = [
       { label: 'Occurrence Taxonomy', href: '/super/taxonomy', icon: 'ListTree', roles: ['super_user'] },
       { label: 'Form Builder', href: '/super/form-builder', icon: 'LayoutTemplate', roles: ['super_user'] },
       { label: 'Email Alerts', href: '/super/email-alerts', icon: 'Mail', roles: ['super_user'] },
-      { label: 'AI Assistant', href: '/super/ai', icon: 'Sparkles', roles: ['super_user'] },
+      { label: 'AI & Features', href: '/super/ai', icon: 'Sparkles', roles: ['super_user'] },
       { label: 'Welcome Packs', href: '/super/welcome-packs', icon: 'MailPlus', roles: ['super_user'] },
     ],
   },
@@ -115,6 +122,12 @@ export const NAV: NavSection[] = [
 export function visibleSections(
   rolesOrRole: AppRole | AppRole[],
   caps?: Set<string> | null,
+  /**
+   * feature key -> roles allowed, from org_feature_roles. A key that is absent
+   * means "not configured", so the item shows as it always did; an empty array
+   * means nobody but a super user.
+   */
+  featureRoles?: Record<string, string[]> | null,
 ): NavSection[] {
   const roles = Array.isArray(rolesOrRole) ? rolesOrRole : [rolesOrRole];
   const isSuper = !!caps && caps.has('*');
@@ -124,6 +137,10 @@ export function visibleSections(
       items: section.items.filter((i) => {
         if (i.roles && !i.roles.some((r) => roles.includes(r))) return false;
         if (caps && i.capability && !isSuper && !caps.has(i.capability)) return false;
+        if (i.feature && !isSuper && featureRoles) {
+          const allowed = featureRoles[i.feature];
+          if (allowed && !allowed.some((r) => roles.includes(r as AppRole))) return false;
+        }
         return true;
       }),
     }))

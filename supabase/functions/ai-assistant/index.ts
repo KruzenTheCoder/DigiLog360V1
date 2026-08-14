@@ -535,9 +535,9 @@ Every action must address an INCIDENT pattern, never routine volume. Give betwee
   if (mode === 'chat') {
     // Chat is an AI feature too, so the master switch must cover it.
     const { data: orgChat } = await admin
-      .from('organizations').select('ai_insights_enabled').eq('id', orgId).maybeSingle();
-    if (orgChat && orgChat.ai_insights_enabled === false) {
-      return json({ error: 'AI features are switched off for this organisation.' }, 403);
+      .from('organizations').select('ai_chat_enabled').eq('id', orgId).maybeSingle();
+    if (orgChat && orgChat.ai_chat_enabled === false) {
+      return json({ error: 'The AI assistant is switched off for this organisation.' }, 403);
     }
     const message = String(body.message ?? '').trim();
     if (!message) return json({ error: 'message is required' }, 400);

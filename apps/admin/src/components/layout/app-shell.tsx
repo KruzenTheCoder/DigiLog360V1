@@ -17,7 +17,7 @@ import { BRAND, ROLE_LABELS, type Profile } from '@digilog/shared';
 export function AppShell({
   profile, siteName, children, capabilities = [],
   showNetstreamLogo = true, netstreamLogoUrl = null, siteCount = 0,
-  tenants = [], activeOrg = null,
+  tenants = [], activeOrg = null, featureRoles = null,
 }: {
   profile: Profile;
   siteName: string | null;
@@ -33,6 +33,8 @@ export function AppShell({
   /** Organisations a super user may switch between. Empty for everyone else. */
   tenants?: Array<{ id: string; name: string }>;
   activeOrg?: string | null;
+  /** feature key -> roles allowed, from org_feature_roles. */
+  featureRoles?: Record<string, string[]> | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -43,7 +45,7 @@ export function AppShell({
   const roleList = Array.isArray(profile.roles) && profile.roles.length > 0
     ? profile.roles
     : [profile.role];
-  const sections = visibleSections(roleList, caps);
+  const sections = visibleSections(roleList, caps, featureRoles);
 
   // Admin / Manager / Control Room navigate from the /menu hub (full card
   // grid), so the sidebar is redundant for them. Hide it when the user holds

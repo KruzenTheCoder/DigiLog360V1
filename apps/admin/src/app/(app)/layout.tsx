@@ -44,6 +44,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     : [];
   const activeOrg = isSuper ? await activeOrgId(profile) : null;
 
+  // Which roles may see each gated feature in THIS tenant. Absent key = not
+  // configured, so the item behaves as it always did.
+  const scopedOrg = await activeOrgId(profile);
+  const { data: featureRows } = await sb
+    .from('org_feature_roles')
+    .select('feature_key, roles')
+    .eq('org_id', scopedOrg);
+  const featureRoles = Object.fromEntries(
+    ((featureRows ?? []) as Array<{ feature_key: string; roles: string[] | null }>)
+      .map((r) => [r.feature_key, r.roles ?? []]),
+  );
+
   return (
     <AppShell
       profile={profile}
@@ -54,6 +66,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       netstreamLogoUrl={orgRow.data?.netstream_logo_url ?? null}
       tenants={tenants}
       activeOrg={activeOrg}
+      featureRoles={featureRoles}
     >
       {children}
     </AppShell>

@@ -297,28 +297,23 @@ function renderShell(opts: {
              style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,.08);">
 
         <!-- Brand header.
-             The wordmark sits on WHITE, as it does on the sign-in screen, so
-             the two brand colours actually read — metallic blue "DigiLog" and
-             silver "360". The app renders those as clipped gradients, which no
-             mail client supports, so these are the midpoints of each gradient:
-             close enough to be the same mark, and legible everywhere.
-             The gradient survives as the rule beneath, and the coloured event
-             band directly below still carries the tone of the message. -->
+             The gradient band is the platform's signature, so it stays. The
+             wordmark on it uses the app's ON-DARK palette — pale blue
+             "DigiLog", near-white "360" — which is how the Logo component
+             renders against the same gradient in the sidebar and on the
+             sign-in panel. The app clips those from gradients, which no mail
+             client supports, so each is the midpoint of its gradient: the
+             same mark, legible in Outlook. -->
         <tr>
-          <td bgcolor="#ffffff" style="background:#ffffff;padding:20px 32px 16px;">
+          <td bgcolor="${opts.accent}" style="background-image:linear-gradient(135deg,${opts.accent} 0%,${BRAND_GRADIENT_TO} 100%);padding:20px 32px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-              <td style="font-family:'Segoe UI',Arial,sans-serif;font-size:22px;font-weight:800;letter-spacing:-.02em;white-space:nowrap;">
-                <span style="color:#2f6fb0;">DigiLog</span><span style="color:#94a3b8;">360</span>
+              <td style="font-family:'Segoe UI',Arial,sans-serif;font-size:23px;font-weight:800;letter-spacing:-.02em;white-space:nowrap;">
+                <span style="color:#bfe0ff;">DigiLog</span><span style="color:#ffffff;">360</span>
               </td>
-              <td align="right" style="font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:600;color:#64748b;">
+              <td align="right" style="font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);">
                 ${escapeHtml(opts.orgName)}
               </td>
             </tr></table>
-          </td>
-        </tr>
-        <tr>
-          <td style="height:4px;line-height:4px;font-size:0;" bgcolor="${opts.accent}">
-            <div style="height:4px;background-image:linear-gradient(90deg,${opts.accent} 0%,${BRAND_GRADIENT_TO} 100%);">&nbsp;</div>
           </td>
         </tr>
 
