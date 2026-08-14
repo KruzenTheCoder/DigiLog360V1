@@ -25,6 +25,11 @@ const MODEL = Deno.env.get('GROQ_MODEL') ?? 'llama-3.3-70b-versatile';
 // How many occurrence records to hand the model. Enough to see a pattern,
 // bounded so a busy org can't blow the context window or the bill.
 const MAX_RECORDS = 200;
+// Of those, how many are listed WITH their free-text description. Descriptions
+// dominate the payload and have sharply diminishing value past a decent
+// sample, since the tallies already carry the distribution.
+const MAX_DETAILED = 60;
+const DESC_CHARS = 140;
 
 // deno-lint-ignore no-explicit-any
 type Sb = any;
@@ -40,6 +45,11 @@ How to answer:
 - Say plainly when the data is too thin to support a conclusion. Do not manufacture a trend from two records.
 - Write in British English, in short paragraphs. No bullet-point soup, no headings unless genuinely useful.
 - You are talking to security professionals. Be direct and concrete; skip the hedging and the motivational filler.
+
+ROUTINE ACTIVITY vs INCIDENTS — this matters more than anything else:
+Many logged occurrences are ROUTINE OPERATIONS, not problems. Opening and closing a gate, opening and closing a warehouse, booking a vehicle in or out, a shift handover — these are the job being done correctly. A high count of them means the site is busy and the logging is working, NOT that something is wrong. Never describe routine volume as a risk, a trend to worry about, or evidence of a procedural failure.
+An INCIDENT is something that went wrong or needs a response: a breach, an intrusion, theft, damage, a fault, an injury, a fire, an alarm, a broken boom, an unauthorised person or vehicle, a policy violation.
+Judge by what the occurrence type MEANS, not by how often it appears. Your analysis, risk assessment and recommended actions must be about INCIDENTS. Mention routine activity only for coverage (is logging happening where it should?) or genuine anomalies (a site that logs no gate activity for a week).
 
 The data is confidential. Discuss it only with the user asking.`;
 
@@ -149,8 +159,10 @@ async function buildContext(admin: Sb, orgId: string, siteId: string | null, day
     ),
   };
 
-  // Full records, per the configured data scope for this deployment.
-  const records = rows.map((r) => [
+  // A detailed sample carries the texture; the tallies above carry the
+  // distribution. Sending every description blew Groq's 12k tokens/minute
+  // on-demand limit on real data, and added little the tallies did not.
+  const line = (r: OccRow, withDesc: boolean) => [
     r.ob_number ?? `#${r.id}`,
     new Date(r.incident_at).toISOString().slice(0, 16).replace('T', ' '),
     r.site_name ?? '—',
@@ -158,17 +170,51 @@ async function buildContext(admin: Sb, orgId: string, siteId: string | null, day
     r.severity ?? '—',
     r.status ?? '—',
     r.assigned_to ? (nameOf.get(r.assigned_to) ?? '—') : 'unassigned',
-    (r.description ?? '').replace(/\s+/g, ' ').slice(0, 220),
-  ].join(' | ')).join('\n');
+    ...(withDesc ? [(r.description ?? '').replace(/\s+/g, ' ').slice(0, DESC_CHARS)] : []),
+  ].join(' | ');
+  const records = rows.slice(0, MAX_DETAILED).map((r) => line(r, true)).join('\n');
+  const brief = rows.slice(MAX_DETAILED).map((r) => line(r, false)).join('\n');
 
   const prompt = `SUMMARY STATISTICS (last ${days} days, ${facts.site_filter}):
 ${JSON.stringify(facts, null, 2)}
 
-OCCURRENCE RECORDS${facts.truncated ? ` (most recent ${MAX_RECORDS} — older ones exist)` : ''}
-Columns: OB | when | site | type | severity | status | assigned to | description
-${records || '(no occurrences in this window)'}`;
+DISTINCT OCCURRENCE TYPES IN THIS WINDOW — classify every one of these:
+${Object.entries(facts.by_type).map(([k, v]) => `- ${k} (${v})`).join('\n') || '(none)'}
 
-  return { facts, prompt, count: rows.length };
+MOST RECENT ${Math.min(MAX_DETAILED, rows.length)} RECORDS IN DETAIL
+Columns: OB | when | site | type | severity | status | assigned to | description
+${records || '(no occurrences in this window)'}${brief ? `
+
+REMAINING ${rows.length - MAX_DETAILED} RECORDS (no description)
+Columns: OB | when | site | type | severity | status | assigned to
+${brief}` : ''}`;
+
+  return { facts, prompt, count: rows.length, rows, nameOf };
+}
+
+function factsFor(rows: OccRow[], days: number, siteLabel: string, nameOf: Map<string, string>) {
+  const now = Date.now();
+  const terminal = new Set(['resolved', 'closed', 'cancelled']);
+  const open = rows.filter((r) => !terminal.has(String(r.status)));
+  const breached = rows.filter((r) => r.sla_due_at && !r.closed_at && new Date(r.sla_due_at).getTime() < now);
+  const closed = rows.filter((r) => r.closed_at);
+  const tally = (key: (r: OccRow) => string | null) => {
+    const m = new Map<string, number>();
+    for (const r of rows) { const k = key(r); if (k) m.set(k, (m.get(k) ?? 0) + 1); }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  };
+  return {
+    window_days: days, site_filter: siteLabel, total: rows.length, truncated: false,
+    open: open.length, resolved: rows.length - open.length, sla_breached: breached.length,
+    avg_resolution_hours: closed.length
+      ? Math.round(closed.reduce((s, r) => s + (new Date(r.closed_at as string).getTime() - new Date(r.incident_at).getTime()), 0) / closed.length / 36e5)
+      : null,
+    by_type: Object.fromEntries(tally((r) => r.occurrence_type).slice(0, 12)),
+    by_site: Object.fromEntries(tally((r) => r.site_name).slice(0, 12)),
+    by_severity: Object.fromEntries(tally((r) => r.severity)),
+    by_status: Object.fromEntries(tally((r) => r.status)),
+    by_assignee: Object.fromEntries(tally((r) => (r.assigned_to ? nameOf.get(r.assigned_to) ?? null : null)).slice(0, 10)),
+  };
 }
 
 /**
@@ -270,12 +316,20 @@ Deno.serve(async (req) => {
 
   // ── Dashboard insight ────────────────────────────────────────────────────
   if (mode === 'insight') {
+    // Super users can switch the briefing off per organisation — some will not
+    // want occurrence text leaving the estate at all.
+    const { data: orgRow } = await admin
+      .from('organizations').select('ai_insights_enabled').eq('id', orgId).maybeSingle();
+    if (orgRow && orgRow.ai_insights_enabled === false) {
+      return json({ error: 'AI insights are switched off for this organisation.' }, 403);
+    }
+
     const scopeKey = `${siteId ?? 'all'}:${days}`;
 
     if (!body.refresh) {
       const { data: cached } = await admin
         .from('ai_insights')
-        .select('headline, body, facts, kpis, actions, model, created_at')
+        .select('headline, body, facts, kpis, actions, routine_kpis, routine_note, routine_types, model, created_at')
         .eq('org_id', orgId).eq('scope_key', scopeKey)
         .maybeSingle();
       // An hour old is still a fair read of a 30-day window, and it keeps the
@@ -295,11 +349,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // KPIs come from the data, never from the model. A headline number an LLM
-    // invented is worse than no number — these are arithmetic on the same
-    // facts the model is shown, so the tiles and the prose cannot disagree.
-    const kpis = buildKpis(ctx.facts);
-
     const res = await callGroq([
       { role: 'system', content: SYSTEM_PROMPT },
       {
@@ -308,10 +357,14 @@ Deno.serve(async (req) => {
 
 Brief the manager who owns this dashboard, and tell them what to DO.
 
+First classify every distinct occurrence type in the data as routine operations or incidents, then analyse ONLY the incidents.
+
 Reply with JSON only, in exactly this shape:
 {
-  "headline": "one sentence naming the single most important thing",
-  "summary": "2-3 short paragraphs: what stands out, where risk is concentrated, what is trending wrong. Separate paragraphs with a blank line. Cite real sites, types and counts.",
+  "routine_types": ["exact type names from the data that are routine operations, not incidents"],
+  "routine_note": "one sentence on routine activity — volume, whether logging coverage looks healthy, anything genuinely odd",
+  "headline": "one sentence naming the single most important thing, about INCIDENTS",
+  "summary": "2-3 short paragraphs about INCIDENTS: what stands out, where risk is concentrated, what is trending wrong. Separate paragraphs with a blank line. Cite real sites, types and counts. Do not treat routine volume as a problem.",
   "actions": [
     {
       "title": "imperative, specific, doable this week",
@@ -323,7 +376,7 @@ Reply with JSON only, in exactly this shape:
   ]
 }
 
-Give between 3 and 5 actions, ordered most important first. Every action must be something a security manager can actually start this week — not "review procedures" but what to review, where, and what the outcome should be. Every "measure" must be a number that can be checked against this dashboard next month.`,
+Every action must address an INCIDENT pattern, never routine volume. Give between 3 and 5 actions, ordered most important first. Every action must be something a security manager can actually start this week — not "review procedures" but what to review, where, and what the outcome should be. Every "measure" must be a number that can be checked against this dashboard next month.`,
       },
     ], true);
     if (!res.ok) return json({ error: res.error }, 502);
@@ -337,6 +390,30 @@ Give between 3 and 5 actions, ordered most important first. Every action must be
     } catch {
       parsed = { headline: 'Operations briefing', summary: res.content.trim(), actions: [] };
     }
+
+    // The model decides which TYPES are routine; the arithmetic is still ours,
+    // so the tiles cannot disagree with the prose above them.
+    const routineTypes = Array.isArray((parsed as { routine_types?: unknown }).routine_types)
+      ? ((parsed as { routine_types: unknown[] }).routine_types).map((x) => String(x)).filter(Boolean)
+      : [];
+    const routineSet = new Set(routineTypes.map((s) => s.toLowerCase().trim()));
+    const isRoutine = (r: OccRow) => routineSet.has(String(r.occurrence_type ?? '').toLowerCase().trim());
+    const incidentRows = ctx.rows.filter((r: OccRow) => !isRoutine(r));
+    const routineRows = ctx.rows.filter((r: OccRow) => isRoutine(r));
+
+    const kpis = buildKpis(factsFor(incidentRows, days, String(ctx.facts.site_filter), ctx.nameOf));
+    const rf = factsFor(routineRows, days, String(ctx.facts.site_filter), ctx.nameOf);
+    const topRoutine = Object.entries(rf.by_type)[0];
+    const routineKpis = routineRows.length === 0 ? [] : [
+      { label: 'Routine logs', value: String(routineRows.length),
+        unit: `${Math.round((routineRows.length / Math.max(1, ctx.rows.length)) * 100)}% of all activity`,
+        tone: 'neutral', note: 'Gate, warehouse and access operations — the job being done' },
+      { label: 'Most logged', value: topRoutine ? String(topRoutine[1]) : '—',
+        unit: topRoutine ? String(topRoutine[0]) : 'none', tone: 'neutral', note: 'Highest-volume routine task' },
+      { label: 'Sites covered', value: String(Object.keys(rf.by_site).length),
+        unit: 'logging routine activity', tone: 'neutral', note: 'A site missing here may not be logging' },
+    ];
+    const routineNote = String((parsed as { routine_note?: unknown }).routine_note ?? '').trim() || null;
 
     const headline = String(parsed.headline ?? 'Operations briefing').trim();
     const text = String(parsed.summary ?? '').trim();
@@ -356,11 +433,13 @@ Give between 3 and 5 actions, ordered most important first. Every action must be
     await admin.from('ai_insights').upsert({
       org_id: orgId, scope_key: scopeKey, site_id: siteId, days,
       headline, body: text, facts: ctx.facts, kpis, actions,
+      routine_kpis: routineKpis, routine_note: routineNote, routine_types: routineTypes,
       model: MODEL, generated_by: userId,
       created_at: new Date().toISOString(),
     }, { onConflict: 'org_id,scope_key' });
 
-    return json({ ok: true, cached: false, headline, body: text, facts: ctx.facts, kpis, actions, model: MODEL });
+    return json({ ok: true, cached: false, headline, body: text, facts: ctx.facts, kpis, actions,
+      routine_kpis: routineKpis, routine_note: routineNote, routine_types: routineTypes, model: MODEL });
   }
 
   // ── Chat ─────────────────────────────────────────────────────────────────

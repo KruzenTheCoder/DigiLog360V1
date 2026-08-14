@@ -9,7 +9,7 @@
 // until the cache ages out.
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, ListChecks, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertCircle, ListChecks, Repeat, RefreshCw, ShieldAlert, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { functionErrorMessage } from '@/lib/fn-error';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,6 +29,10 @@ interface Insight {
   body: string;
   kpis?: Kpi[];
   actions?: Action[];
+  /** Routine operations reported separately so their volume cannot drown the findings. */
+  routine_kpis?: Kpi[];
+  routine_note?: string | null;
+  routine_types?: string[];
   cached?: boolean;
   model?: string;
   created_at?: string;
@@ -80,7 +84,7 @@ export function AiInsightPanel({ siteId, days = 30 }: { siteId?: string | null; 
       const sb: any = supabase;
       const { data } = await sb
         .from('ai_insights')
-        .select('headline, body, kpis, actions, created_at')
+        .select('headline, body, kpis, actions, routine_kpis, routine_note, routine_types, created_at')
         .eq('scope_key', `${siteId ?? 'all'}:${days}`)
         .maybeSingle();
       if (!cancelled) {
@@ -131,22 +135,31 @@ export function AiInsightPanel({ siteId, days = 30 }: { siteId?: string | null; 
           <div>
             <p className="text-base font-semibold leading-snug">{insight.headline}</p>
 
-            {/* Measured figures — computed from the data, not written by the model. */}
+            {/* Measured figures — computed from the data, not written by the model.
+                These describe INCIDENTS only; routine operations are below. */}
             {!!insight.kpis?.length && (
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {insight.kpis.map((k) => (
-                  <div key={k.label} className="rounded-xl border px-3 py-2.5">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
-                      {k.label}
-                    </p>
-                    <p className={`mt-0.5 text-2xl font-bold leading-none ${TONE[k.tone ?? 'neutral']}`}>
-                      {k.value}
-                    </p>
-                    {k.unit && <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">{k.unit}</p>}
-                    {k.note && <p className="mt-0.5 text-[10px] text-[hsl(var(--muted))]">{k.note}</p>}
-                  </div>
-                ))}
-              </div>
+              <>
+                <p className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
+                  <ShieldAlert className="h-3.5 w-3.5" /> Incidents
+                </p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  {insight.kpis.map((k) => (
+                    <div
+                      key={k.label}
+                      className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-3 py-2.5 transition hover:border-[hsl(var(--brand))]/40"
+                    >
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
+                        {k.label}
+                      </p>
+                      <p className={`mt-0.5 text-2xl font-bold leading-none ${TONE[k.tone ?? 'neutral']}`}>
+                        {k.value}
+                      </p>
+                      {k.unit && <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">{k.unit}</p>}
+                      {k.note && <p className="mt-0.5 text-[10px] leading-snug text-[hsl(var(--muted))]">{k.note}</p>}
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
 
             {insight.body && (
@@ -189,6 +202,42 @@ export function AiInsightPanel({ siteId, days = 30 }: { siteId?: string | null; 
                     </li>
                   ))}
                 </ol>
+              </div>
+            )}
+
+            {/* Routine operations — the job being done, not a problem. Kept
+                visibly apart so its volume never colours the findings above. */}
+            {(!!insight.routine_kpis?.length || insight.routine_note) && (
+              <div className="mt-5 rounded-xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--surface))]/60 p-4">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
+                  <Repeat className="h-3.5 w-3.5" /> Routine activity
+                  <span className="font-normal normal-case tracking-normal">— normal operations, not incidents</span>
+                </p>
+                {!!insight.routine_kpis?.length && (
+                  <div className="mt-2.5 grid gap-2 sm:grid-cols-3">
+                    {insight.routine_kpis.map((k) => (
+                      <div key={k.label} className="rounded-lg bg-[hsl(var(--background))] px-3 py-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
+                          {k.label}
+                        </p>
+                        <p className="mt-0.5 text-lg font-bold leading-none">{k.value}</p>
+                        {k.unit && <p className="mt-1 text-[11px] text-[hsl(var(--muted))]">{k.unit}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {insight.routine_note && (
+                  <p className="mt-2.5 text-xs leading-relaxed text-[hsl(var(--muted))]">{insight.routine_note}</p>
+                )}
+                {!!insight.routine_types?.length && (
+                  <p className="mt-2 flex flex-wrap gap-1.5">
+                    {insight.routine_types.map((t) => (
+                      <span key={t} className="rounded-full bg-[hsl(var(--background))] px-2 py-0.5 text-[10px] text-[hsl(var(--muted))]">
+                        {t}
+                      </span>
+                    ))}
+                  </p>
+                )}
               </div>
             )}
 
