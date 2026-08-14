@@ -1,0 +1,66 @@
+{
+  "version": "5",
+  "redirects": {
+    "https://esm.sh/@supabase/supabase-js@2": "https://esm.sh/@supabase/supabase-js@2.112.3"
+  },
+  "remote": {
+    "https://esm.sh/@supabase/supabase-js@2.112.3": "f6b9130984301066587e8917dfab3b3d60be47dc966bd3d04c733bc9423c1cf9"
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@azure/storage-blob@^12.33.0",
+        "npm:@supabase/supabase-js@^2.45.0",
+        "npm:bcryptjs@^2.4.3",
+        "npm:dotenv@^17.4.2",
+        "npm:jimp@^1.6.1",
+        "npm:mssql@^12.6.0",
+        "npm:typescript@^5.6.3",
+        "npm:vitest@^2.1.9",
+        "npm:zxing-wasm@^3.1.2"
+      ]
+    },
+    "members": {
+      "apps/admin": {
+        "packageJson": {
+          "dependencies": [
+            "npm:@digilog/shared@*",
+            "npm:@sentry/nextjs@^8.40.0",
+            "npm:@supabase/ssr@~0.10.3",
+            "npm:@supabase/supabase-js@^2.45.4",
+            "npm:@types/leaflet@^1.9.12",
+            "npm:@types/node@^22.9.0",
+            "npm:@types/react-dom@^19.0.1",
+            "npm:@types/react@^19.0.1",
+            "npm:autoprefixer@^10.4.20",
+            "npm:class-variance-authority@0.7",
+            "npm:clsx@^2.1.1",
+            "npm:date-fns@^3.6.0",
+            "npm:leaflet@^1.9.4",
+            "npm:lucide-react@0.454",
+            "npm:next@^15.0.3",
+            "npm:postcss@^8.4.49",
+            "npm:qrcode.react@^4.1.0",
+            "npm:react-dom@19",
+            "npm:react-leaflet@5",
+            "npm:react@19",
+            "npm:recharts@^2.13.3",
+            "npm:tailwind-merge@^2.5.4",
+            "npm:tailwindcss@^3.4.15",
+            "npm:tesseract.js@^5.1.1",
+            "npm:typescript@^5.6.3",
+            "npm:zod@^3.23.8"
+          ]
+        }
+      },
+      "packages/shared": {
+        "packageJson": {
+          "dependencies": [
+            "npm:typescript@^5.6.3",
+            "npm:zod@^3.23.8"
+          ]
+        }
+      }
+    }
+  }
+}

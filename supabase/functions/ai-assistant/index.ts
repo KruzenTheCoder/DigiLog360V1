@@ -17,20 +17,15 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { serviceClient, requireUser } from '../_shared/auth.ts';
 import { renderDigestEmail } from '../_shared/email-templates.ts';
+import {
+  affordableRows, budget, buildPrompt, factsHash, learnUnknownTypes,
+  loadFacts, loadIncidents, recordUsage, type EngineFacts,
+} from '../_shared/insight-engine.ts';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 // Groq's largest general model. Fast enough for interactive use and strong
 // enough to reason over a few hundred occurrence records.
 const MODEL = Deno.env.get('GROQ_MODEL') ?? 'llama-3.3-70b-versatile';
-
-// How many occurrence records to hand the model. Enough to see a pattern,
-// bounded so a busy org can't blow the context window or the bill.
-const MAX_RECORDS = 200;
-// Of those, how many are listed WITH their free-text description. Descriptions
-// dominate the payload and have sharply diminishing value past a decent
-// sample, since the tallies already carry the distribution.
-const MAX_DETAILED = 60;
-const DESC_CHARS = 140;
 
 /**
  * What each role needs out of the same data. A guard asking "what should I
@@ -87,21 +82,6 @@ Judge by what the occurrence type MEANS, not by how often it appears. Your analy
 
 The data is confidential. Discuss it only with the user asking.`;
 
-interface OccRow {
-  id: number;
-  ob_number: string | null;
-  occurrence_type: string | null;
-  description: string | null;
-  severity: string | null;
-  status: string | null;
-  site_name: string | null;
-  incident_at: string;
-  closed_at: string | null;
-  sla_due_at: string | null;
-  assigned_to: string | null;
-  logged_by: string | null;
-}
-
 async function callGroq(messages: Array<{ role: string; content: string }>, asJson = false) {
   const key = Deno.env.get('GROQ_API_KEY');
   if (!key) return { ok: false as const, error: 'GROQ_API_KEY is not configured on this project.' };
@@ -124,199 +104,101 @@ async function callGroq(messages: Array<{ role: string; content: string }>, asJs
   return { ok: true as const, content, tokens: body?.usage?.total_tokens as number | undefined };
 }
 
-/**
- * Everything the model is allowed to see, gathered server-side.
- * Returns both a compact fact sheet (for auditing) and the prompt text.
- */
-async function buildContext(
-  admin: Sb, orgId: string, siteId: string | null, days: number,
-  scope?: { role: string; userId: string; siteIds: string[] },
-) {
-  const since = new Date(Date.now() - days * 864e5).toISOString();
 
-  let q = admin
-    .from('occurrences')
-    .select('id, ob_number, occurrence_type, description, severity, status, site_name, site_id, incident_at, closed_at, sla_due_at, assigned_to, logged_by')
-    .eq('org_id', orgId)
-    .gte('incident_at', since)
-    .order('incident_at', { ascending: false })
-    .limit(MAX_RECORDS);
-  if (siteId) q = q.eq('site_id', siteId);
-  // Roles below manager see only their own sites — briefing an officer on a
-  // depot they have never visited is noise, and it leaks detail sideways.
-  else if (scope && !['admin', 'super_user'].includes(scope.role) && scope.siteIds.length > 0) {
-    q = q.in('site_id', scope.siteIds);
-  }
-
-  const [{ data: occRaw }, { data: people }, { data: sites }] = await Promise.all([
-    q,
-    admin.from('profiles').select('id, full_name, role').eq('org_id', orgId),
-    admin.from('sites').select('id, name').eq('org_id', orgId),
-  ]);
-
-  const rows = (occRaw ?? []) as OccRow[];
-  const nameOf = new Map<string, string>(
-    ((people ?? []) as Array<{ id: string; full_name: string | null }>)
-      .map((p) => [p.id, p.full_name ?? 'Unknown']),
-  );
-
-  const now = Date.now();
-  const terminal = new Set(['resolved', 'closed', 'cancelled']);
-  const open = rows.filter((r) => !terminal.has(String(r.status)));
-  const breached = rows.filter((r) =>
-    r.sla_due_at && !r.closed_at && new Date(r.sla_due_at).getTime() < now);
-
-  const tally = (key: (r: OccRow) => string | null) => {
-    const m = new Map<string, number>();
-    for (const r of rows) {
-      const k = key(r);
-      if (k) m.set(k, (m.get(k) ?? 0) + 1);
-    }
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  };
-
-  const closed = rows.filter((r) => r.closed_at);
-  const avgHours = closed.length
-    ? Math.round(closed.reduce((s, r) =>
-        s + (new Date(r.closed_at as string).getTime() - new Date(r.incident_at).getTime()), 0)
-        / closed.length / 36e5)
-    : null;
-
-  const facts = {
-    window_days: days,
-    site_filter: siteId ? (((sites ?? []) as Array<{ id: string; name: string }>)
-      .find((s) => s.id === siteId)?.name ?? siteId) : 'All sites',
-    total: rows.length,
-    truncated: rows.length >= MAX_RECORDS,
-    open: open.length,
-    resolved: rows.length - open.length,
-    sla_breached: breached.length,
-    avg_resolution_hours: avgHours,
-    by_type: Object.fromEntries(tally((r) => r.occurrence_type).slice(0, 12)),
-    by_site: Object.fromEntries(tally((r) => r.site_name).slice(0, 12)),
-    by_severity: Object.fromEntries(tally((r) => r.severity)),
-    by_status: Object.fromEntries(tally((r) => r.status)),
-    by_assignee: Object.fromEntries(
-      tally((r) => (r.assigned_to ? nameOf.get(r.assigned_to) ?? null : null)).slice(0, 10),
-    ),
-  };
-
-  // A detailed sample carries the texture; the tallies above carry the
-  // distribution. Sending every description blew Groq's 12k tokens/minute
-  // on-demand limit on real data, and added little the tallies did not.
-  const line = (r: OccRow, withDesc: boolean) => [
-    r.ob_number ?? `#${r.id}`,
-    new Date(r.incident_at).toISOString().slice(0, 16).replace('T', ' '),
-    r.site_name ?? '—',
-    r.occurrence_type ?? '—',
-    r.severity ?? '—',
-    r.status ?? '—',
-    r.assigned_to ? (nameOf.get(r.assigned_to) ?? '—') : 'unassigned',
-    ...(withDesc ? [(r.description ?? '').replace(/\s+/g, ' ').slice(0, DESC_CHARS)] : []),
-  ].join(' | ');
-  const records = rows.slice(0, MAX_DETAILED).map((r) => line(r, true)).join('\n');
-  const brief = rows.slice(MAX_DETAILED).map((r) => line(r, false)).join('\n');
-
-  const prompt = `SUMMARY STATISTICS (last ${days} days, ${facts.site_filter}):
-${JSON.stringify(facts, null, 2)}
-
-DISTINCT OCCURRENCE TYPES IN THIS WINDOW — classify every one of these:
-${Object.entries(facts.by_type).map(([k, v]) => `- ${k} (${v})`).join('\n') || '(none)'}
-
-MOST RECENT ${Math.min(MAX_DETAILED, rows.length)} RECORDS IN DETAIL
-Columns: OB | when | site | type | severity | status | assigned to | description
-${records || '(no occurrences in this window)'}${brief ? `
-
-REMAINING ${rows.length - MAX_DETAILED} RECORDS (no description)
-Columns: OB | when | site | type | severity | status | assigned to
-${brief}` : ''}`;
-
-  return { facts, prompt, count: rows.length, rows, nameOf };
-}
-
-function factsFor(rows: OccRow[], days: number, siteLabel: string, nameOf: Map<string, string>) {
-  const now = Date.now();
-  const terminal = new Set(['resolved', 'closed', 'cancelled']);
-  const open = rows.filter((r) => !terminal.has(String(r.status)));
-  const breached = rows.filter((r) => r.sla_due_at && !r.closed_at && new Date(r.sla_due_at).getTime() < now);
-  const closed = rows.filter((r) => r.closed_at);
-  const tally = (key: (r: OccRow) => string | null) => {
-    const m = new Map<string, number>();
-    for (const r of rows) { const k = key(r); if (k) m.set(k, (m.get(k) ?? 0) + 1); }
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  };
-  return {
-    window_days: days, site_filter: siteLabel, total: rows.length, truncated: false,
-    open: open.length, resolved: rows.length - open.length, sla_breached: breached.length,
-    avg_resolution_hours: closed.length
-      ? Math.round(closed.reduce((s, r) => s + (new Date(r.closed_at as string).getTime() - new Date(r.incident_at).getTime()), 0) / closed.length / 36e5)
-      : null,
-    by_type: Object.fromEntries(tally((r) => r.occurrence_type).slice(0, 12)),
-    by_site: Object.fromEntries(tally((r) => r.site_name).slice(0, 12)),
-    by_severity: Object.fromEntries(tally((r) => r.severity)),
-    by_status: Object.fromEntries(tally((r) => r.status)),
-    by_assignee: Object.fromEntries(tally((r) => (r.assigned_to ? nameOf.get(r.assigned_to) ?? null : null)).slice(0, 10)),
-  };
-}
 
 /**
- * The measured half of the briefing. Every figure here is arithmetic on the
- * same facts handed to the model, so a tile can never contradict the prose —
- * and a wrong number can be traced to a query rather than to a hallucination.
+ * The measured half of the briefing, built from the engine's facts.
+ *
+ * Every figure is arithmetic over the COMPLETE window, computed in Postgres,
+ * so a tile can never contradict the prose — and a wrong number can be traced
+ * to a query rather than to a hallucination. These also stand on their own
+ * when the model is unavailable: the numbers are still true.
  */
-// deno-lint-ignore no-explicit-any
-function buildKpis(f: any) {
-  const total = Number(f.total ?? 0);
+function buildKpisFromFacts(facts: EngineFacts) {
+  const inc = facts.incident;
+  const total = inc.total;
   const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
-  const topEntry = (obj: Record<string, number> | undefined) => {
+  const top = (obj: Record<string, number>) => {
     const e = Object.entries(obj ?? {});
     return e.length ? e[0] : null;
   };
-  const topSite = topEntry(f.by_site);
-  const topType = topEntry(f.by_type);
-  const unassigned = total - Object.values<number>(f.by_assignee ?? {}).reduce((s, n) => s + Number(n), 0);
+  const topSite = top(inc.by_site);
+  const topType = top(inc.by_type);
 
   return [
     {
-      label: 'Occurrences', value: String(total), unit: `in ${f.window_days} days`,
+      label: 'Incidents', value: String(total), unit: `in ${facts.window_days} days`,
       tone: 'neutral',
-      note: f.truncated ? 'Capped at the most recent 200 for analysis' : 'All records in the window',
+      note: `Out of ${facts.total} occurrences logged — routine activity excluded`,
     },
     {
-      label: 'Still open', value: String(f.open ?? 0), unit: `${pct(Number(f.open ?? 0))}% of total`,
-      tone: pct(Number(f.open ?? 0)) > 40 ? 'bad' : 'good',
-      note: `${f.resolved ?? 0} resolved or closed`,
+      label: 'Still open', value: String(inc.open), unit: `${pct(inc.open)}% of incidents`,
+      tone: pct(inc.open) > 40 ? 'bad' : 'good',
+      note: `${total - inc.open} resolved or closed`,
     },
     {
-      label: 'SLA breached', value: String(f.sla_breached ?? 0),
-      unit: `${pct(Number(f.sla_breached ?? 0))}% of total`,
-      tone: Number(f.sla_breached ?? 0) > 0 ? 'bad' : 'good',
-      note: Number(f.sla_breached ?? 0) > 0 ? 'Past due and not closed' : 'Nothing past due',
+      label: 'SLA breached', value: String(inc.sla_breached),
+      unit: `${pct(inc.sla_breached)}% of incidents`,
+      tone: inc.sla_breached > 0 ? 'bad' : 'good',
+      note: inc.sla_breached > 0 ? 'Past due and not closed' : 'Nothing past due',
     },
     {
       label: 'Avg resolution',
-      value: f.avg_resolution_hours == null ? '—' : String(f.avg_resolution_hours),
+      value: inc.avg_resolution_hours == null ? '—' : String(inc.avg_resolution_hours),
       unit: 'hours to close', tone: 'neutral',
-      note: 'Across everything closed in the window',
+      note: 'Across every incident closed in the window',
     },
     {
       label: 'Busiest site', value: topSite ? String(topSite[1]) : '—',
       unit: topSite ? `${pct(Number(topSite[1]))}% at ${topSite[0]}` : 'no data',
       tone: topSite && pct(Number(topSite[1])) > 60 ? 'warn' : 'neutral',
-      note: 'Concentration of workload',
+      note: 'Where incidents concentrate',
     },
     {
       label: 'Most common type', value: topType ? String(topType[1]) : '—',
       unit: topType ? String(topType[0]) : 'no data',
-      tone: 'neutral', note: 'Single largest occurrence category',
+      tone: 'neutral', note: 'Largest incident category',
     },
     {
-      label: 'Unassigned', value: String(Math.max(0, unassigned)),
-      unit: `${pct(Math.max(0, unassigned))}% of total`,
-      tone: pct(Math.max(0, unassigned)) > 50 ? 'bad' : 'warn',
+      label: 'Unassigned', value: String(inc.unassigned),
+      unit: `${pct(inc.unassigned)}% of incidents`,
+      tone: pct(inc.unassigned) > 50 ? 'bad' : 'warn',
       note: 'Nobody accountable for these yet',
     },
   ];
+}
+
+/** Routine activity is coverage evidence, not risk — reported separately. */
+function routineKpisFromFacts(facts: EngineFacts) {
+  if (facts.routine.total === 0) return [];
+  const topRoutine = Object.entries(facts.routine.by_type)[0];
+  const share = Math.round((facts.routine.total / Math.max(1, facts.total)) * 100);
+  const tiles = [
+    { label: 'Routine logs', value: String(facts.routine.total),
+      unit: `${share}% of all activity`, tone: 'neutral',
+      note: 'Gate, warehouse and access operations — the job being done' },
+    { label: 'Most logged', value: topRoutine ? String(topRoutine[1]) : '—',
+      unit: topRoutine ? String(topRoutine[0]) : 'none', tone: 'neutral',
+      note: 'Highest-volume routine task' },
+    { label: 'Sites covered', value: String(Object.keys(facts.routine.by_site).length),
+      unit: 'logging routine activity', tone: 'neutral',
+      note: 'A site missing here may not be logging' },
+  ];
+  if (facts.routine_anomalies > 0) {
+    tiles.push({
+      label: 'Went wrong', value: String(facts.routine_anomalies),
+      unit: 'routine tasks', tone: 'warn',
+      note: 'Severe, breaching or left open — pulled into the incident list',
+    });
+  }
+  return tiles;
+}
+
+/** Assignee names, for turning ids into people in the prompt. */
+async function loadNames(admin: Sb, orgId: string): Promise<Map<string, string>> {
+  const { data } = await admin.from('profiles').select('id, full_name').eq('org_id', orgId);
+  return new Map(((data ?? []) as Array<{ id: string; full_name: string | null }>)
+    .map((p) => [p.id, p.full_name ?? 'Unknown']));
 }
 
 Deno.serve(async (req) => {
@@ -422,47 +304,105 @@ Deno.serve(async (req) => {
     // Role is part of the key: an officer and an admin must not share a cached
     // briefing, because they are not being told the same thing.
     const scopeKey = `${siteId ?? 'all'}:${days}:${callerRole}`;
+    const startedAt = Date.now();
 
-    if (!body.refresh) {
-      const { data: cached } = await admin
-        .from('ai_insights')
-        .select('headline, body, facts, kpis, actions, routine_kpis, routine_note, routine_types, model, created_at')
-        .eq('org_id', orgId).eq('scope_key', scopeKey)
-        .maybeSingle();
-      // An hour old is still a fair read of a 30-day window, and it keeps the
-      // dashboard instant for everyone after the first viewer.
-      if (cached && Date.now() - new Date(cached.created_at).getTime() < 3600_000) {
-        return json({ ok: true, cached: true, ...cached });
-      }
-    }
+    // Roles below manager are bounded to their own sites; everyone else sees
+    // the estate. Passing null means unscoped, not "no sites".
+    const boundSites = ['admin', 'super_user', 'manager'].includes(callerRole) || callerSiteIds.length === 0
+      ? null
+      : callerSiteIds;
 
-    const ctx = await buildContext(admin, orgId, siteId, days, scope);
-    if (ctx.count === 0) {
+    // ── Facts first, and they are arithmetic ─────────────────────────────
+    // Computed over the COMPLETE window in Postgres. The model is never asked
+    // for a number, so a tile can never disagree with the prose above it.
+    let facts = await loadFacts(admin, orgId, days, siteId, boundSites);
+
+    if (facts.total === 0) {
       return json({
         ok: true, cached: false,
         headline: 'Nothing to report yet',
         body: `No occurrences were logged in the last ${days} days for this view, so there is nothing to analyse.`,
-        facts: ctx.facts,
+        facts,
       });
     }
+
+    // ── Learn any occurrence types we have not classified before ──────────
+    // Vocabulary, not volume: PMI has thirteen types across five thousand
+    // occurrences, so this is a one-off cost per new type and then free.
+    if (facts.unknown_types.length > 0) {
+      const learned = await learnUnknownTypes(admin, orgId, facts.unknown_types, callGroq);
+      if (learned.learned > 0) {
+        await recordUsage(admin, {
+          orgId, mode: 'classify', model: MODEL, totalTokens: learned.tokens,
+          source: 'live', latencyMs: Date.now() - startedAt,
+        });
+        // Re-read: the routine/incident split has just changed underneath us.
+        facts = await loadFacts(admin, orgId, days, siteId, boundSites);
+      }
+    }
+
+    // ── Content-addressed cache ───────────────────────────────────────────
+    // Keyed on the facts themselves rather than on a clock, so a quiet day
+    // costs nothing and a moving one regenerates immediately.
+    const hash = await factsHash(facts, callerRole);
+    if (!body.refresh) {
+      const { data: cached } = await admin
+        .from('ai_insights')
+        .select('headline, body, facts, kpis, actions, routine_kpis, routine_note, routine_types, model, created_at, facts_hash')
+        .eq('org_id', orgId).eq('scope_key', scopeKey)
+        .maybeSingle();
+      if (cached && cached.facts_hash === hash) {
+        await recordUsage(admin, {
+          orgId, mode: 'insight', model: MODEL, source: 'cache',
+          cacheKey: hash, latencyMs: Date.now() - startedAt,
+        });
+        return json({ ok: true, cached: true, ...cached });
+      }
+    }
+
+    // ── Budget ────────────────────────────────────────────────────────────
+    // Shed detail rather than refuse. The record ordering guarantees that what
+    // gets shed is the least serious, never an open critical.
+    const state = await budget(admin);
+    if (state.exhausted) {
+      const { data: stale } = await admin
+        .from('ai_insights')
+        .select('headline, body, facts, kpis, actions, routine_kpis, routine_note, routine_types, model, created_at')
+        .eq('org_id', orgId).eq('scope_key', scopeKey).maybeSingle();
+      // The KPIs are ours, so they stand even when the narrative cannot be
+      // rewritten. A briefing with real numbers and yesterday's prose is far
+      // better than an error card.
+      return json({
+        ok: true, cached: true, budget_exhausted: true,
+        headline: stale?.headline ?? 'Model quota reached',
+        body: stale?.body ?? 'The daily AI allowance is used up. The figures below are live; the written analysis will refresh once the allowance resets.',
+        facts, kpis: buildKpisFromFacts(facts), actions: stale?.actions ?? [],
+        routine_kpis: routineKpisFromFacts(facts), routine_note: stale?.routine_note ?? null,
+        routine_types: stale?.routine_types ?? [], model: MODEL,
+      });
+    }
+
+    const rows = await loadIncidents(admin, orgId, days, siteId, boundSites, affordableRows(state));
+    const nameOf = await loadNames(admin, orgId);
+    const siteLabel = siteId ? (facts.incident.by_site && Object.keys(facts.incident.by_site)[0]) || 'this site' : 'All sites';
+    const promptText = buildPrompt(facts, rows, nameOf, siteLabel);
 
     const res = await callGroq([
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'system', content: `WHO YOU ARE BRIEFING: a ${roleBrief.label}. ${roleBrief.focus}` },
       {
         role: 'user',
-        content: `${ctx.prompt}
+        content: `${promptText}
 
 Brief this ${roleBrief.label} on what matters to them, and tell them what to DO.
 
-First classify every distinct occurrence type in the data as routine operations or incidents, then analyse ONLY the incidents.
+The routine/incident split above has already been made and is correct — do not re-do it, and do not treat routine volume as a problem. Analyse the incidents.
 
 Reply with JSON only, in exactly this shape:
 {
-  "routine_types": ["exact type names from the data that are routine operations, not incidents"],
   "routine_note": "one sentence on routine activity — volume, whether logging coverage looks healthy, anything genuinely odd",
   "headline": "one sentence naming the single most important thing, about INCIDENTS",
-  "summary": "2-3 short paragraphs about INCIDENTS: what stands out, where risk is concentrated, what is trending wrong. Separate paragraphs with a blank line. Cite real sites, types and counts. Do not treat routine volume as a problem.",
+  "summary": "2-3 short paragraphs about INCIDENTS: what stands out, where risk is concentrated, what is trending wrong. Separate paragraphs with a blank line. Cite real sites, types and counts from the figures given. Never invent a number.",
   "actions": [
     {
       "title": "imperative, specific, doable this week",
@@ -474,10 +414,22 @@ Reply with JSON only, in exactly this shape:
   ]
 }
 
+Anything tagged ROUTINE-TASK-GONE-WRONG is a routine task that failed — name it as that, not as a new category of incident. Anything tagged SLA-BREACHED or UNASSIGNED is a process failure worth an action.
+
 Every action must address an INCIDENT pattern, never routine volume. Give between 3 and 5 actions, ordered most important first. Every action must be something a security manager can actually start this week — not "review procedures" but what to review, where, and what the outcome should be. Every "measure" must be a number that can be checked against this dashboard next month.`,
       },
     ], true);
-    if (!res.ok) return json({ error: res.error }, 502);
+    if (!res.ok) {
+      await recordUsage(admin, {
+        orgId, mode: 'insight', model: MODEL, source: 'live',
+        latencyMs: Date.now() - startedAt, ok: false, error: res.error,
+      });
+      return json({ error: res.error }, 502);
+    }
+    await recordUsage(admin, {
+      orgId, mode: 'insight', model: MODEL, totalTokens: res.tokens ?? 0,
+      source: 'live', cacheKey: hash, latencyMs: Date.now() - startedAt,
+    });
 
     // Parse defensively: a model asked for JSON can still return it fenced or
     // with a stray preamble, and a briefing is not worth failing over.
@@ -489,28 +441,12 @@ Every action must address an INCIDENT pattern, never routine volume. Give betwee
       parsed = { headline: 'Operations briefing', summary: res.content.trim(), actions: [] };
     }
 
-    // The model decides which TYPES are routine; the arithmetic is still ours,
-    // so the tiles cannot disagree with the prose above them.
-    const routineTypes = Array.isArray((parsed as { routine_types?: unknown }).routine_types)
-      ? ((parsed as { routine_types: unknown[] }).routine_types).map((x) => String(x)).filter(Boolean)
-      : [];
-    const routineSet = new Set(routineTypes.map((s) => s.toLowerCase().trim()));
-    const isRoutine = (r: OccRow) => routineSet.has(String(r.occurrence_type ?? '').toLowerCase().trim());
-    const incidentRows = ctx.rows.filter((r: OccRow) => !isRoutine(r));
-    const routineRows = ctx.rows.filter((r: OccRow) => isRoutine(r));
-
-    const kpis = buildKpis(factsFor(incidentRows, days, String(ctx.facts.site_filter), ctx.nameOf));
-    const rf = factsFor(routineRows, days, String(ctx.facts.site_filter), ctx.nameOf);
-    const topRoutine = Object.entries(rf.by_type)[0];
-    const routineKpis = routineRows.length === 0 ? [] : [
-      { label: 'Routine logs', value: String(routineRows.length),
-        unit: `${Math.round((routineRows.length / Math.max(1, ctx.rows.length)) * 100)}% of all activity`,
-        tone: 'neutral', note: 'Gate, warehouse and access operations — the job being done' },
-      { label: 'Most logged', value: topRoutine ? String(topRoutine[1]) : '—',
-        unit: topRoutine ? String(topRoutine[0]) : 'none', tone: 'neutral', note: 'Highest-volume routine task' },
-      { label: 'Sites covered', value: String(Object.keys(rf.by_site).length),
-        unit: 'logging routine activity', tone: 'neutral', note: 'A site missing here may not be logging' },
-    ];
+    // The split is the engine's, learned once and held in ai_type_memory, so
+    // the tiles cannot disagree with the prose above them — and two people
+    // reading the same dashboard cannot be shown different classifications.
+    const routineTypes = Object.keys(facts.routine.by_type);
+    const kpis = buildKpisFromFacts(facts);
+    const routineKpis = routineKpisFromFacts(facts);
     const routineNote = String((parsed as { routine_note?: unknown }).routine_note ?? '').trim() || null;
 
     const headline = String(parsed.headline ?? 'Operations briefing').trim();
@@ -530,14 +466,15 @@ Every action must address an INCIDENT pattern, never routine volume. Give betwee
 
     await admin.from('ai_insights').upsert({
       org_id: orgId, scope_key: scopeKey, site_id: siteId, days,
-      headline, body: text, facts: ctx.facts, kpis, actions,
+      headline, body: text, facts, kpis, actions,
       routine_kpis: routineKpis, routine_note: routineNote, routine_types: routineTypes,
       audience_role: callerRole, model: MODEL, generated_by: userId,
-      created_at: new Date().toISOString(),
+      facts_hash: hash, created_at: new Date().toISOString(),
     }, { onConflict: 'org_id,scope_key' });
 
-    return json({ ok: true, cached: false, headline, body: text, facts: ctx.facts, kpis, actions,
-      routine_kpis: routineKpis, routine_note: routineNote, routine_types: routineTypes, model: MODEL });
+    return json({ ok: true, cached: false, headline, body: text, facts, kpis, actions,
+      routine_kpis: routineKpis, routine_note: routineNote, routine_types: routineTypes,
+      model: MODEL, incidents_considered: rows.length });
   }
 
   // ── Chat ─────────────────────────────────────────────────────────────────
@@ -562,23 +499,55 @@ Every action must address an INCIDENT pattern, never routine volume. Give betwee
       .limit(10);
     const history = ((recent ?? []) as Array<{ role: string; content: string }>).reverse();
 
-    const ctx = await buildContext(admin, orgId, siteId, days, scope);
+    // Chat draws on the SAME facts as the dashboard briefing, so the assistant
+    // cannot quote a number the tiles disagree with. It also inherits the full
+    // window: asking "what happened this month" used to be answered from the
+    // most recent day and a half.
+    const chatStarted = Date.now();
+    const boundSites = ['admin', 'super_user', 'manager'].includes(callerRole) || callerSiteIds.length === 0
+      ? null
+      : callerSiteIds;
+
+    const state = await budget(admin);
+    if (state.exhausted) {
+      return json({
+        error: 'The daily AI allowance is used up. Figures on the dashboard are still live; the assistant will answer again once it resets.',
+      }, 429);
+    }
+
+    const facts = await loadFacts(admin, orgId, days, siteId, boundSites);
+    if (facts.unknown_types.length > 0) {
+      await learnUnknownTypes(admin, orgId, facts.unknown_types, callGroq);
+    }
+    const rows = await loadIncidents(admin, orgId, days, siteId, boundSites, affordableRows(state));
+    const nameOf = await loadNames(admin, orgId);
+    const promptText = buildPrompt(facts, rows, nameOf, siteId ? 'this site' : 'All sites');
 
     const res = await callGroq([
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'system', content: `WHO YOU ARE TALKING TO: a ${roleBrief.label}. ${roleBrief.focus}` },
-      { role: 'system', content: `Current operational data you may draw on:\n\n${ctx.prompt}` },
+      { role: 'system', content: `Current operational data you may draw on. The routine/incident split has already been made and is correct.\n\n${promptText}` },
       ...history,
       { role: 'user', content: message },
     ]);
-    if (!res.ok) return json({ error: res.error }, 502);
+    if (!res.ok) {
+      await recordUsage(admin, {
+        orgId, mode: 'chat', model: MODEL, source: 'live',
+        latencyMs: Date.now() - chatStarted, ok: false, error: res.error,
+      });
+      return json({ error: res.error }, 502);
+    }
+    await recordUsage(admin, {
+      orgId, mode: 'chat', model: MODEL, totalTokens: res.tokens ?? 0,
+      source: 'live', latencyMs: Date.now() - chatStarted,
+    });
 
     await admin.from('ai_chat_messages').insert([
       { org_id: orgId, user_id: userId, role: 'user', content: message },
       { org_id: orgId, user_id: userId, role: 'assistant', content: res.content, tokens: res.tokens ?? null },
     ]);
 
-    return json({ ok: true, reply: res.content, model: MODEL, records_considered: ctx.count });
+    return json({ ok: true, reply: res.content, model: MODEL, incidents_considered: rows.length });
   }
 
   return json({ error: `Unknown mode "${mode}"` }, 400);
@@ -625,6 +594,23 @@ async function runWeeklyDigest(admin: Sb, body: Record<string, unknown>) {
     let sent = 0; let failed = 0; let recipients = 0;
     let firstHeadline: string | null = null;
 
+    // The facts and the incident list are the same for every role — only the
+    // framing differs — so they are fetched once per org rather than per role.
+    let orgFacts = await loadFacts(admin, org.id, 7, null, null);
+    if (orgFacts.unknown_types.length > 0) {
+      const learned = await learnUnknownTypes(admin, org.id, orgFacts.unknown_types, callGroq);
+      if (learned.learned > 0) {
+        await recordUsage(admin, {
+          orgId: org.id, mode: 'classify', model: MODEL, totalTokens: learned.tokens, source: 'live',
+        });
+        orgFacts = await loadFacts(admin, org.id, 7, null, null);
+      }
+    }
+    const orgRows = await loadIncidents(admin, org.id, 7, null, null, 60);
+    const orgNames = await loadNames(admin, org.id);
+    const orgPrompt = buildPrompt(orgFacts, orgRows, orgNames, 'All sites');
+    if (orgFacts.total === 0) continue;
+
     for (const role of roles) {
       const { data: peopleRaw } = await admin
         .from('profiles')
@@ -638,17 +624,14 @@ async function runWeeklyDigest(admin: Sb, body: Record<string, unknown>) {
       const brief = ROLE_BRIEF[role] ?? ROLE_BRIEF.guard;
       // One generation per role, shared by everyone holding it — the analysis
       // is about the organisation, not the individual.
-      const ctx = await buildContext(admin, org.id, null, 7);
-      if (ctx.count === 0) continue;
-
       const ask = [
-        ctx.prompt,
+        orgPrompt,
         '',
         'This is the WEEK AHEAD briefing, sent on a Monday morning. Summarise the week just gone and say what to do in the week starting now.',
+        'The routine/incident split above has already been made and is correct — do not re-do it.',
         '',
         'Reply with JSON only:',
         '{',
-        '  "routine_types": ["type names that are routine operations, not incidents"],',
         '  "routine_note": "one sentence on routine activity and logging coverage",',
         '  "headline": "one sentence this reader should see first",',
         '  "summary": "2-3 short paragraphs about INCIDENTS — what happened, what is still open going into this week, what to expect",',
@@ -680,18 +663,15 @@ async function runWeeklyDigest(admin: Sb, body: Record<string, unknown>) {
         continue;
       }
 
-      const routineTypes = Array.isArray(parsed.routine_types)
-        ? (parsed.routine_types as unknown[]).map(String) : [];
-      const routineSet = new Set(routineTypes.map((s) => s.toLowerCase().trim()));
-      const incidents = ctx.rows.filter(
-        (r: OccRow) => !routineSet.has(String(r.occurrence_type ?? '').toLowerCase().trim()));
-      const f = factsFor(incidents, 7, 'All sites', ctx.nameOf);
-      const topSite = Object.entries(f.by_site)[0];
+      // The figures come from the engine's facts, not from the model and not
+      // from a re-derived split, so the email and the dashboard agree.
+      const inc = orgFacts.incident;
+      const topSite = Object.entries(inc.by_site)[0];
 
       const kpis = [
-        { label: 'Incidents', value: String(f.total), unit: 'in the last 7 days' },
-        { label: 'Still open', value: String(f.open), unit: 'going into this week' },
-        { label: 'SLA breached', value: String(f.sla_breached), unit: 'past due, not closed' },
+        { label: 'Incidents', value: String(inc.total), unit: 'in the last 7 days' },
+        { label: 'Still open', value: String(inc.open), unit: 'going into this week' },
+        { label: 'SLA breached', value: String(inc.sla_breached), unit: 'past due, not closed' },
         {
           label: 'Busiest site',
           value: topSite ? String(topSite[1]) : '—',
