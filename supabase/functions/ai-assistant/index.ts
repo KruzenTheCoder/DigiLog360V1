@@ -361,12 +361,21 @@ Deno.serve(async (req) => {
   const { profile: caller } = result;
   if (!caller) return json({ error: 'No profile for caller' }, 403);
 
-  const orgId = (caller as { org_id?: string }).org_id ?? '';
-  const userId = (caller as { id: string }).id;
-  if (!orgId) return json({ error: 'Caller has no organisation' }, 403);
-
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+
+  const userId = (caller as { id: string }).id;
+  const callerOrg = (caller as { org_id?: string }).org_id ?? '';
+
+  // A super user is a PLATFORM account: it administers every tenant and is not
+  // really a member of the one its profile happens to carry. So it may name the
+  // organisation it is acting for — that is what the tenant picker in the
+  // header selects. Everyone else is pinned to their own, whatever they send.
+  const isSuper = (caller as { role?: string }).role === 'super_user';
+  const requestedOrg = typeof body.org_id === 'string' && body.org_id ? body.org_id : null;
+  const orgId = isSuper && requestedOrg ? requestedOrg : callerOrg;
+  if (!orgId) return json({ error: 'No organisation to work with' }, 403);
+
   const mode = String(body.mode ?? 'chat');
 
   // ── Transcript management ────────────────────────────────────────────────

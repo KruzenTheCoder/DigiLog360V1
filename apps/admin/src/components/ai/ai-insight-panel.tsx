@@ -59,10 +59,15 @@ const PRIORITY: Record<string, { label: string; bar: string; pill: string }> = {
 };
 
 export function AiInsightPanel(
-  { siteId, days = 30, role, enabled = true }: {
+  { siteId, days = 30, role, enabled = true, orgId }: {
     siteId?: string | null; days?: number; role: string;
     /** False when the org has the briefing switched off. */
     enabled?: boolean;
+    /**
+     * Tenant to brief on. For a super user this is whatever the header picker
+     * selects, not the org their profile carries — they are a platform account.
+     */
+    orgId: string;
   },
 ) {
   // Switched off means gone, not a panel explaining that it is off. A section
@@ -89,7 +94,7 @@ export function AiInsightPanel(
     setError(null);
     const supabase = createClient();
     const { data, error: err } = await supabase.functions.invoke('ai-assistant', {
-      body: { mode: 'insight', site_id: siteId ?? null, days, refresh },
+      body: { mode: 'insight', site_id: siteId ?? null, days, refresh, org_id: orgId },
     });
     setBusy(false);
     const d = data as (Insight & { ok?: boolean; error?: string }) | null;
@@ -98,7 +103,7 @@ export function AiInsightPanel(
       return;
     }
     setInsight(d);
-  }, [siteId, days]);
+  }, [siteId, days, orgId]);
 
   // Take whatever is already cached on mount, but never pay for a generation
   // the user didn't ask for.
@@ -112,6 +117,7 @@ export function AiInsightPanel(
       const { data } = await sb
         .from('ai_insights')
         .select('headline, body, kpis, actions, routine_kpis, routine_note, routine_types, created_at')
+        .eq('org_id', orgId)
         .eq('scope_key', `${siteId ?? 'all'}:${days}:${role}`)
         .maybeSingle();
       if (!cancelled) {
@@ -120,7 +126,7 @@ export function AiInsightPanel(
       }
     })();
     return () => { cancelled = true; };
-  }, [siteId, days, role]);
+  }, [siteId, days, role, orgId]);
 
   const heroes = (insight?.kpis ?? []).slice(0, 3);
   const counters = (insight?.kpis ?? []).slice(3);

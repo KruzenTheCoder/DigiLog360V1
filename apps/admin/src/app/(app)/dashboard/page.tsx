@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/auth';
+import { activeOrgId } from '@/lib/active-org';
 import { siteScope } from '@/lib/site-scope';
 import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
@@ -136,10 +137,14 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
   // Whether this tenant has the AI briefing switched on. Fetched here so the
   // panel can be omitted entirely rather than rendered and then apologising.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // A super user is a platform account, so "which tenant" comes from the
+  // header picker rather than from whichever org their profile happens to
+  // carry. Everyone else resolves to their own.
+  const aiOrgId = await activeOrgId(profile);
   const { data: aiOrg } = await (supabase as any)
     .from('organizations')
     .select('ai_insights_enabled')
-    .eq('id', (profile as unknown as { org_id: string }).org_id)
+    .eq('id', aiOrgId)
     .maybeSingle();
   const aiEnabled = aiOrg?.ai_insights_enabled !== false;
 
@@ -299,7 +304,13 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
 
       {/* Written read of everything below — generated on request, not on load. */}
       <div className="mb-5">
-        <AiInsightPanel siteId={siteParam ?? null} days={30} role={String(profile.role)} enabled={aiEnabled} />
+        <AiInsightPanel
+          siteId={siteParam ?? null}
+          days={30}
+          role={String(profile.role)}
+          enabled={aiEnabled}
+          orgId={aiOrgId ?? ''}
+        />
       </div>
 
       {(breached > 0 || updateDue > 0) && (

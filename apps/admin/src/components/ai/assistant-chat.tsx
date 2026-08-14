@@ -24,7 +24,7 @@ const SUGGESTIONS = [
   'Is any one person carrying too much of the workload?',
 ];
 
-export function AssistantChat() {
+export function AssistantChat({ orgId }: { orgId: string }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -35,7 +35,7 @@ export function AssistantChat() {
   useEffect(() => {
     (async () => {
       const supabase = createClient();
-      const { data } = await supabase.functions.invoke('ai-assistant', { body: { mode: 'history' } });
+      const { data } = await supabase.functions.invoke('ai-assistant', { body: { mode: 'history', org_id: orgId } });
       const d = data as { messages?: Msg[] } | null;
       setMessages(d?.messages ?? []);
       setLoaded(true);
@@ -57,7 +57,7 @@ export function AssistantChat() {
 
     const supabase = createClient();
     const { data, error: err } = await supabase.functions.invoke('ai-assistant', {
-      body: { mode: 'chat', message },
+      body: { mode: 'chat', message, org_id: orgId },
     });
     setBusy(false);
 
@@ -74,7 +74,7 @@ export function AssistantChat() {
 
   async function clearAll() {
     const supabase = createClient();
-    await supabase.functions.invoke('ai-assistant', { body: { mode: 'clear' } });
+    await supabase.functions.invoke('ai-assistant', { body: { mode: 'clear', org_id: orgId } });
     setMessages([]);
     setError(null);
   }
