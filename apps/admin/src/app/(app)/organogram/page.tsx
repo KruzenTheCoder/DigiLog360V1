@@ -11,11 +11,11 @@ export default async function OrganogramPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb: any = supabase;
 
-  const [{ data: people }, { data: chart }] = await Promise.all([
+  const [{ data: people }, { data: positions }] = await Promise.all([
     sb.from('profiles')
-      .select('id, full_name, email, role, reports_to, is_active')
+      .select('id, full_name, email, role, reports_to, is_active, org_id')
       .order('full_name'),
-    sb.rpc('org_chart'),
+    sb.from('org_chart_positions').select('profile_id, x, y'),
   ]);
 
   return (
@@ -26,7 +26,7 @@ export default async function OrganogramPage() {
       />
       <Organogram
         people={(people ?? []).filter((p: { is_active?: boolean }) => p.is_active !== false)}
-        chart={chart ?? []}
+        positions={positions ?? []}
         canEdit={isManager(profile)}
       />
     </>

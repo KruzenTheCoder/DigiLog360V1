@@ -1,21 +1,20 @@
 'use client';
 
-// The reporting hierarchy, as a tree plus an editor.
+// The organogram as a canvas: drag people to arrange them, drag a connector
+// from one card to another to set who reports to whom.
 //
-// The tree is built client-side from a flat list rather than fetched
-// recursively — org_chart() already returns everyone with their depth, so one
-// round trip is enough. Cycles are impossible by the time data reaches here
-// (a database trigger rejects them at write time), but the builder still
-// guards against orphans so a stale reports_to never hides a person entirely.
+// Built with absolutely-positioned cards over an SVG layer rather than a
+// diagram library — 60 cards and a few dozen lines is well within what plain
+// pointer events handle, and it keeps the admin bundle where it is.
+//
+// Anyone without a saved position gets one computed from the reporting tree,
+// so a chart nobody has arranged still opens tidy rather than as a pile in
+// the corner.
 
-import { useMemo, useState } from 'react';
-import {
-  AlertCircle, Check, ChevronDown, ChevronRight, Loader2, Search, Users2,
-} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, Check, Link2Off, Loader2, RotateCcw, Users2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input, Label, Select } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface Person {
   id: string;
@@ -24,6 +23,7 @@ interface Person {
   role: string;
   reports_to: string | null;
 }
+interface Pos { x: number; y: number }
 
 const ROLE_TONE: Record<string, string> = {
   super_user: '#7c3aed', admin: '#667eea', manager: '#0891b2',
@@ -34,119 +34,248 @@ const ROLE_LABEL: Record<string, string> = {
   control_room: 'Control Room', supervisor: 'Supervisor', guard: 'Officer',
 };
 
-interface Node extends Person { children: Node[] }
+const CARD_W = 190;
+const CARD_H = 62;
+const COL_GAP = 30;
+const ROW_GAP = 110;
 
 export function Organogram({
-  people: initial, canEdit,
+  people: initial, positions: savedPositions, canEdit,
 }: {
   people: Person[];
-  chart: unknown[];
+  positions: Array<{ profile_id: string; x: number; y: number }>;
   canEdit: boolean;
 }) {
   const [people, setPeople] = useState<Person[]>(initial);
-  const [query, setQuery] = useState('');
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [pos, setPos] = useState<Record<string, Pos>>({});
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
 
-  const nameOf = (id: string | null) =>
-    id ? (people.find((p) => p.id === id)?.full_name ?? 'Unknown') : null;
+  const canvasRef = useRef<HTMLDivElement>(null);
+  // What the pointer is currently doing. Kept in a ref as well as state so the
+  // move handler doesn't re-subscribe on every pixel.
+  const dragRef = useRef<
+    | { kind: 'move'; id: string; dx: number; dy: number }
+    | { kind: 'link'; from: string }
+    | null
+  >(null);
+  const [linkFrom, setLinkFrom] = useState<string | null>(null);
+  const [ghost, setGhost] = useState<Pos | null>(null);
+  const [hoverId, setHoverId] = useState<string | null>(null);
 
-  // Flat list -> tree. Anyone whose manager isn't in the visible set is
-  // treated as a root, so a person is never silently dropped.
-  const roots = useMemo<Node[]>(() => {
-    const byId = new Map<string, Node>(people.map((p) => [p.id, { ...p, children: [] }]));
-    const top: Node[] = [];
-    for (const node of byId.values()) {
-      const parent = node.reports_to ? byId.get(node.reports_to) : undefined;
-      if (parent && parent.id !== node.id) parent.children.push(node);
-      else top.push(node);
+  // ── Initial layout ───────────────────────────────────────────────────────
+  // Saved positions win; anyone without one is placed by walking the tree, so
+  // depth becomes row and sibling order becomes column.
+  const computeLayout = useCallback((rows: Person[]) => {
+    const byId = new Map(rows.map((p) => [p.id, p]));
+    const kids = new Map<string | null, Person[]>();
+    for (const p of rows) {
+      const parent = p.reports_to && byId.has(p.reports_to) ? p.reports_to : null;
+      const list = kids.get(parent) ?? [];
+      list.push(p);
+      kids.set(parent, list);
     }
-    const sort = (ns: Node[]) => {
-      ns.sort((a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? ''));
-      ns.forEach((n) => sort(n.children));
+    for (const list of kids.values()) {
+      list.sort((a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? ''));
+    }
+    const out: Record<string, Pos> = {};
+    let cursor = 0;
+    const place = (person: Person, depth: number) => {
+      const children = kids.get(person.id) ?? [];
+      if (children.length === 0) {
+        out[person.id] = { x: cursor * (CARD_W + COL_GAP) + 40, y: depth * ROW_GAP + 40 };
+        cursor += 1;
+        return;
+      }
+      const before = cursor;
+      children.forEach((c) => place(c, depth + 1));
+      // Sit the parent over the middle of its children.
+      const first = out[children[0].id].x;
+      const last = out[children[children.length - 1].id].x;
+      out[person.id] = { x: (first + last) / 2, y: depth * ROW_GAP + 40 };
+      if (cursor === before) cursor += 1;
     };
-    sort(top);
-    return top;
-  }, [people]);
+    (kids.get(null) ?? []).forEach((r) => place(r, 0));
+    return out;
+  }, []);
 
-  const directReports = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const p of people) if (p.reports_to) m.set(p.reports_to, (m.get(p.reports_to) ?? 0) + 1);
-    return m;
-  }, [people]);
+  useEffect(() => {
+    const saved: Record<string, Pos> = {};
+    for (const p of savedPositions) saved[p.profile_id] = { x: Number(p.x), y: Number(p.y) };
+    const computed = computeLayout(initial);
+    const merged: Record<string, Pos> = {};
+    for (const p of initial) merged[p.id] = saved[p.id] ?? computed[p.id] ?? { x: 40, y: 40 };
+    setPos(merged);
+  }, [initial, savedPositions, computeLayout]);
 
-  async function setManager(personId: string, managerId: string | null) {
-    setBusyId(personId);
+  // ── Persistence ──────────────────────────────────────────────────────────
+  async function savePosition(id: string, p: Pos) {
+    const supabase = createClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb: any = supabase;
+    const orgId = (initial as unknown as Array<{ org_id?: string }>)[0]?.org_id;
+    await sb.from('org_chart_positions').upsert(
+      { profile_id: id, x: Math.round(p.x), y: Math.round(p.y), ...(orgId ? { org_id: orgId } : {}), updated_at: new Date().toISOString() },
+      { onConflict: 'profile_id' },
+    );
+  }
+
+  async function setManager(childId: string, managerId: string | null) {
+    const prev = people.find((p) => p.id === childId)?.reports_to ?? null;
+    // Optimistic — the line should follow the pointer immediately.
+    setPeople((ps) => ps.map((p) => (p.id === childId ? { ...p, reports_to: managerId } : p)));
+    setSaving(true);
     setMsg(null);
     const supabase = createClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb: any = supabase;
-    const { error } = await sb.from('profiles')
-      .update({ reports_to: managerId }).eq('id', personId);
-    setBusyId(null);
+    const { error } = await sb.from('profiles').update({ reports_to: managerId }).eq('id', childId);
+    setSaving(false);
     if (error) {
-      // The acyclic trigger speaks in plain language; surface it as-is.
+      // The database refuses loops; put the line back and say why.
+      setPeople((ps) => ps.map((p) => (p.id === childId ? { ...p, reports_to: prev } : p)));
       setMsg({ kind: 'error', text: error.message });
       return;
     }
-    setPeople((ps) => ps.map((p) => (p.id === personId ? { ...p, reports_to: managerId } : p)));
+    const name = (id: string | null) => people.find((p) => p.id === id)?.full_name ?? 'Unknown';
     setMsg({
       kind: 'ok',
       text: managerId
-        ? `${nameOf(personId)} now reports to ${nameOf(managerId)}.`
-        : `${nameOf(personId)} is now at the top of their line.`,
+        ? `${name(childId)} now reports to ${name(managerId)}.`
+        : `${name(childId)} no longer reports to anyone.`,
     });
   }
 
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return people;
-    return people.filter((p) =>
-      `${p.full_name ?? ''} ${p.email ?? ''}`.toLowerCase().includes(q));
-  }, [people, query]);
+  // ── Pointer handling ─────────────────────────────────────────────────────
+  const pointFromEvent = (e: PointerEvent | React.PointerEvent): Pos => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    return {
+      x: e.clientX - (rect?.left ?? 0) + (canvasRef.current?.scrollLeft ?? 0),
+      y: e.clientY - (rect?.top ?? 0) + (canvasRef.current?.scrollTop ?? 0),
+    };
+  };
 
-  function toggle(id: string) {
-    setCollapsed((c) => {
-      const n = new Set(c);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
+  // Which card is under the pointer, by hit-testing the coordinates.
+  //
+  // Deliberately NOT pointerenter/pointerleave on the cards: those are skipped
+  // when the pointer moves fast, and on touch devices they do not fire during
+  // a drag at all — which would make connecting impossible on a tablet, the
+  // very device a supervisor is most likely to use.
+  const cardUnder = (e: PointerEvent): string | null => {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    return (el?.closest('[data-person-id]') as HTMLElement | null)?.dataset.personId ?? null;
+  };
+
+  useEffect(() => {
+    function onMove(e: PointerEvent) {
+      const d = dragRef.current;
+      if (!d) return;
+      const pt = pointFromEvent(e);
+      if (d.kind === 'move') {
+        setPos((p) => ({ ...p, [d.id]: { x: Math.max(0, pt.x - d.dx), y: Math.max(0, pt.y - d.dy) } }));
+      } else {
+        setGhost(pt);
+        const over = cardUnder(e);
+        setHoverId(over && over !== d.from ? over : null);
+      }
+    }
+    function onUp(e: PointerEvent) {
+      const d = dragRef.current;
+      dragRef.current = null;
+      if (!d) return;
+      if (d.kind === 'move') {
+        const p = pos[d.id];
+        if (p) void savePosition(d.id, p);
+      } else {
+        // Resolve the drop target from where the pointer actually ended up,
+        // so a fast or touch-driven drag lands the same as a slow mouse one.
+        const target = cardUnder(e);
+        if (target && target !== d.from) void setManager(d.from, target);
+        setLinkFrom(null);
+        setGhost(null);
+      }
+      setHoverId(null);
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  });
+
+  function startMove(e: React.PointerEvent, id: string) {
+    if (!canEdit) return;
+    e.preventDefault();
+    const pt = pointFromEvent(e);
+    const p = pos[id] ?? { x: 0, y: 0 };
+    dragRef.current = { kind: 'move', id, dx: pt.x - p.x, dy: pt.y - p.y };
   }
 
-  function renderNode(n: Node, depth: number) {
-    const kids = n.children.length;
-    const isCollapsed = collapsed.has(n.id);
-    return (
-      <li key={n.id}>
-        <div
-          className="flex flex-wrap items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-[hsl(var(--surface))]"
-          style={{ marginLeft: depth * 20 }}
-        >
-          {kids > 0 ? (
-            <button type="button" onClick={() => toggle(n.id)} className="text-[hsl(var(--muted))]">
-              {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-          ) : <span className="w-4" />}
-          <span className="text-sm font-medium">{n.full_name ?? 'Unnamed'}</span>
-          <Badge color={ROLE_TONE[n.role] ?? '#64748b'}>{ROLE_LABEL[n.role] ?? n.role}</Badge>
-          {kids > 0 && (
-            <span className="text-xs text-[hsl(var(--muted))]">
-              {kids} direct report{kids === 1 ? '' : 's'}
-            </span>
-          )}
-        </div>
-        {kids > 0 && !isCollapsed && (
-          <ul className="border-l border-[hsl(var(--border))]" style={{ marginLeft: depth * 20 + 8 }}>
-            {n.children.map((c) => renderNode(c, depth + 1))}
-          </ul>
-        )}
-      </li>
+  function startLink(e: React.PointerEvent, id: string) {
+    if (!canEdit) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = { kind: 'link', from: id };
+    setLinkFrom(id);
+    setGhost(pointFromEvent(e));
+  }
+
+  async function autoArrange() {
+    const computed = computeLayout(people);
+    setPos(computed);
+    setSaving(true);
+    const supabase = createClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb: any = supabase;
+    const orgId = (initial as unknown as Array<{ org_id?: string }>)[0]?.org_id;
+    await sb.from('org_chart_positions').upsert(
+      people.map((p) => ({
+        profile_id: p.id, x: Math.round(computed[p.id]?.x ?? 40), y: Math.round(computed[p.id]?.y ?? 40),
+        ...(orgId ? { org_id: orgId } : {}), updated_at: new Date().toISOString(),
+      })),
+      { onConflict: 'profile_id' },
     );
+    setSaving(false);
+    setMsg({ kind: 'ok', text: 'Chart tidied up.' });
   }
+
+  // Lines, drawn from the middle-bottom of the manager to the middle-top of
+  // the report.
+  const edges = useMemo(() => {
+    const out: Array<{ id: string; d: string; childId: string; midX: number; midY: number }> = [];
+    for (const p of people) {
+      if (!p.reports_to) continue;
+      const a = pos[p.reports_to];
+      const b = pos[p.id];
+      if (!a || !b) continue;
+      const x1 = a.x + CARD_W / 2, y1 = a.y + CARD_H;
+      const x2 = b.x + CARD_W / 2, y2 = b.y;
+      const midY = (y1 + y2) / 2;
+      out.push({
+        id: `${p.reports_to}-${p.id}`,
+        childId: p.id,
+        d: `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`,
+        midX: (x1 + x2) / 2,
+        midY,
+      });
+    }
+    return out;
+  }, [people, pos]);
+
+  const extent = useMemo(() => {
+    const xs = Object.values(pos).map((p) => p.x);
+    const ys = Object.values(pos).map((p) => p.y);
+    return {
+      w: Math.max(1200, ...(xs.length ? xs : [0]).map((x) => x + CARD_W + 120)),
+      h: Math.max(600, ...(ys.length ? ys : [0]).map((y) => y + CARD_H + 160)),
+    };
+  }, [pos]);
+
+  const nameOf = (id: string) => people.find((p) => p.id === id)?.full_name ?? 'Unknown';
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {msg && (
         <div className={`flex items-start gap-2 rounded-lg border px-4 py-3 text-sm ${
           msg.kind === 'ok'
@@ -158,74 +287,106 @@ export function Organogram({
         </div>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
-        <Card>
-          <CardContent className="py-5">
-            <p className="mb-3 flex items-center gap-2 text-sm font-semibold">
-              <Users2 className="h-4 w-4" /> Reporting structure
-            </p>
-            {roots.length === 0 ? (
-              <p className="text-sm text-[hsl(var(--muted))]">No people to show.</p>
-            ) : (
-              <ul className="space-y-0.5">{roots.map((r) => renderNode(r, 0))}</ul>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="flex items-center gap-2 text-sm text-[hsl(var(--muted))]">
+          <Users2 className="h-4 w-4" />
+          {canEdit
+            ? 'Drag a card to move it. Drag the dot underneath a person onto someone else to make them report to that person.'
+            : 'Reporting structure — read only.'}
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        </p>
+        {canEdit && (
+          <Button variant="secondary" size="sm" onClick={autoArrange}>
+            <RotateCcw className="h-4 w-4" /> Tidy up
+          </Button>
+        )}
+      </div>
+
+      <div
+        ref={canvasRef}
+        className="relative overflow-auto rounded-xl border bg-[hsl(var(--surface))]"
+        style={{ height: '70vh' }}
+      >
+        <div className="relative" style={{ width: extent.w, height: extent.h }}>
+          {/* Connections */}
+          <svg className="pointer-events-none absolute inset-0" width={extent.w} height={extent.h}>
+            {edges.map((e) => (
+              <g key={e.id}>
+                <path d={e.d} fill="none" stroke="hsl(var(--border))" strokeWidth={2} />
+                {canEdit && (
+                  <g
+                    className="pointer-events-auto cursor-pointer"
+                    onClick={() => setManager(e.childId, null)}
+                  >
+                    <circle cx={e.midX} cy={e.midY} r={9} fill="hsl(var(--background))" stroke="hsl(var(--border))" />
+                    <title>Disconnect {nameOf(e.childId)}</title>
+                    <path
+                      d={`M ${e.midX - 3.5} ${e.midY} L ${e.midX + 3.5} ${e.midY}`}
+                      stroke="#dc2626" strokeWidth={2} strokeLinecap="round"
+                    />
+                  </g>
+                )}
+              </g>
+            ))}
+            {/* The line being dragged */}
+            {linkFrom && ghost && pos[linkFrom] && (
+              <path
+                d={`M ${pos[linkFrom].x + CARD_W / 2} ${pos[linkFrom].y + CARD_H} L ${ghost.x} ${ghost.y}`}
+                fill="none" stroke="hsl(var(--brand))" strokeWidth={2} strokeDasharray="5 4"
+              />
             )}
-            <p className="mt-4 text-[11px] text-[hsl(var(--muted))]">
-              People at the top of the list have no one above them. An occurrence escalated
-              by someone with no manager falls back to an administrator.
-            </p>
-          </CardContent>
-        </Card>
+          </svg>
 
-        <Card>
-          <CardContent className="space-y-4 py-5">
-            <p className="text-sm font-semibold">
-              {canEdit ? 'Set reporting lines' : 'Reporting lines'}
-            </p>
-
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted))]" />
-              <Input className="pl-9" value={query} onChange={(e) => setQuery(e.target.value)}
-                placeholder="Find a person" />
-            </div>
-
-            <div className="max-h-[32rem] space-y-2 overflow-y-auto">
-              {visible.map((p) => (
-                <div key={p.id} className="rounded-lg border p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium">{p.full_name ?? 'Unnamed'}</span>
-                    <Badge color={ROLE_TONE[p.role] ?? '#64748b'}>{ROLE_LABEL[p.role] ?? p.role}</Badge>
-                    {busyId === p.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  </div>
-                  <div className="mt-2">
-                    <Label>Reports to</Label>
-                    <Select
-                      value={p.reports_to ?? ''}
-                      disabled={!canEdit || busyId === p.id}
-                      onChange={(e) => setManager(p.id, e.target.value || null)}
-                    >
-                      <option value="">— nobody (top of line) —</option>
-                      {people
-                        .filter((o) => o.id !== p.id)
-                        .map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.full_name ?? 'Unnamed'} · {ROLE_LABEL[o.role] ?? o.role}
-                          </option>
-                        ))}
-                    </Select>
-                  </div>
-                  {directReports.get(p.id) && (
-                    <p className="mt-1.5 text-[11px] text-[hsl(var(--muted))]">
-                      {directReports.get(p.id)} person(s) report to them
-                    </p>
-                  )}
+          {/* People */}
+          {people.map((p) => {
+            const pt = pos[p.id];
+            if (!pt) return null;
+            const isTarget = linkFrom && hoverId === p.id && p.id !== linkFrom;
+            return (
+              <div
+                key={p.id}
+                className={`absolute select-none rounded-xl border bg-[hsl(var(--background))] shadow-sm transition-shadow ${
+                  canEdit ? 'cursor-grab active:cursor-grabbing' : ''
+                } ${isTarget ? 'ring-2 ring-[hsl(var(--brand))]' : ''}`}
+                data-person-id={p.id}
+                style={{ left: pt.x, top: pt.y, width: CARD_W, height: CARD_H }}
+                onPointerDown={(e) => startMove(e, p.id)}
+              >
+                <div className="h-1.5 rounded-t-xl" style={{ background: ROLE_TONE[p.role] ?? '#64748b' }} />
+                <div className="px-3 py-1.5">
+                  <p className="truncate text-sm font-semibold leading-tight" title={p.full_name ?? ''}>
+                    {p.full_name ?? 'Unnamed'}
+                  </p>
+                  <p className="truncate text-[11px] text-[hsl(var(--muted))]">
+                    {ROLE_LABEL[p.role] ?? p.role}
+                  </p>
                 </div>
-              ))}
-              {visible.length === 0 && (
-                <p className="py-6 text-center text-sm text-[hsl(var(--muted))]">No one matches.</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+
+                {canEdit && (
+                  <button
+                    type="button"
+                    onPointerDown={(e) => startLink(e, p.id)}
+                    title="Drag onto the person this one reports to"
+                    className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border-2 border-[hsl(var(--background))] bg-[hsl(var(--brand))] transition hover:scale-125"
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-[11px] text-[hsl(var(--muted))]">
+        {Object.entries(ROLE_LABEL).map(([k, label]) => (
+          <span key={k} className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: ROLE_TONE[k] }} />{label}
+          </span>
+        ))}
+        {canEdit && (
+          <span className="flex items-center gap-1.5">
+            <Link2Off className="h-3 w-3" /> Click the dash on a line to disconnect
+          </span>
+        )}
       </div>
     </div>
   );
