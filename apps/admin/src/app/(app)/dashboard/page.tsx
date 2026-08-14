@@ -289,7 +289,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
 
       {/* Written read of everything below — generated on request, not on load. */}
       <div className="mb-5">
-        <AiInsightPanel siteId={siteParam ?? null} days={30} />
+        <AiInsightPanel siteId={siteParam ?? null} days={30} role={String(profile.role)} />
       </div>
 
       {(breached > 0 || updateDue > 0) && (

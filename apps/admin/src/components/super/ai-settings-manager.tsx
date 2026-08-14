@@ -2,41 +2,64 @@
 
 // Super User → AI Assistant.
 //
-// One switch per organisation. It gates the briefing at the EDGE FUNCTION, not
-// merely in the UI — turning it off means occurrence text stops being sent to
-// Groq for that org, which is the whole point of having the switch.
+// One master switch per organisation plus the weekly digest settings. The
+// master switch gates the EDGE FUNCTION, not merely the UI — turned off, the
+// dashboard briefing, the chat assistant and the weekly email all refuse, and
+// no occurrence text is sent to Groq for that organisation at all.
 
 import { useState } from 'react';
-import { AlertCircle, Check, Loader2, Sparkles } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Mail, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { GradientSection } from '@/components/ui/gradient-section';
 
-interface Org { id: string; name: string; ai_insights_enabled: boolean | null }
+interface Org {
+  id: string; name: string;
+  ai_insights_enabled: boolean | null;
+  ai_weekly_digest_enabled: boolean | null;
+  ai_digest_roles: string[] | null;
+}
+
+const DIGEST_ROLES = [
+  { key: 'admin', label: 'Administrators' },
+  { key: 'manager', label: 'Managers' },
+  { key: 'supervisor', label: 'Supervisors' },
+  { key: 'control_room', label: 'Control Room' },
+];
+
+function Switch({
+  on, busy, label, onClick,
+}: { on: boolean; busy: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button" role="switch" aria-checked={on} aria-label={label}
+      disabled={busy} onClick={onClick}
+      className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-50 ${
+        on ? 'bg-brand-gradient' : 'bg-[hsl(var(--border))]'
+      }`}
+    >
+      <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? 'left-6' : 'left-1'}`} />
+    </button>
+  );
+}
 
 export function AiSettingsManager({ orgs: initial }: { orgs: Org[] }) {
   const [orgs, setOrgs] = useState<Org[]>(initial);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
-  async function toggle(org: Org) {
-    const next = !(org.ai_insights_enabled ?? true);
+  // One writer for every control on this page, so they cannot drift apart.
+  async function update(org: Org, patch: Partial<Org>, note: string) {
     setBusyId(org.id);
     setMsg(null);
     const supabase = createClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb: any = supabase;
-    const { error } = await sb.from('organizations')
-      .update({ ai_insights_enabled: next }).eq('id', org.id);
+    const { error } = await sb.from('organizations').update(patch).eq('id', org.id);
     setBusyId(null);
     if (error) { setMsg({ kind: 'error', text: error.message }); return; }
-    setOrgs((os) => os.map((o) => (o.id === org.id ? { ...o, ai_insights_enabled: next } : o)));
-    setMsg({
-      kind: 'ok',
-      text: next
-        ? `AI briefing switched on for ${org.name}.`
-        : `AI briefing switched off for ${org.name} — no occurrence data will be sent to the model.`,
-    });
+    setOrgs((os) => os.map((o) => (o.id === org.id ? { ...o, ...patch } : o)));
+    setMsg({ kind: 'ok', text: note });
   }
 
   return (
@@ -52,49 +75,103 @@ export function AiSettingsManager({ orgs: initial }: { orgs: Org[] }) {
         </div>
       )}
 
-      <GradientSection title="AI briefing by organisation" icon="Sparkles" tone="brand">
-        <Card>
-          <CardContent className="divide-y py-2">
-            {orgs.length === 0 && (
-              <p className="py-6 text-center text-sm text-[hsl(var(--muted))]">No organisations.</p>
-            )}
-            {orgs.map((o) => {
-              const on = o.ai_insights_enabled ?? true;
-              return (
-                <div key={o.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <p className="font-medium">{o.name}</p>
-                    <p className="text-xs text-[hsl(var(--muted))]">
-                      {on
-                        ? 'Dashboard briefing and assistant are available. Occurrence data is sent to Groq when a briefing is generated.'
-                        : 'Off — the briefing returns a clear message and nothing is sent to the model.'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={on}
-                    aria-label={`AI briefing for ${o.name}`}
-                    disabled={busyId === o.id}
-                    onClick={() => toggle(o)}
-                    className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-50 ${
-                      on ? 'bg-brand-gradient' : 'bg-[hsl(var(--border))]'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                        on ? 'left-6' : 'left-1'
-                      }`}
+      <GradientSection title="AI features by organisation" icon="Sparkles" tone="brand">
+        <div className="space-y-4">
+          {orgs.length === 0 && (
+            <p className="py-6 text-center text-sm text-[hsl(var(--muted))]">No organisations.</p>
+          )}
+          {orgs.map((o) => {
+            const on = o.ai_insights_enabled ?? true;
+            const weekly = o.ai_weekly_digest_enabled ?? false;
+            const roles = o.ai_digest_roles ?? ['admin', 'manager'];
+            return (
+              <Card key={o.id}>
+                <CardContent className="space-y-4 py-4">
+                  {/* Master switch */}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 font-semibold">
+                        {o.name}
+                        {busyId === o.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      </p>
+                      <p className="text-xs text-[hsl(var(--muted))]">
+                        {on
+                          ? 'Dashboard briefing, chat assistant and weekly email are available.'
+                          : 'All AI features off — nothing is sent to the model for this organisation.'}
+                      </p>
+                    </div>
+                    <Switch
+                      on={on} busy={busyId === o.id}
+                      label={`All AI features for ${o.name}`}
+                      onClick={() => update(o, { ai_insights_enabled: !on }, on
+                        ? `AI switched off for ${o.name} — no occurrence data will be sent to the model.`
+                        : `AI switched on for ${o.name}.`)}
                     />
-                    {busyId === o.id && (
-                      <Loader2 className="absolute -right-6 top-1.5 h-4 w-4 animate-spin text-[hsl(var(--muted))]" />
+                  </div>
+
+                  {/* Weekly digest, only meaningful while AI is on */}
+                  <div className={`rounded-xl border p-3 ${on ? '' : 'opacity-50'}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-1.5 text-sm font-medium">
+                          <Mail className="h-3.5 w-3.5" /> Weekly &ldquo;week ahead&rdquo; email
+                        </p>
+                        <p className="text-xs text-[hsl(var(--muted))]">
+                          Monday morning. One edition per role, written for that role, sent to
+                          everyone holding it.
+                        </p>
+                      </div>
+                      <Switch
+                        on={weekly} busy={busyId === o.id || !on}
+                        label={`Weekly digest for ${o.name}`}
+                        onClick={() => update(o, { ai_weekly_digest_enabled: !weekly }, !weekly
+                          ? `Weekly digest switched on for ${o.name}.`
+                          : `Weekly digest switched off for ${o.name}.`)}
+                      />
+                    </div>
+
+                    {weekly && on && (
+                      <div className="mt-3 border-t pt-3">
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--muted))]">
+                          Who receives it
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {DIGEST_ROLES.map((r) => {
+                            const picked = roles.includes(r.key);
+                            return (
+                              <button
+                                key={r.key}
+                                type="button"
+                                disabled={busyId === o.id}
+                                onClick={() => update(
+                                  o,
+                                  { ai_digest_roles: picked ? roles.filter((x) => x !== r.key) : [...roles, r.key] },
+                                  picked ? `${r.label} removed from the digest.` : `${r.label} added to the digest.`,
+                                )}
+                                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                                  picked
+                                    ? 'border-[hsl(var(--brand))] bg-[hsl(var(--brand))] text-white'
+                                    : 'border-[hsl(var(--border))] hover:border-[hsl(var(--brand))]'
+                                }`}
+                              >
+                                {r.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {roles.length === 0 && (
+                          <p className="mt-2 text-xs text-amber-600">
+                            Nobody selected — the digest will not be sent.
+                          </p>
+                        )}
+                      </div>
                     )}
-                  </button>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </GradientSection>
 
       <GradientSection title="What the assistant can see" icon="Sparkles" tone="slate">
@@ -103,14 +180,16 @@ export function AiSettingsManager({ orgs: initial }: { orgs: Org[] }) {
             <p className="flex items-start gap-2">
               <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--brand))]" />
               <span>
-                When on, the briefing sends occurrence records — including descriptions and
-                assignee names — to Groq for the organisation being viewed. The payload is
+                While AI is on, occurrence records — including descriptions and assignee
+                names — are sent to Groq for the organisation being viewed. The payload is
                 assembled server-side, so the browser cannot widen it.
               </span>
             </p>
             <p className="pl-6">
-              Figures shown on the dashboard are calculated from your database, not written by
-              the model. Only the narrative and the recommended actions are AI-generated.
+              Briefings are written for the reader&apos;s role, and people below manager only
+              see their own sites. Figures on the dashboard are calculated from your database,
+              not written by the model — only the narrative and the recommended actions are
+              AI-generated.
             </p>
           </CardContent>
         </Card>

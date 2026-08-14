@@ -147,6 +147,9 @@ Deno.serve(async (req) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              // Gateway auth, then the internal key send-email checks itself.
+              Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`,
+              apikey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
               'x-internal-key': Deno.env.get('INTERNAL_FN_KEY') ?? '',
             },
             body: JSON.stringify({

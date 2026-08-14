@@ -15,7 +15,7 @@ export default async function SuperAiPage() {
   const sb: any = supabase;
   const { data: orgs } = await sb
     .from('organizations')
-    .select('id, name, ai_insights_enabled')
+    .select('id, name, ai_insights_enabled, ai_weekly_digest_enabled, ai_digest_roles')
     .order('name');
 
   return (

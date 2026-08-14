@@ -16,6 +16,7 @@
 // browser — the client picks a mode and a site filter, and that is all.
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { serviceClient, requireUser } from '../_shared/auth.ts';
+import { renderDigestEmail } from '../_shared/email-templates.ts';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 // Groq's largest general model. Fast enough for interactive use and strong
@@ -30,6 +31,39 @@ const MAX_RECORDS = 200;
 // sample, since the tallies already carry the distribution.
 const MAX_DETAILED = 60;
 const DESC_CHARS = 140;
+
+/**
+ * What each role needs out of the same data. A guard asking "what should I
+ * worry about" wants their shift; a manager wants their sites; an admin wants
+ * the estate. Without this the briefing wrote the same board-level summary for
+ * everyone, which is useful to almost nobody.
+ */
+const ROLE_BRIEF: Record<string, { label: string; focus: string }> = {
+  guard: {
+    label: 'Officer',
+    focus: 'You are briefing an officer on the ground. Talk about their sites and their shift: what is still open where they work, what needs logging or closing out, and what to watch for on patrol. Keep it short and practical. No management analysis, no staffing recommendations, no budget talk.',
+  },
+  supervisor: {
+    label: 'Supervisor',
+    focus: 'You are briefing a shift supervisor. Focus on their team and sites: unclosed occurrences, anything past its deadline, gaps in coverage, and which officer needs support. Recommend things a supervisor can do on shift, not policy changes.',
+  },
+  control_room: {
+    label: 'Control Room',
+    focus: 'You are briefing a control room operator. Focus on what is live and unresolved right now, what is closest to breaching, and which sites are generating the most traffic this shift. Be terse and operational.',
+  },
+  manager: {
+    label: 'Manager',
+    focus: 'You are briefing a site manager. Focus on performance across their sites: SLA compliance, repeat incident patterns, workload distribution across their people, and what to raise with the team this week.',
+  },
+  admin: {
+    label: 'Administrator',
+    focus: 'You are briefing an organisation administrator. Take the whole estate: which sites carry the risk, where process is failing, ownership gaps, and what to escalate.',
+  },
+  super_user: {
+    label: 'Platform Super User',
+    focus: 'You are briefing the platform owner. Take the whole estate and be blunt about systemic problems — unassigned work, sites that never log, roles that never close anything.',
+  },
+};
 
 // deno-lint-ignore no-explicit-any
 type Sb = any;
@@ -94,7 +128,10 @@ async function callGroq(messages: Array<{ role: string; content: string }>, asJs
  * Everything the model is allowed to see, gathered server-side.
  * Returns both a compact fact sheet (for auditing) and the prompt text.
  */
-async function buildContext(admin: Sb, orgId: string, siteId: string | null, days: number) {
+async function buildContext(
+  admin: Sb, orgId: string, siteId: string | null, days: number,
+  scope?: { role: string; userId: string; siteIds: string[] },
+) {
   const since = new Date(Date.now() - days * 864e5).toISOString();
 
   let q = admin
@@ -105,6 +142,11 @@ async function buildContext(admin: Sb, orgId: string, siteId: string | null, day
     .order('incident_at', { ascending: false })
     .limit(MAX_RECORDS);
   if (siteId) q = q.eq('site_id', siteId);
+  // Roles below manager see only their own sites — briefing an officer on a
+  // depot they have never visited is noise, and it leaks detail sideways.
+  else if (scope && !['admin', 'super_user'].includes(scope.role) && scope.siteIds.length > 0) {
+    q = q.in('site_id', scope.siteIds);
+  }
 
   const [{ data: occRaw }, { data: people }, { data: sites }] = await Promise.all([
     q,
@@ -282,6 +324,38 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   const admin = serviceClient();
+
+  // ── Weekly digest ────────────────────────────────────────────────────────
+  // Driven by cron, which has no user session, so this is checked BEFORE the
+  // per-user gate below. Authorised by the internal key or the service role.
+  let peeked: Record<string, unknown> = {};
+  try { peeked = await req.clone().json(); } catch { /* not JSON — fall through */ }
+  if (peeked.mode === 'weekly_digest') {
+    // Same acceptance rule as task-alerts: a project may run legacy JWT keys,
+    // new sb_secret_ keys, or both, so a plain env comparison rejects a
+    // perfectly valid service caller. Accept the internal header, an exact env
+    // match, membership in SUPABASE_SECRET_KEYS, or a JWT whose role claim is
+    // service_role (the platform verified its signature before this ran).
+    const bearer = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+    const internalKey = Deno.env.get('INTERNAL_FN_KEY');
+    const okInternal = !!internalKey && req.headers.get('x-internal-key') === internalKey;
+    const okService = (() => {
+      if (!bearer) return false;
+      if (bearer === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) return true;
+      if (bearer.startsWith('sb_secret_')
+          && (Deno.env.get('SUPABASE_SECRET_KEYS') ?? '').includes(bearer)) return true;
+      const parts = bearer.split('.');
+      if (parts.length === 3) {
+        try {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          return payload?.role === 'service_role';
+        } catch { return false; }
+      }
+      return false;
+    })();
+    if (!okInternal && !okService) return json({ error: 'Not authorised to run the digest' }, 401);
+    return await runWeeklyDigest(admin, peeked);
+  }
   const result = await requireUser(req, admin);
   if (result.error) return json({ error: result.error }, 401);
   const { profile: caller } = result;
@@ -314,6 +388,18 @@ Deno.serve(async (req) => {
   const siteId = typeof body.site_id === 'string' && body.site_id ? body.site_id : null;
   const days = Math.min(365, Math.max(1, Number(body.days) || 30));
 
+  // The briefing is written FOR the reader, so the role travels with the
+  // request and the caller's own sites bound what they are shown.
+  const callerRole = String((caller as { role?: string }).role ?? 'guard');
+  const roleBrief = ROLE_BRIEF[callerRole] ?? ROLE_BRIEF.guard;
+  const callerSiteIds: string[] = (() => {
+    const c = caller as { site_ids?: string[]; site_id?: string | null };
+    const ids = new Set<string>(Array.isArray(c.site_ids) ? c.site_ids : []);
+    if (c.site_id) ids.add(c.site_id);
+    return [...ids];
+  })();
+  const scope = { role: callerRole, userId, siteIds: callerSiteIds };
+
   // ── Dashboard insight ────────────────────────────────────────────────────
   if (mode === 'insight') {
     // Super users can switch the briefing off per organisation — some will not
@@ -324,7 +410,9 @@ Deno.serve(async (req) => {
       return json({ error: 'AI insights are switched off for this organisation.' }, 403);
     }
 
-    const scopeKey = `${siteId ?? 'all'}:${days}`;
+    // Role is part of the key: an officer and an admin must not share a cached
+    // briefing, because they are not being told the same thing.
+    const scopeKey = `${siteId ?? 'all'}:${days}:${callerRole}`;
 
     if (!body.refresh) {
       const { data: cached } = await admin
@@ -339,7 +427,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const ctx = await buildContext(admin, orgId, siteId, days);
+    const ctx = await buildContext(admin, orgId, siteId, days, scope);
     if (ctx.count === 0) {
       return json({
         ok: true, cached: false,
@@ -351,11 +439,12 @@ Deno.serve(async (req) => {
 
     const res = await callGroq([
       { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: `WHO YOU ARE BRIEFING: a ${roleBrief.label}. ${roleBrief.focus}` },
       {
         role: 'user',
         content: `${ctx.prompt}
 
-Brief the manager who owns this dashboard, and tell them what to DO.
+Brief this ${roleBrief.label} on what matters to them, and tell them what to DO.
 
 First classify every distinct occurrence type in the data as routine operations or incidents, then analyse ONLY the incidents.
 
@@ -434,7 +523,7 @@ Every action must address an INCIDENT pattern, never routine volume. Give betwee
       org_id: orgId, scope_key: scopeKey, site_id: siteId, days,
       headline, body: text, facts: ctx.facts, kpis, actions,
       routine_kpis: routineKpis, routine_note: routineNote, routine_types: routineTypes,
-      model: MODEL, generated_by: userId,
+      audience_role: callerRole, model: MODEL, generated_by: userId,
       created_at: new Date().toISOString(),
     }, { onConflict: 'org_id,scope_key' });
 
@@ -444,6 +533,12 @@ Every action must address an INCIDENT pattern, never routine volume. Give betwee
 
   // ── Chat ─────────────────────────────────────────────────────────────────
   if (mode === 'chat') {
+    // Chat is an AI feature too, so the master switch must cover it.
+    const { data: orgChat } = await admin
+      .from('organizations').select('ai_insights_enabled').eq('id', orgId).maybeSingle();
+    if (orgChat && orgChat.ai_insights_enabled === false) {
+      return json({ error: 'AI features are switched off for this organisation.' }, 403);
+    }
     const message = String(body.message ?? '').trim();
     if (!message) return json({ error: 'message is required' }, 400);
     if (message.length > 4000) return json({ error: 'Message is too long' }, 400);
@@ -458,10 +553,11 @@ Every action must address an INCIDENT pattern, never routine volume. Give betwee
       .limit(10);
     const history = ((recent ?? []) as Array<{ role: string; content: string }>).reverse();
 
-    const ctx = await buildContext(admin, orgId, siteId, days);
+    const ctx = await buildContext(admin, orgId, siteId, days, scope);
 
     const res = await callGroq([
       { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: `WHO YOU ARE TALKING TO: a ${roleBrief.label}. ${roleBrief.focus}` },
       { role: 'system', content: `Current operational data you may draw on:\n\n${ctx.prompt}` },
       ...history,
       { role: 'user', content: message },
@@ -478,3 +574,190 @@ Every action must address an INCIDENT pattern, never routine volume. Give betwee
 
   return json({ error: `Unknown mode "${mode}"` }, 400);
 });
+
+/**
+ * The Monday "week ahead" mail.
+ *
+ * Runs per organisation that has the digest switched on, writes one edition
+ * PER ROLE (a supervisor and an admin are told different things), and sends it
+ * to everyone holding that role. Every run is recorded in ai_digest_log, so a
+ * week where nothing arrived is visible rather than silent.
+ */
+async function runWeeklyDigest(admin: Sb, body: Record<string, unknown>) {
+  const appUrl = (Deno.env.get('PUBLIC_APP_URL') ?? '').replace(/\/+$/, '') || null;
+  const onlyOrg = typeof body.org_id === 'string' ? body.org_id : null;
+  // A dry run renders and returns without sending — used to preview an edition.
+  const dryRun = body.dry_run === true;
+  const overrideTo = typeof body.to === 'string' && body.to ? body.to : null;
+
+  let orgQ = admin
+    .from('organizations')
+    .select('id, name, ai_insights_enabled, ai_weekly_digest_enabled, ai_digest_roles');
+  if (onlyOrg) orgQ = orgQ.eq('id', onlyOrg);
+  const { data: orgsRaw } = await orgQ;
+
+  const orgs = ((orgsRaw ?? []) as Array<{
+    id: string; name: string;
+    ai_insights_enabled: boolean | null;
+    ai_weekly_digest_enabled: boolean | null;
+    ai_digest_roles: string[] | null;
+  }>).filter((o) =>
+    o.ai_insights_enabled !== false
+    // A one-off test may target an org that has not switched the weekly on yet.
+    && (o.ai_weekly_digest_enabled === true || !!onlyOrg));
+
+  const results: unknown[] = [];
+
+  for (const org of orgs) {
+    const roles = (org.ai_digest_roles ?? ['admin', 'manager']).filter(Boolean);
+    const { data: settings } = await admin
+      .from('org_email_settings').select('*').eq('org_id', org.id).maybeSingle();
+
+    let sent = 0; let failed = 0; let recipients = 0;
+    let firstHeadline: string | null = null;
+
+    for (const role of roles) {
+      const { data: peopleRaw } = await admin
+        .from('profiles')
+        .select('id, full_name, email, role')
+        .eq('org_id', org.id).eq('role', role);
+      const people = ((peopleRaw ?? []) as Array<{
+        id: string; full_name: string | null; email: string | null; role: string;
+      }>).filter((p) => (p.email ?? '').includes('@'));
+      if (people.length === 0) continue;
+
+      const brief = ROLE_BRIEF[role] ?? ROLE_BRIEF.guard;
+      // One generation per role, shared by everyone holding it — the analysis
+      // is about the organisation, not the individual.
+      const ctx = await buildContext(admin, org.id, null, 7);
+      if (ctx.count === 0) continue;
+
+      const ask = [
+        ctx.prompt,
+        '',
+        'This is the WEEK AHEAD briefing, sent on a Monday morning. Summarise the week just gone and say what to do in the week starting now.',
+        '',
+        'Reply with JSON only:',
+        '{',
+        '  "routine_types": ["type names that are routine operations, not incidents"],',
+        '  "routine_note": "one sentence on routine activity and logging coverage",',
+        '  "headline": "one sentence this reader should see first",',
+        '  "summary": "2-3 short paragraphs about INCIDENTS — what happened, what is still open going into this week, what to expect",',
+        '  "actions": [{"title":"","why":"","priority":"high|medium|low","owner":"","measure":""}]',
+        '}',
+        '',
+        'Three to four actions, each doable this week.',
+      ].join('\n');
+
+      const res = await callGroq([
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: `WHO YOU ARE BRIEFING: a ${brief.label}. ${brief.focus}` },
+        { role: 'user', content: ask },
+      ], true);
+      if (!res.ok) { failed += people.length; continue; }
+
+      let parsed: Record<string, unknown> = {};
+      try {
+        parsed = JSON.parse(res.content.trim().replace(/^```(?:json)?\s*|\s*```$/g, ''));
+      } catch { continue; }
+
+      const routineTypes = Array.isArray(parsed.routine_types)
+        ? (parsed.routine_types as unknown[]).map(String) : [];
+      const routineSet = new Set(routineTypes.map((s) => s.toLowerCase().trim()));
+      const incidents = ctx.rows.filter(
+        (r: OccRow) => !routineSet.has(String(r.occurrence_type ?? '').toLowerCase().trim()));
+      const f = factsFor(incidents, 7, 'All sites', ctx.nameOf);
+      const topSite = Object.entries(f.by_site)[0];
+
+      const kpis = [
+        { label: 'Incidents', value: String(f.total), unit: 'in the last 7 days' },
+        { label: 'Still open', value: String(f.open), unit: 'going into this week' },
+        { label: 'SLA breached', value: String(f.sla_breached), unit: 'past due, not closed' },
+        {
+          label: 'Busiest site',
+          value: topSite ? String(topSite[1]) : '—',
+          unit: topSite ? String(topSite[0]) : 'no data',
+        },
+      ];
+      const headline = String(parsed.headline ?? 'Your week ahead').trim();
+      if (firstHeadline === null) firstHeadline = headline;
+
+      const weekLabel = (() => {
+        const d = new Date();
+        const end = new Date(d.getTime() + 6 * 864e5);
+        const fmt = (x: Date) => x.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        return `${fmt(d)} – ${fmt(end)}`;
+      })();
+
+      const actions = Array.isArray(parsed.actions)
+        ? (parsed.actions as Record<string, unknown>[]).slice(0, 4).map((a) => ({
+            title: String(a.title ?? ''),
+            why: String(a.why ?? ''),
+            owner: String(a.owner ?? ''),
+            measure: String(a.measure ?? ''),
+            priority: (['high', 'medium', 'low'].includes(String(a.priority))
+              ? String(a.priority) : 'medium') as 'high' | 'medium' | 'low',
+          })).filter((a) => a.title)
+        : [];
+
+      for (const p of people) {
+        const mail = renderDigestEmail({
+          orgName: org.name,
+          appUrl,
+          recipientName: (p.full_name ?? '').split(' ')[0] || null,
+          audienceLabel: brief.label,
+          headline,
+          summary: String(parsed.summary ?? '').trim(),
+          kpis,
+          actions,
+          routineNote: String(parsed.routine_note ?? '').trim() || null,
+          weekLabel,
+        }, settings);
+
+        recipients += 1;
+        if (dryRun) {
+          results.push({
+            org: org.name, role, to: overrideTo ?? p.email,
+            subject: mail.subject, dry_run: true, html: mail.html,
+          });
+          continue;
+        }
+
+        const to = overrideTo ?? (p.email as string);
+        const send = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // The gateway checks this before send-email runs; the internal key
+            // is what send-email itself checks.
+            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`,
+            apikey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+            'x-internal-key': Deno.env.get('INTERNAL_FN_KEY') ?? '',
+          },
+          body: JSON.stringify({ to, subject: mail.subject, html: mail.html, text: mail.text }),
+        });
+        if (send.ok) {
+          sent += 1;
+        } else {
+          failed += 1;
+          // Keep the reason — a digest that silently fails to send is the
+          // worst possible outcome for a weekly job nobody is watching.
+          const why = await send.text().catch(() => '');
+          results.push({ org: org.name, role, to, send_error: `${send.status}: ${why.slice(0, 200)}` });
+        }
+        // An override address means "send me one sample", not one per person.
+        if (overrideTo) break;
+      }
+      if (overrideTo) break;
+    }
+
+    if (!dryRun) {
+      await admin.from('ai_digest_log').insert({
+        org_id: org.id, recipients, sent, failed, headline: firstHeadline,
+      });
+    }
+    results.push({ org: org.name, recipients, sent, failed, headline: firstHeadline });
+  }
+
+  return json({ ok: true, organisations: orgs.length, results });
+}

@@ -13,7 +13,7 @@
 // generates and caches; everyone after that gets it instantly.
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, ListChecks, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, ListChecks, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { functionErrorMessage } from '@/lib/fn-error';
 import { Card } from '@/components/ui/card';
@@ -58,11 +58,23 @@ const PRIORITY: Record<string, { label: string; bar: string; pill: string }> = {
   low: { label: 'Low', bar: 'bg-slate-300', pill: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
 };
 
-export function AiInsightPanel({ siteId, days = 30 }: { siteId?: string | null; days?: number }) {
+export function AiInsightPanel(
+  { siteId, days = 30, role }: { siteId?: string | null; days?: number; role: string },
+) {
   const [insight, setInsight] = useState<Insight | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
+  // Figures collapse away so the briefing can be read as prose, or the tiles
+  // scanned on their own. Remembered per browser — a preference, not state.
+  const [showKpis, setShowKpis] = useState(true);
+  useEffect(() => {
+    setShowKpis(window.localStorage.getItem('ai-kpis-collapsed') !== '1');
+  }, []);
+  const toggleKpis = () => setShowKpis((v) => {
+    window.localStorage.setItem('ai-kpis-collapsed', v ? '1' : '0');
+    return !v;
+  });
 
   const load = useCallback(async (refresh: boolean) => {
     setBusy(true);
@@ -92,7 +104,7 @@ export function AiInsightPanel({ siteId, days = 30 }: { siteId?: string | null; 
       const { data } = await sb
         .from('ai_insights')
         .select('headline, body, kpis, actions, routine_kpis, routine_note, routine_types, created_at')
-        .eq('scope_key', `${siteId ?? 'all'}:${days}`)
+        .eq('scope_key', `${siteId ?? 'all'}:${days}:${role}`)
         .maybeSingle();
       if (!cancelled) {
         if (data) setInsight({ ...(data as unknown as Insight), cached: true });
@@ -100,7 +112,7 @@ export function AiInsightPanel({ siteId, days = 30 }: { siteId?: string | null; 
       }
     })();
     return () => { cancelled = true; };
-  }, [siteId, days]);
+  }, [siteId, days, role]);
 
   const heroes = (insight?.kpis ?? []).slice(0, 3);
   const counters = (insight?.kpis ?? []).slice(3);
@@ -145,9 +157,22 @@ export function AiInsightPanel({ siteId, days = 30 }: { siteId?: string | null; 
         <>
           <p className="text-lg font-bold leading-snug">{insight.headline}</p>
 
+          {(heroes.length > 0 || counters.length > 0) && (
+            <button
+              type="button"
+              onClick={toggleKpis}
+              className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--muted))] transition hover:text-[hsl(var(--foreground))]"
+              aria-expanded={showKpis}
+            >
+              {showKpis ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              Key figures
+              {!showKpis && <span className="font-normal normal-case tracking-normal">({heroes.length + counters.length} hidden)</span>}
+            </button>
+          )}
+
           {/* Hero tiles — same component the dashboard uses above its charts. */}
-          {heroes.length > 0 && (
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
+          {showKpis && heroes.length > 0 && (
+            <div className="mt-2 grid gap-4 md:grid-cols-3">
               {heroes.map((k, i) => (
                 <HeroKpi
                   key={k.label}
@@ -163,7 +188,7 @@ export function AiInsightPanel({ siteId, days = 30 }: { siteId?: string | null; 
           )}
 
           {/* Accent-bar counters — the dashboard's quick-counter pattern. */}
-          {counters.length > 0 && (
+          {showKpis && counters.length > 0 && (
             <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
               {counters.map((k) => (
                 <Card key={k.label} className="flex items-stretch overflow-hidden p-0">

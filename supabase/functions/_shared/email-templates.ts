@@ -1013,3 +1013,126 @@ export function renderSystemEmail(
 
   return { subject, html, text };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Weekly digest
+//
+// The Monday-morning "week ahead" mail. Same shell as everything else, but the
+// body carries measured figures and the recommended actions rather than a
+// single record — it is a briefing, not a notification about one thing.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DigestKpi { label: string; value: string; unit?: string | null }
+export interface DigestAction {
+  title: string; why?: string | null; owner?: string | null; measure?: string | null;
+  priority?: 'high' | 'medium' | 'low';
+}
+
+export interface DigestEmailData {
+  orgName: string;
+  appUrl?: string | null;
+  recipientName?: string | null;
+  /** Role this edition was written for — shown so it's clear why it differs. */
+  audienceLabel?: string | null;
+  headline: string;
+  summary: string;
+  kpis?: DigestKpi[];
+  actions?: DigestAction[];
+  routineNote?: string | null;
+  weekLabel?: string | null;
+}
+
+const DIGEST_PRIORITY: Record<string, string> = {
+  high: '#dc2626', medium: '#d97706', low: '#64748b',
+};
+
+export function renderDigestEmail(
+  data: DigestEmailData,
+  settings?: Partial<OrgEmailSettingsRow> | null,
+): { subject: string; html: string; text: string } {
+  const accent = settings?.accent_color || BRAND_GRADIENT_FROM;
+  const appUrl = (data.appUrl ?? '').replace(/\/+$/, '');
+  const subject = `Your week ahead — ${data.orgName}`;
+  const greeting = data.recipientName ? `Hi ${escapeHtml(data.recipientName)},` : 'Hi,';
+
+  // Figures as a two-column grid of cells — tables, because email.
+  const kpiCells = (data.kpis ?? []).map((k) => `
+    <td width="50%" style="padding:6px;vertical-align:top;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+             style="border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
+        <tr><td style="padding:12px 14px;font-family:'Segoe UI',Arial,sans-serif;">
+          <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">${escapeHtml(k.label)}</p>
+          <p style="margin:3px 0 0;font-size:22px;font-weight:800;color:#0f172a;line-height:1;">${escapeHtml(k.value)}</p>
+          ${k.unit ? `<p style="margin:4px 0 0;font-size:11px;color:#64748b;">${escapeHtml(k.unit)}</p>` : ''}
+        </td></tr>
+      </table>
+    </td>`);
+  const kpiRows: string[] = [];
+  for (let i = 0; i < kpiCells.length; i += 2) {
+    kpiRows.push(`<tr>${kpiCells[i]}${kpiCells[i + 1] ?? '<td width="50%"></td>'}</tr>`);
+  }
+
+  const actionsHtml = (data.actions ?? []).map((a, i) => `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">
+      <tr><td style="border-left:3px solid ${DIGEST_PRIORITY[a.priority ?? 'medium']};background:#ffffff;border-radius:0 8px 8px 0;padding:12px 14px;font-family:'Segoe UI',Arial,sans-serif;">
+        <p style="margin:0;font-size:14px;font-weight:700;color:#0f172a;">${i + 1}. ${escapeHtml(a.title)}</p>
+        ${a.why ? `<p style="margin:4px 0 0;font-size:13px;line-height:1.6;color:#475569;">${escapeHtml(a.why)}</p>` : ''}
+        ${a.owner || a.measure ? `<p style="margin:6px 0 0;font-size:11px;color:#94a3b8;">
+          ${a.owner ? `Owner <strong style="color:#475569;">${escapeHtml(a.owner)}</strong>` : ''}
+          ${a.owner && a.measure ? ' &nbsp;·&nbsp; ' : ''}
+          ${a.measure ? `Measure <strong style="color:#475569;">${escapeHtml(a.measure)}</strong>` : ''}
+        </p>` : ''}
+      </td></tr>
+    </table>`).join('');
+
+  const bodyHtml = `
+    ${kpiRows.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:-6px;">${kpiRows.join('')}</table>` : ''}
+    ${data.summary ? `<div style="margin-top:16px;font-family:'Segoe UI',Arial,sans-serif;font-size:14px;line-height:1.7;color:#334155;">
+      ${data.summary.split(/\n{2,}/).map((p) => `<p style="margin:0 0 10px;">${escapeHtml(p.trim())}</p>`).join('')}
+    </div>` : ''}
+    ${actionsHtml ? `<p style="margin:18px 0 0;font-family:'Segoe UI',Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">Do this week</p>${actionsHtml}` : ''}
+    ${data.routineNote ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
+      <tr><td style="border:1px dashed #cbd5e1;border-radius:8px;padding:10px 14px;font-family:'Segoe UI',Arial,sans-serif;">
+        <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">Routine activity</p>
+        <p style="margin:4px 0 0;font-size:13px;line-height:1.6;color:#64748b;">${escapeHtml(data.routineNote)}</p>
+      </td></tr>
+    </table>` : ''}`;
+
+  const ctaHtml = appUrl
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto 0;">
+        <tr><td style="border-radius:10px;background:${accent};background-image:linear-gradient(135deg,${accent},${BRAND_GRADIENT_TO});">
+          <a href="${appUrl}/dashboard" target="_blank"
+             style="display:inline-block;padding:13px 34px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">
+            Open the dashboard&nbsp;&rarr;
+          </a>
+        </td></tr>
+      </table>`
+    : '';
+
+  const html = renderShell({
+    subject,
+    preheader: data.headline,
+    accent,
+    orgName: data.orgName,
+    pillHtml: chip('WEEK AHEAD', '#0891b2'),
+    headline: data.headline,
+    greeting,
+    intro: data.weekLabel ? `Your briefing for ${data.weekLabel}.` : undefined,
+    bodyHtml,
+    ctaHtml,
+    footerNote: (settings?.footer_note ?? '').trim() || undefined,
+    footerReason: `You receive this weekly because you ${data.audienceLabel ? `are a ${escapeHtml(data.audienceLabel)}` : 'monitor operations'} in <strong style="color:#64748b;">${escapeHtml(data.orgName)}</strong> on Digilog360.`,
+  });
+
+  const text = [
+    data.headline, '',
+    ...(data.kpis ?? []).map((k) => `${k.label}: ${k.value}${k.unit ? ` (${k.unit})` : ''}`),
+    '', data.summary, '',
+    ...(data.actions ?? []).map((a, i) => `${i + 1}. ${a.title}${a.why ? ` — ${a.why}` : ''}`),
+    data.routineNote ? `\nRoutine activity: ${data.routineNote}` : '',
+    appUrl ? `\nOpen the dashboard: ${appUrl}/dashboard` : '',
+    `\n— Digilog360 · ${data.orgName}`,
+  ].filter((l) => l !== '').join('\n');
+
+  return { subject, html, text };
+}
