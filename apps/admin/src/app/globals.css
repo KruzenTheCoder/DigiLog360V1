@@ -140,6 +140,49 @@ html {
   html:has(.site-root) { scroll-behavior: smooth; }
 }
 
+/* The nav floats over the page, so an anchor jump has to stop clear of it.
+   Without this every in-page link lands with its heading tucked under the
+   pill, and the visitor has to nudge back up — the small, constant friction
+   that makes a site feel unfinished. */
+html:has(.site-root) { scroll-padding-top: 6.5rem; }
+
+/* ── Where the frames go ──────────────────────────────────────────────────
+   `backdrop-filter` is the most expensive thing on this site. It forces the
+   compositor to re-sample everything behind the element on any frame where
+   either layer moves — and the nav pill is over moving content the entire
+   time somebody is scrolling, on every page.
+
+   So the blur is treated as a budget rather than a default:
+
+     • the pill is promoted to its own layer, so scrolling under it does not
+       repaint it;
+     • the radius is halved from `xl`, which is 24px of sampling for a strip
+       40px tall — most of it invisible under an opaque-enough background;
+     • below `sm` it is dropped entirely for a solid surface. Phones are where
+       the cost lands hardest and where the effect is least visible.
+
+   The same applies to anyone who has asked for reduced transparency. */
+.site-root .site-nav-pill,
+.site-nav-pill {
+  transform: translateZ(0);
+}
+
+@media (max-width: 639px) {
+  .site-nav-pill.is-scrolled {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: hsl(var(--surface));
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .site-nav-pill.is-scrolled {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: hsl(var(--surface));
+  }
+}
+
 /* Buttons and links take a press. The scale is tiny on purpose: enough to
    register as contact, not enough to look like the page is squashing. */
 .site-root a,
@@ -430,8 +473,13 @@ html {
   transform-style: preserve-3d;
   /* Slow enough to feel weighted, fast enough not to lag the pointer. */
   transition: transform 400ms cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform;
 }
+/* `will-change` is a promise to the browser that costs memory for as long as
+   it stands, so it is made only while the pointer is actually over the stage.
+   Left on permanently it pins a compositor layer for a board most visitors
+   never touch — the standard way this hint becomes a leak rather than an
+   optimisation. */
+.hero-stage:hover .hero-tilt { will-change: transform; }
 
 @keyframes hero-in {
   from {

@@ -61,10 +61,13 @@ export function SiteNav() {
       <div className="site-w pt-3">
         <div
           className={[
-            'pointer-events-auto flex items-center gap-6 rounded-full px-4 py-2.5 sm:px-5',
-            'transition-[background-color,box-shadow,backdrop-filter] duration-300 motion-reduce:transition-none',
+            // `site-nav-pill` carries the compositing and blur-budget rules —
+            // see globals.css. The pill is over moving content whenever anyone
+            // scrolls, so it is the one element where a cheap backdrop matters.
+            'site-nav-pill pointer-events-auto flex items-center gap-6 rounded-full px-4 py-2.5 sm:px-5',
+            'transition-[background-color,box-shadow] duration-300 motion-reduce:transition-none',
             scrolled
-              ? 'bg-[hsl(var(--surface))]/80 shadow-[0_8px_30px_-12px_rgba(2,6,23,0.25)] backdrop-blur-xl'
+              ? 'is-scrolled bg-[hsl(var(--surface))]/90 shadow-[0_8px_30px_-12px_rgba(2,6,23,0.25)] backdrop-blur-md'
               : 'bg-transparent shadow-none',
           ].join(' ')}
         >

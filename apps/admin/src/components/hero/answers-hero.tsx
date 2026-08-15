@@ -28,7 +28,10 @@ export function AnswersHero() {
   return (
     <HeroShell
       ground="bg-[hsl(var(--background))] text-[hsl(var(--foreground))]"
-      height="tall"
+      // Hugs its content rather than reserving most of a screen. The taller
+      // setting centred a short composition inside 70svh and left a band of
+      // empty page between the question index and whatever came next.
+      height="short"
       exit={false}
     >
       <Stage at={0}>
