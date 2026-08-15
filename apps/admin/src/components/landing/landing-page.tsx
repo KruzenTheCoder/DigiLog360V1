@@ -11,6 +11,7 @@ import { Logo } from '@/components/brand/logo';
 import { BRAND, SLA_CONFIG, SEVERITY_LABELS, SEVERITY_COLORS, SEVERITIES } from '@digilog/shared';
 import { HeroBoard } from './hero-board';
 import { TiltStage, Depth } from './tilt-stage';
+import { CountUp } from './count-up';
 import { LiveBoard } from './live-board';
 import { Reveal } from './reveal';
 import { SiteCard, CardDeck } from './site-card';
@@ -198,14 +199,19 @@ export function LandingPage(
           aria-hidden
           className="hero-aurora pointer-events-none absolute inset-0 bg-[radial-gradient(1200px_600px_at_78%_-15%,rgba(255,255,255,0.30),transparent_60%),radial-gradient(900px_500px_at_5%_110%,rgba(2,6,23,0.45),transparent_60%)]"
         />
+        <div className="parallax-back pointer-events-none absolute inset-0">
+          <div
+            aria-hidden
+            className="animate-radar-sweep absolute -right-[22rem] -top-[26rem] h-[60rem] w-[60rem] rounded-full opacity-[0.14]"
+            style={{ background: 'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.9) 30deg, transparent 64deg)' }}
+          />
+        </div>
+        {/* The grid is the layer that sells the depth: it is the only one with
+            hard edges, so its drift is what the eye actually measures against
+            the content moving past it. */}
         <div
           aria-hidden
-          className="animate-radar-sweep pointer-events-none absolute -right-[22rem] -top-[26rem] h-[60rem] w-[60rem] rounded-full opacity-[0.14]"
-          style={{ background: 'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.9) 30deg, transparent 64deg)' }}
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.06]"
+          className="parallax-back pointer-events-none absolute inset-0 opacity-[0.06]"
           style={{
             backgroundImage: 'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
             backgroundSize: '72px 72px',
@@ -340,7 +346,7 @@ export function LandingPage(
           className="hero-rise relative z-10 mx-auto mb-2 hidden w-full max-w-[92rem] px-5 sm:px-8 lg:block lg:px-12"
           style={{ animationDelay: '1150ms' }}
         >
-          <span aria-hidden className="flex h-10 w-px overflow-hidden bg-white/15">
+          <span aria-hidden className="fade-on-scroll flex h-10 w-px overflow-hidden bg-white/15">
             <span className="cue-run block h-full w-px bg-white/70" />
           </span>
         </div>
@@ -358,8 +364,8 @@ export function LandingPage(
                 className={`hero-rise ${i > 0 ? 'lg:border-l lg:border-white/15 lg:pl-8' : ''}`}
                 style={{ animationDelay: `${1000 + i * 90}ms` }}
               >
-                <dt className="text-[clamp(1.6rem,3vw,2.5rem)] font-extrabold leading-none tracking-tight tabular-nums">
-                  {s.v}
+                <dt className="text-[clamp(1.6rem,3vw,2.5rem)] font-extrabold leading-none tracking-tight">
+                  <CountUp value={s.v} delay={1000 + i * 90} />
                 </dt>
                 <dd className="mt-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-white/70">
                   {s.l}

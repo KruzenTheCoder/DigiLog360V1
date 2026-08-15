@@ -8,7 +8,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
   return (
     // The sections paint themselves edge to edge, so this only shows through
     // where a page is shorter than the viewport.
-    <div className="min-h-screen bg-[hsl(var(--background))]">
+    <div className="site-root min-h-screen bg-[hsl(var(--background))]">
       <SiteNav />
       {children}
     </div>

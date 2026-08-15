@@ -35,7 +35,7 @@ export function HeroBoard() {
 
   return (
     <div className="w-full rounded-2xl border border-white/25 bg-white/[0.10] shadow-[0_30px_70px_-25px_rgba(2,6,23,0.65)] backdrop-blur-md">
-      <div className="flex items-center gap-2 border-b border-white/15 px-4 py-3">
+      <div className="hero-rise flex items-center gap-2 border-b border-white/15 px-4 py-3" style={{ animationDelay: '440ms' }}>
         <span className="h-2.5 w-2.5 rounded-full bg-white/35" />
         <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
         <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
@@ -56,7 +56,13 @@ export function HeroBoard() {
           const left = secs[i]!;
           const pct = Math.max(0, Math.min(100, (left / r.total) * 100));
           return (
-            <li key={r.ref} className="flex items-center gap-3 px-4 py-3">
+            // The rows deal in behind the board itself, so the panel arrives
+            // first and then fills — the order a real board loads in.
+            <li
+              key={r.ref}
+              className="hero-rise flex items-center gap-3 px-4 py-3"
+              style={{ animationDelay: `${520 + i * 110}ms` }}
+            >
               <span className={`h-9 w-1 shrink-0 rounded-full ${r.rail}`} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -84,7 +90,10 @@ export function HeroBoard() {
         })}
       </ul>
 
-      <div className="flex items-center justify-between border-t border-white/15 px-4 py-2.5 text-[0.68rem] text-white/65">
+      <div
+        className="hero-rise flex items-center justify-between border-t border-white/15 px-4 py-2.5 text-[0.68rem] text-white/65"
+        style={{ animationDelay: '860ms' }}
+      >
         <span>Streaming over websockets</span>
         <span className="font-mono">no refresh</span>
       </div>
