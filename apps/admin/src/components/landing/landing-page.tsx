@@ -7,7 +7,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Logo } from '@/components/brand/logo';
 import { BRAND, SLA_CONFIG, SEVERITY_LABELS, SEVERITY_COLORS, SEVERITIES } from '@digilog/shared';
 import { HeroBoard } from './hero-board';
 import { TiltStage, Depth } from './tilt-stage';
@@ -18,6 +17,7 @@ import { SiteCard, CardDeck } from './site-card';
 import { BlockReveal, Mark } from './block-reveal';
 import { Ambient } from './ambient';
 import { Constellation } from './constellation';
+import { SiteFooter } from './site-footer';
 
 // ---------------------------------------------------------------------------
 // Content lives as data so the markup stays readable. Every location and
@@ -1010,17 +1010,7 @@ export function LandingPage(
       </section>
       )}
 
-      {showFooter && (
-      <footer className="w-full bg-slate-950 py-8 text-slate-500">
-        <div className="site-w flex flex-wrap items-center justify-between gap-3 text-sm">
-          <span className="flex items-center gap-2">
-            <Logo className="text-lg" onDark />
-            <span className="text-slate-500">— {BRAND.tagline}</span>
-          </span>
-          <span>Proprietary &amp; confidential</span>
-        </div>
-      </footer>
-      )}
+      {showFooter && <SiteFooter />}
     </main>
   );
 }

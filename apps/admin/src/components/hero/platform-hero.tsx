@@ -26,35 +26,44 @@ const LEDGERS = [
     label: 'Occurrence book',
     detail: 'Handwritten · one copy',
     icon: BookOpen,
-    // Where it starts, relative to its resting place.
-    fx: '-58%', fy: '-42%', fr: '-7deg', at: 120,
+    // Where it starts, relative to its resting place. Short travel on purpose:
+    // four long crossing paths read as clutter, not as convergence.
+    fx: '-34%', fy: '-26%', fr: '-5deg', at: 0,
   },
   {
     label: 'Patrol clock',
     detail: 'Punched · read weekly',
     icon: Clock,
-    fx: '62%', fy: '-38%', fr: '6deg', at: 340,
+    fx: '36%', fy: '-24%', fr: '4deg', at: 130,
   },
   {
     label: 'Visitor register',
     detail: 'At the gate · unsearchable',
     icon: IdCard,
-    fx: '-54%', fy: '46%', fr: '5deg', at: 560,
+    fx: '-32%', fy: '28%', fr: '4deg', at: 260,
   },
   {
     label: 'Key ledger',
     detail: 'Signed out · rarely back',
     icon: KeyRound,
-    fx: '58%', fy: '44%', fr: '-6deg', at: 780,
+    fx: '34%', fy: '26%', fr: '-5deg', at: 390,
   },
 ] as const;
 
 /** The rows the console panel resolves into once the four have merged. */
+/**
+ * The rows the panel fills with.
+ *
+ * Timed to land as the ledgers dissolve rather than before them — the last
+ * artefact starts leaving around 1s, and each row arrives just behind its
+ * paper equivalent, so the sequence reads as four things becoming one rather
+ * than as two animations sharing a box.
+ */
 const ROWS = [
-  { ref: 'OB11430', what: 'Alarm activation', where: 'Plant room', tone: 'bg-red-500', at: 120 },
-  { ref: 'OB11431', what: 'Attempted break-in', where: 'Loading bay', tone: 'bg-orange-500', at: 200 },
-  { ref: 'OB11429', what: 'Visitor signed in', where: 'Main gate', tone: 'bg-sky-500', at: 280 },
-  { ref: 'OB11427', what: 'Key issued · K-14', where: 'Control room', tone: 'bg-emerald-500', at: 360 },
+  { ref: 'OB11430', what: 'Alarm activation', where: 'Plant room', tone: 'bg-red-500', at: 760 },
+  { ref: 'OB11431', what: 'Attempted break-in', where: 'Loading bay', tone: 'bg-orange-500', at: 850 },
+  { ref: 'OB11429', what: 'Visitor signed in', where: 'Main gate', tone: 'bg-sky-500', at: 940 },
+  { ref: 'OB11427', what: 'Key issued · K-14', where: 'Control room', tone: 'bg-emerald-500', at: 1030 },
 ] as const;
 
 export function PlatformHero() {

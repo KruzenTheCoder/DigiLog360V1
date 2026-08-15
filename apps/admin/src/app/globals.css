@@ -231,19 +231,28 @@ html {
 .wipe > .wipe-ink { display: inline-block; }
 .wipe > .wipe-block {
   position: absolute;
-  inset: -0.08em -0.16em;
+  inset: -0.1em -0.2em;
   transform: scaleX(0);
   transform-origin: left center;
   pointer-events: none;
-  border-radius: 0.15em;
+  /* The brush edge. The block contains no text, so masking it is safe. */
+  -webkit-mask-image: var(--brush);
+  mask-image: var(--brush);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 /* Armed but not yet played: hold the text back so the block arrives first. */
 .wipe-armed > .wipe-ink { opacity: 0; }
 .wipe-run > .wipe-ink {
-  animation: wipe-text 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: wipe-text var(--dur-sequence) var(--ease-enter) both;
 }
 .wipe-run > .wipe-block {
-  animation: wipe-block 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* Symmetric easing, because this is a stroke being laid down and lifted
+     rather than something arriving. The decelerating `enter` curve made the
+     retreat crawl off the right-hand edge. */
+  animation: wipe-block var(--dur-sequence) var(--ease-move) both;
 }
 
 /* ── Keyword highlight ────────────────────────────────────────────────────
@@ -262,6 +271,23 @@ html {
   from { background-size: 0% 0.94em; }
   to   { background-size: 100% 0.94em; }
 }
+/* ── Paint ────────────────────────────────────────────────────────────────
+   Both the wipe block and the marker fill used to be rectangles, and a
+   rectangle sliding across a headline reads as a loading bar rather than as
+   ink. These give them a brush edge instead.
+
+   `--brush` is a single SVG path with a slightly uneven top and bottom and
+   tapered ends, stretched to whatever it is masking (`preserveAspectRatio
+   none`). One inline data URI, no network request, no image decode.
+
+   It is applied as a mask only to elements that contain no text. Masking a
+   run of type would chew the letterforms as well as the fill, so the marker
+   highlight gets an asymmetric border-radius instead — the same hand-drawn
+   intent by a route that cannot damage the words sitting on it. */
+:root {
+  --brush: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 60' preserveAspectRatio='none'%3E%3Cpath d='M5,30 C9,13 28,9 56,11 C102,6 148,14 196,9 C238,5 272,11 295,19 C299,25 299,36 295,42 C272,51 232,53 188,49 C138,54 90,47 50,51 C24,53 8,45 5,34 Z' fill='%23000'/%3E%3C/svg%3E");
+}
+
 .mark { display: inline; }
 .mark > .mark-ink {
   /* The fill hugs the type rather than filling the whole em box.
@@ -275,8 +301,10 @@ html {
      occupied no extra width, which meant the fill overlapped the word before
      it — "book cannot" with the block eating the space between them. A
      highlight needs its own room; taking the room back defeats the padding. */
-  padding: 0.04em 0.2em;
-  border-radius: 0.14em;
+  padding: 0.04em 0.22em;
+  /* Four different corners, so the fill reads as laid down by hand rather
+     than drawn by a border-radius. */
+  border-radius: 0.5em 0.22em 0.42em 0.28em / 0.32em 0.46em 0.24em 0.4em;
   background-image: linear-gradient(var(--mark-fill), var(--mark-fill));
   background-repeat: no-repeat;
   background-position: 0 0.14em;
@@ -533,14 +561,26 @@ html {
 /* ── /platform — four ledgers converge ────────────────────────────────── */
 /* Each artefact carries its own start offset and angle as custom properties,
    so one keyframe serves all four. */
+/* Four artefacts arrive, settle, and are absorbed into the panel underneath.
+   Three things make it read as one move rather than four pop-ins:
+
+     • it fades UP early (26%) and holds, so the card is legible as an object
+       well before it stops travelling;
+     • it comes to rest slightly off-centre and un-rotated, so the settle is a
+       real deceleration rather than a stop;
+     • it leaves by scaling DOWN into the panel instead of simply vanishing,
+       which is what makes the panel read as the thing it became.
+
+   The travel is deliberately short. The first version threw them in from
+   ±58%/±42% and the four crossing paths read as clutter. */
 @keyframes converge {
-  0%   { opacity: 0; transform: translate3d(var(--fx), var(--fy), 0) rotate(var(--fr)) scale(1.04); }
-  38%  { opacity: 1; transform: translate3d(calc(var(--fx) * 0.12), calc(var(--fy) * 0.12), 0) rotate(var(--fr)) scale(1); }
-  62%  { opacity: 1; transform: translate3d(calc(var(--fx) * 0.12), calc(var(--fy) * 0.12), 0) rotate(var(--fr)) scale(1); }
-  100% { opacity: 0; transform: none; }
+  0%   { opacity: 0; transform: translate3d(var(--fx), var(--fy), 0) rotate(var(--fr)) scale(1.03); }
+  26%  { opacity: 1; }
+  58%  { opacity: 1; transform: translate3d(calc(var(--fx) * 0.06), calc(var(--fy) * 0.06), 0) rotate(calc(var(--fr) * 0.28)) scale(1); }
+  100% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg) scale(0.94); }
 }
 .motion-ready .ledger {
-  animation: converge var(--dur-cinematic) var(--ease-enter) both;
+  animation: converge 1100ms var(--ease-enter) both;
   animation-delay: var(--t, 0ms);
 }
 /* The console panel the four collapse into. */
