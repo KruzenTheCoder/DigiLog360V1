@@ -28,8 +28,14 @@ export const SITE_LINKS = [
   { href: '/answers', label: 'Answers' },
 ];
 
-/** Routes whose first section is dark, and therefore need pale links. */
-const DARK_OPENING = new Set(['/', '/why', '/story', '/console']);
+/**
+ * Routes whose hero opens dark, and therefore need pale links until the pill
+ * appears behind them.
+ *
+ * Every route except /answers now opens on a dark hero — /answers is
+ * deliberately the quiet one, on the app's own pale ground.
+ */
+const DARK_OPENING = new Set(['/', '/why', '/platform', '/story', '/console']);
 
 export function SiteNav() {
   const pathname = usePathname();

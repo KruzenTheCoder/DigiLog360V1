@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LandingPage } from '@/components/landing/landing-page';
+import { StoryHero } from '@/components/hero/story-hero';
 
 export const metadata: Metadata = {
   title: 'One night, minute by minute — Digilog360',
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function StoryPage() {
-  return <LandingPage sections={['story', 'targets', 'field']} />;
+  return (
+    <>
+      <StoryHero />
+      <LandingPage sections={['story', 'targets', 'field']} />
+    </>
+  );
 }

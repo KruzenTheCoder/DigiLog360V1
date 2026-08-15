@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LandingPage } from '@/components/landing/landing-page';
+import { ConsoleHero } from '@/components/hero/console-hero';
 
 export const metadata: Metadata = {
   title: 'The console — Digilog360',
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function ConsolePage() {
-  return <LandingPage sections={['console', 'realtime']} />;
+  return (
+    <>
+      <ConsoleHero />
+      <LandingPage sections={['console', 'realtime']} />
+    </>
+  );
 }

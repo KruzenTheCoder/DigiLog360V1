@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LandingPage } from '@/components/landing/landing-page';
+import { AnswersHero } from '@/components/hero/answers-hero';
 
 export const metadata: Metadata = {
   title: 'Answers — Digilog360',
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function AnswersPage() {
-  return <LandingPage sections={['faq', 'confidential', 'outcome']} />;
+  return (
+    <>
+      <AnswersHero />
+      <LandingPage sections={['faq', 'confidential', 'outcome']} />
+    </>
+  );
 }

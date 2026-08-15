@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useReveal } from '@/lib/animation/use-reveal';
+import { useReducedMotion } from '@/lib/animation/use-reduced-motion';
 import { Badge } from '@/components/ui/badge';
 import { SEVERITY_COLORS, SEVERITY_LABELS, type SeverityLevel } from '@digilog/shared';
 
@@ -58,50 +60,45 @@ export function LiveBoard() {
   const [open, setOpen] = useState(18);
   const [critical, setCritical] = useState(3);
   const [stamp, setStamp] = useState('now');
-  const hostRef = useRef<HTMLDivElement>(null);
   const started = useRef(false);
 
-  // Clocks tick every second.
+  // New incidents arrive once the board is actually on screen. The trigger
+  // comes from the shared observer registry rather than one of its own — this
+  // wants the same "tell me when it crosses the fold" callback every reveal on
+  // the page wants, so it should not allocate a second observer to get it.
+  //
+  // `useReveal` already returns early under reduced motion, which would leave
+  // `shown` true and start the feed; the explicit check below keeps the board
+  // still for anyone who asked for that.
+  const { ref: hostRef, shown } = useReveal<HTMLDivElement>({ threshold: 0.2, rootMargin: '0px' });
+  const reduced = useReducedMotion();
+
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (reduced || !shown || started.current) return;
+    started.current = true;
+
+    const timers = INCOMING.map((row, i) =>
+      setTimeout(() => {
+        setRows((prev) => [{ ...row, fresh: true }, ...prev]);
+        setOpen((n) => n + 1);
+        if (row.severity === 'critical') setCritical((n) => n + 1);
+        setStamp('just now');
+      }, 3000 + i * 11000),
+    );
+
+    return () => timers.forEach(clearTimeout);
+  }, [shown, reduced]);
+
+  // Clocks tick every second, but only while the board is on screen — an
+  // off-screen interval re-rendering every row once a second is pure waste on
+  // a page the visitor has already scrolled past.
+  useEffect(() => {
+    if (reduced || !shown) return;
     const id = setInterval(() => {
       setRows((prev) => prev.map((r) => ({ ...r, seconds: r.seconds - 1, fresh: false })));
     }, 1000);
     return () => clearInterval(id);
-  }, []);
-
-  // New incidents arrive once the board is actually on screen.
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const el = hostRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (!entries[0]?.isIntersecting || started.current) return;
-        started.current = true;
-        io.disconnect();
-
-        INCOMING.forEach((row, i) => {
-          timers.push(
-            setTimeout(() => {
-              setRows((prev) => [{ ...row, fresh: true }, ...prev]);
-              setOpen((n) => n + 1);
-              if (row.severity === 'critical') setCritical((n) => n + 1);
-              setStamp('just now');
-            }, 3000 + i * 11000),
-          );
-        });
-      },
-      { threshold: 0.2 },
-    );
-    io.observe(el);
-    return () => {
-      io.disconnect();
-      timers.forEach(clearTimeout);
-    };
-  }, []);
+  }, [shown, reduced]);
 
   return (
     // The board sits inside a dark, `text-white` section but renders on the

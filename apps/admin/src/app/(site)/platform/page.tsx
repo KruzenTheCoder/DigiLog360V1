@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LandingPage } from '@/components/landing/landing-page';
+import { PlatformHero } from '@/components/hero/platform-hero';
 
 export const metadata: Metadata = {
   title: 'Platform — Digilog360',
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function PlatformPage() {
-  return <LandingPage sections={['solution', 'what', 'underneath']} />;
+  return (
+    <>
+      <PlatformHero />
+      <LandingPage sections={['solution', 'what', 'underneath']} />
+    </>
+  );
 }

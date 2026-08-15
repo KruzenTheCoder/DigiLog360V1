@@ -4,26 +4,8 @@
     {
       "name": "admin",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "admin"],
+      "runtimeArgs": ["run", "dev", "--workspace=@digilog/admin"],
       "port": 3000
-    },
-    {
-      "name": "admin-alt",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--workspace=@digilog/admin", "--", "-p", "3005"],
-      "port": 3005
-    },
-    {
-      "name": "admin-prod",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start", "--workspace=@digilog/admin"],
-      "port": 3000
-    },
-    {
-      "name": "diag",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "diag:tmp"],
-      "port": 3999
     }
   ]
 }

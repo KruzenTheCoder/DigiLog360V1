@@ -19,7 +19,9 @@
 // only held back once JS has armed the effect and an observer exists to
 // release it. A no-JS visitor reads the heading normally.
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { useReveal } from '@/lib/animation/use-reveal';
+import { VIEWPORT_HEADING } from '@/config/motion';
 
 type Tone = 'brand' | 'dark' | 'light' | 'red' | 'green' | 'violet' | 'amber';
 
@@ -45,29 +47,20 @@ const FILL: Record<Tone, string> = {
   amber: '#f59e0b',
 };
 
-/** Shared scroll trigger: fires once, the first time the element is seen. */
+/**
+ * Scroll trigger: fires once, the first time the element is seen.
+ *
+ * A heading is read as it arrives, so it uses the higher heading threshold —
+ * the wipe should start when the line is genuinely in view, not when its top
+ * pixel crosses the fold. The observer itself is shared with every other
+ * reveal on the page.
+ */
 function usePlayOnce(delay = 0) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [armed, setArmed] = useState(false);
-  const [run, setRun] = useState(false);
-
-  useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') { setRun(true); return; }
-    const el = ref.current;
-    if (!el) return;
-    setArmed(true);
-
-    let timer: ReturnType<typeof setTimeout>;
-    const io = new IntersectionObserver((entries) => {
-      if (!entries[0]?.isIntersecting) return;
-      io.disconnect();
-      timer = setTimeout(() => setRun(true), delay);
-    }, { threshold: 0.35, rootMargin: '0px 0px -8% 0px' });
-    io.observe(el);
-    return () => { io.disconnect(); clearTimeout(timer); };
-  }, [delay]);
-
-  return { ref, armed, run };
+  const { ref, shown, armed } = useReveal<HTMLSpanElement>({
+    ...VIEWPORT_HEADING,
+    delay,
+  });
+  return { ref, armed, run: shown };
 }
 
 export function BlockReveal({

@@ -22,6 +22,7 @@
 import {
   useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode,
 } from 'react';
+import { useReveal } from '@/lib/animation/use-reveal';
 
 type Tone = 'default' | 'brand' | 'red' | 'green' | 'violet' | 'amber' | 'dark';
 
@@ -188,9 +189,6 @@ export function DealtCard({
    */
   offsetY?: number;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [armed, setArmed] = useState(false);
-  const [shown, setShown] = useState(false);
   const [wide, setWide] = useState(false);
 
   useEffect(() => {
@@ -203,25 +201,14 @@ export function DealtCard({
     return () => mq.removeEventListener('change', sync);
   }, []);
 
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        || typeof IntersectionObserver === 'undefined') {
-      setShown(true);
-      return;
-    }
-    const el = ref.current;
-    if (!el) return;
-    setArmed(true);
-
-    let timer: ReturnType<typeof setTimeout>;
-    const io = new IntersectionObserver((entries) => {
-      if (!entries[0]?.isIntersecting) return;
-      io.disconnect();
-      timer = setTimeout(() => setShown(true), delay);
-    }, { threshold: 0.12, rootMargin: '0px 0px -4% 0px' });
-    io.observe(el);
-    return () => { io.disconnect(); clearTimeout(timer); };
-  }, [delay]);
+  // A card sits lower in the viewport than body copy when it should start
+  // moving, so it keeps its own slightly earlier trigger — the shared registry
+  // holds one observer per configuration, so this costs nothing extra.
+  const { ref, shown, armed } = useReveal<HTMLDivElement>({
+    threshold: 0.12,
+    rootMargin: '0px 0px -4% 0px',
+    delay,
+  });
 
   const hidden = armed && !shown;
 

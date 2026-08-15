@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LandingPage } from '@/components/landing/landing-page';
+import { WhyHero } from '@/components/hero/why-hero';
 
 export const metadata: Metadata = {
   title: 'Why it matters — Digilog360',
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function WhyPage() {
-  return <LandingPage sections={['problem', 'who']} />;
+  return (
+    <>
+      <WhyHero />
+      <LandingPage sections={['problem', 'who']} />
+    </>
+  );
 }

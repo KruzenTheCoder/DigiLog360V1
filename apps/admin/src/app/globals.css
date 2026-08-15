@@ -100,6 +100,38 @@ html {
   .scrollbar-thin::-webkit-scrollbar-thumb { @apply rounded-full bg-slate-300 dark:bg-slate-700; }
 }
 
+/* ── Motion tokens ────────────────────────────────────────────────────────
+   Mirror of src/config/motion.ts, which is the source of truth. Most of the
+   site animates in CSS, so the same values have to be reachable from a
+   stylesheet; changing one without the other is the obvious failure mode, so
+   motion.test.ts asserts the two agree.
+
+   The names describe the job rather than the shape, so a rule below reads as
+   intent: `var(--ease-enter)` rather than a bare cubic-bezier nobody can
+   place. `--ease-scrub` is linear and belongs to scroll-linked animation
+   only — time-based linear motion is what makes an interface feel mechanical. */
+:root {
+  --dur-instant: 90ms;
+  --dur-micro: 160ms;
+  --dur-quick: 260ms;
+  --dur-element: 420ms;
+  --dur-reveal: 640ms;
+  --dur-sequence: 900ms;
+  --dur-cinematic: 1200ms;
+
+  --ease-exit: cubic-bezier(0.55, 0, 1, 0.45);
+  --ease-enter: cubic-bezier(0.16, 1, 0.30, 1);
+  --ease-move: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-ui: cubic-bezier(0.30, 0, 0.20, 1);
+  --ease-ambient: cubic-bezier(0.45, 0, 0.55, 1);
+  --ease-scrub: linear;
+
+  --stagger-tight: 45ms;
+  --stagger-normal: 80ms;
+  --stagger-editorial: 120ms;
+  --stagger-scene: 220ms;
+}
+
 /* ── Interaction feel ─────────────────────────────────────────────────────
    Anchor jumps on the marketing site glide rather than teleport. Scoped to
    the site so the console's programmatic scrolling stays instant — an admin
@@ -395,8 +427,180 @@ html {
   pointer-events: none;
 }
 
+/* ── Page heroes ──────────────────────────────────────────────────────────
+   Every route now opens with its own composition rather than dropping the
+   visitor into a content section mid-argument. The five below share one
+   contract and nothing else: each stage of an entrance reads its delay from
+   `--t`, so choreography is expressed at the call site rather than baked into
+   a keyframe, and every move is transform or opacity only.
+
+   The text itself is never the thing animating from `opacity: 0` — a masked
+   line animates its *wrapper*, so the largest text block is painted and
+   measurable at first frame. Animating the heading directly is the usual way
+   a hero redesign costs you LCP. */
+
+/* A stage in a choreographed entrance: rises out from behind its own clip. */
+@keyframes stage-rise {
+  from { opacity: 0; transform: translate3d(0, 18px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.stage {
+  animation: stage-rise var(--dur-sequence) var(--ease-enter) both;
+  animation-delay: var(--t, 0ms);
+}
+
+/* A line revealed by lifting it out from under a clip — the wrapper hides,
+   the text is always present. */
+.line-mask { display: block; overflow: hidden; }
+@keyframes line-up {
+  from { transform: translate3d(0, 105%, 0); }
+  to   { transform: none; }
+}
+.line-mask > * {
+  display: block;
+  animation: line-up var(--dur-sequence) var(--ease-enter) both;
+  animation-delay: var(--t, 0ms);
+}
+
+/* ── /why — the gap ───────────────────────────────────────────────────── */
+/* The rule between the two timestamps draws itself left to right. scaleX on
+   the compositor, never a width animation. */
+@keyframes rule-draw {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.gap-rule {
+  transform-origin: left center;
+  animation: rule-draw var(--dur-cinematic) var(--ease-move) both;
+  animation-delay: var(--t, 0ms);
+}
+/* The second timestamp lands rather than fades — a short, hard settle. */
+@keyframes stamp-land {
+  0%   { opacity: 0; transform: translate3d(0, -10px, 0); }
+  70%  { opacity: 1; transform: translate3d(0, 2px, 0); }
+  100% { opacity: 1; transform: none; }
+}
+.stamp-land {
+  animation: stamp-land var(--dur-reveal) var(--ease-enter) both;
+  animation-delay: var(--t, 0ms);
+}
+
+/* ── /platform — four ledgers converge ────────────────────────────────── */
+/* Each artefact carries its own start offset and angle as custom properties,
+   so one keyframe serves all four. */
+@keyframes converge {
+  0%   { opacity: 0; transform: translate3d(var(--fx), var(--fy), 0) rotate(var(--fr)) scale(1.04); }
+  38%  { opacity: 1; transform: translate3d(calc(var(--fx) * 0.12), calc(var(--fy) * 0.12), 0) rotate(var(--fr)) scale(1); }
+  62%  { opacity: 1; transform: translate3d(calc(var(--fx) * 0.12), calc(var(--fy) * 0.12), 0) rotate(var(--fr)) scale(1); }
+  100% { opacity: 0; transform: none; }
+}
+.ledger {
+  animation: converge var(--dur-cinematic) var(--ease-enter) both;
+  animation-delay: var(--t, 0ms);
+}
+/* The console panel the four collapse into. */
+@keyframes panel-form {
+  0%   { opacity: 0; transform: scale(0.94); }
+  100% { opacity: 1; transform: none; }
+}
+.panel-form {
+  animation: panel-form var(--dur-sequence) var(--ease-enter) both;
+  animation-delay: var(--t, 0ms);
+}
+
+/* ── /story — the establishing shot ───────────────────────────────────── */
+@keyframes band-rise {
+  from { opacity: 0; transform: translate3d(0, 26px, 0); }
+  to   { opacity: var(--band-o, 1); transform: none; }
+}
+.band {
+  animation: band-rise var(--dur-cinematic) var(--ease-enter) both;
+  animation-delay: var(--t, 0ms);
+}
+@keyframes bloom-in {
+  from { opacity: 0; transform: scale(0.7); }
+  to   { opacity: 1; transform: none; }
+}
+.bloom {
+  animation: bloom-in 1800ms var(--ease-ambient) both;
+  animation-delay: var(--t, 0ms);
+}
+/* A card materialising under a scan line. */
+@keyframes scan-wipe {
+  from { clip-path: inset(0 0 100% 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+.scan-wipe {
+  animation: scan-wipe var(--dur-sequence) var(--ease-move) both;
+  animation-delay: var(--t, 0ms);
+}
+/* Haze: two very slow, unequal drifts so the pair never resynchronises into
+   a visible beat. */
+@keyframes haze-a { 0%,100% { transform: translate3d(-3%, 0, 0); } 50% { transform: translate3d(4%, -2%, 0); } }
+@keyframes haze-b { 0%,100% { transform: translate3d(3%, 1%, 0); } 50% { transform: translate3d(-4%, -1%, 0); } }
+.haze-a { animation: haze-a 31s var(--ease-ambient) infinite; }
+.haze-b { animation: haze-b 43s var(--ease-ambient) infinite; }
+
+/* ── /console — rows deal in ──────────────────────────────────────────── */
+@keyframes row-deal {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.row-deal {
+  animation: row-deal var(--dur-element) var(--ease-enter) both;
+  animation-delay: var(--t, 0ms);
+}
+/* The frame draws before it fills. */
+@keyframes frame-draw {
+  from { opacity: 0; transform: scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+.frame-draw {
+  animation: frame-draw var(--dur-reveal) var(--ease-enter) both;
+  animation-delay: var(--t, 0ms);
+}
+
+/* ── Hero exits ───────────────────────────────────────────────────────────
+   Scroll-linked, so the hero hands over to the first section rather than
+   simply ending. Off the main thread; skipped entirely where the timeline is
+   unsupported, which costs an effect and never the layout. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes hero-lift { to { transform: translate3d(0, -8%, 0); opacity: 0.55; } }
+    .hero-exit {
+      animation: hero-lift linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 90vh;
+    }
+  }
+}
+
 /* Someone who asked for less motion gets the content, not the journey. */
 @media (prefers-reduced-motion: reduce) {
+  /* Every hero resolves to its finished composition immediately. The
+     compositions themselves are the design; only the travel is removed. */
+  .stage,
+  .line-mask > *,
+  .gap-rule,
+  .stamp-land,
+  .panel-form,
+  .band,
+  .bloom,
+  .scan-wipe,
+  .row-deal,
+  .frame-draw {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    clip-path: none;
+  }
+  .band { opacity: var(--band-o, 1); }
+  /* The four ledgers end the sequence invisible, so with no animation to run
+     they must be hidden outright rather than left stacked over the panel. */
+  .ledger { animation: none; display: none; }
+  .haze-a, .haze-b { animation: none; }
+  .hero-exit { animation: none; }
+
   .animate-page-in,
   .animate-card-in,
   .animate-deck-in {
