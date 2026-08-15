@@ -259,20 +259,37 @@ html {
    Growing `background-size` is a paint, not a composite. That is the trade for
    wrapping correctly, and it runs once on a handful of short elements. */
 @keyframes mark-in {
-  from { background-size: 0% 100%; }
-  to   { background-size: 100% 100%; }
+  from { background-size: 0% 0.94em; }
+  to   { background-size: 100% 0.94em; }
 }
 .mark { display: inline; }
 .mark > .mark-ink {
-  padding: 0.06em 0.22em;
-  margin: 0 -0.22em;
-  border-radius: 0.16em;
+  /* The fill hugs the type rather than filling the whole em box.
+     `background-size: 100% 100%` painted the full inline content box, which at
+     display sizes is a slab roughly 1.4× the cap height of the words inside
+     it — it read as a rectangle that happened to contain text. Sizing the
+     fill in em and pushing it down off the top leaves a marker stroke sitting
+     on the baseline, which is the thing this is imitating.
+
+     The negative margin is gone. It used to cancel the padding so the phrase
+     occupied no extra width, which meant the fill overlapped the word before
+     it — "book cannot" with the block eating the space between them. A
+     highlight needs its own room; taking the room back defeats the padding. */
+  padding: 0.04em 0.2em;
+  border-radius: 0.14em;
   background-image: linear-gradient(var(--mark-fill), var(--mark-fill));
   background-repeat: no-repeat;
-  background-size: 0% 100%;
+  background-position: 0 0.14em;
+  /* The resting state is FILLED, and the fill is only collapsed once JS has
+     armed the reveal. Callers set the text colour to sit on the fill — a
+     brand-toned mark is `text-white` — so a mark that starts empty is white
+     text on a white section until an observer happens to fire. It has to fail
+     to "highlighted", never to "invisible". */
+  background-size: 100% 0.94em;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
+.motion-ready .mark-armed > .mark-ink { background-size: 0% 0.94em; }
 .mark-run > .mark-ink {
   animation: mark-in 640ms cubic-bezier(0.16, 1, 0.3, 1) 220ms both;
 }
@@ -427,6 +444,34 @@ html {
   pointer-events: none;
 }
 
+/* ── Site width ───────────────────────────────────────────────────────────
+   The marketing site runs full width. Sections were previously capped at
+   92rem, which on a wide monitor left a band of dead space down each side and
+   made the page read as a document floating on a desktop rather than as a
+   product.
+
+   Full width does not mean full-width prose — a 2,000px line of body copy is
+   unreadable. The gutter scales with the viewport, and the text blocks inside
+   keep their own `max-w-[Nch]` measures, so what stretches is the layout and
+   what stays put is the reading line. */
+.site-w {
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4.5vw, 5rem);
+}
+
+/* ── Motion gate ──────────────────────────────────────────────────────────
+   Hero entrances hold their opening frame — opacity 0, or a line sitting
+   below its own clip — until their animation runs. That is what makes a
+   choreographed entrance possible, and it is also a way to ship an invisible
+   page: if the animation never runs, the content never appears.
+
+   So the hiding is gated on a class that a blocking inline script in the root
+   layout sets before first paint. No script, no class, no hiding — the hero
+   renders as plain, finished markup. Every rule that hides something below
+   therefore sits inside `.motion-ready`, and none of them can strand content
+   the way an unguarded `animation-fill-mode: both` can. */
+
 /* ── Page heroes ──────────────────────────────────────────────────────────
    Every route now opens with its own composition rather than dropping the
    visitor into a content section mid-argument. The five below share one
@@ -444,7 +489,7 @@ html {
   from { opacity: 0; transform: translate3d(0, 18px, 0); }
   to   { opacity: 1; transform: none; }
 }
-.stage {
+.motion-ready .stage {
   animation: stage-rise var(--dur-sequence) var(--ease-enter) both;
   animation-delay: var(--t, 0ms);
 }
@@ -456,7 +501,7 @@ html {
   from { transform: translate3d(0, 105%, 0); }
   to   { transform: none; }
 }
-.line-mask > * {
+.motion-ready .line-mask > * {
   display: block;
   animation: line-up var(--dur-sequence) var(--ease-enter) both;
   animation-delay: var(--t, 0ms);
@@ -469,7 +514,7 @@ html {
   from { transform: scaleX(0); }
   to   { transform: scaleX(1); }
 }
-.gap-rule {
+.motion-ready .gap-rule {
   transform-origin: left center;
   animation: rule-draw var(--dur-cinematic) var(--ease-move) both;
   animation-delay: var(--t, 0ms);
@@ -480,7 +525,7 @@ html {
   70%  { opacity: 1; transform: translate3d(0, 2px, 0); }
   100% { opacity: 1; transform: none; }
 }
-.stamp-land {
+.motion-ready .stamp-land {
   animation: stamp-land var(--dur-reveal) var(--ease-enter) both;
   animation-delay: var(--t, 0ms);
 }
@@ -494,7 +539,7 @@ html {
   62%  { opacity: 1; transform: translate3d(calc(var(--fx) * 0.12), calc(var(--fy) * 0.12), 0) rotate(var(--fr)) scale(1); }
   100% { opacity: 0; transform: none; }
 }
-.ledger {
+.motion-ready .ledger {
   animation: converge var(--dur-cinematic) var(--ease-enter) both;
   animation-delay: var(--t, 0ms);
 }
@@ -513,7 +558,7 @@ html {
   from { opacity: 0; transform: translate3d(0, 26px, 0); }
   to   { opacity: var(--band-o, 1); transform: none; }
 }
-.band {
+.motion-ready .band {
   animation: band-rise var(--dur-cinematic) var(--ease-enter) both;
   animation-delay: var(--t, 0ms);
 }
@@ -521,7 +566,7 @@ html {
   from { opacity: 0; transform: scale(0.7); }
   to   { opacity: 1; transform: none; }
 }
-.bloom {
+.motion-ready .bloom {
   animation: bloom-in 1800ms var(--ease-ambient) both;
   animation-delay: var(--t, 0ms);
 }
@@ -530,7 +575,7 @@ html {
   from { clip-path: inset(0 0 100% 0); }
   to   { clip-path: inset(0 0 0 0); }
 }
-.scan-wipe {
+.motion-ready .scan-wipe {
   animation: scan-wipe var(--dur-sequence) var(--ease-move) both;
   animation-delay: var(--t, 0ms);
 }
@@ -546,7 +591,7 @@ html {
   from { opacity: 0; transform: translate3d(0, 12px, 0); }
   to   { opacity: 1; transform: none; }
 }
-.row-deal {
+.motion-ready .row-deal {
   animation: row-deal var(--dur-element) var(--ease-enter) both;
   animation-delay: var(--t, 0ms);
 }
@@ -555,7 +600,7 @@ html {
   from { opacity: 0; transform: scale(0.985); }
   to   { opacity: 1; transform: none; }
 }
-.frame-draw {
+.motion-ready .frame-draw {
   animation: frame-draw var(--dur-reveal) var(--ease-enter) both;
   animation-delay: var(--t, 0ms);
 }
@@ -588,16 +633,16 @@ html {
   .bloom,
   .scan-wipe,
   .row-deal,
-  .frame-draw {
+  .motion-ready .frame-draw {
     animation: none;
     opacity: 1;
     transform: none;
     clip-path: none;
   }
-  .band { opacity: var(--band-o, 1); }
+  .motion-ready .band { opacity: var(--band-o, 1); }
   /* The four ledgers end the sequence invisible, so with no animation to run
      they must be hidden outright rather than left stacked over the panel. */
-  .ledger { animation: none; display: none; }
+  .motion-ready .ledger { animation: none; display: none; }
   .haze-a, .haze-b { animation: none; }
   .hero-exit { animation: none; }
 
@@ -617,7 +662,7 @@ html {
   .wipe > .wipe-block { display: none; }
   /* The marker fill is not decoration — it is emphasis, and the heading
      reads differently without it — so it stays, it just does not travel. */
-  .mark > .mark-ink { background-size: 100% 100%; animation: none; }
+  .mark > .mark-ink { background-size: 100% 0.94em; animation: none; }
 
   /* The board sits flat and still: no entrance, no drift, no lean. */
   .hero-enter { animation: none; opacity: 1; transform: none; }

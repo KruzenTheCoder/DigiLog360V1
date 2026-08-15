@@ -50,6 +50,35 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             never emit an empty href (which React warns about). */}
         {supabaseUrl && <link rel="preconnect" href={supabaseUrl} />}
         {supabaseUrl && <link rel="dns-prefetch" href={supabaseUrl} />}
+        {/*
+          Runs before first paint, and does two jobs.
+
+          1. Theme. The stored choice was previously applied in an effect after
+             hydration, so a dark-mode visitor got a white flash on every full
+             page load. Setting the class here means the first frame is already
+             the right colour.
+
+          2. `motion-ready`. Hero entrances hold their opening frame — opacity
+             0, a line below its own clip — until their animation runs, which
+             is also a way to ship an invisible page if the animation never
+             runs. Every rule that hides something is scoped to this class, so
+             the absence of this script degrades to plain, finished markup
+             rather than to a blank hero.
+
+          Deliberately not deferred: both must land before the browser paints,
+          and the work is a class assignment.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{
+var d=document.documentElement;
+var s=localStorage.getItem('digilog.theme');
+var dark=s==='dark'||(s!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+d.classList.toggle('dark',dark);
+d.classList.add('motion-ready');
+}catch(e){document.documentElement.classList.add('motion-ready');}})();`,
+          }}
+        />
         {/* Preload critical CSS */}
         <style dangerouslySetInnerHTML={{ __html: `
           /* Critical CSS - Inline for fastest paint */

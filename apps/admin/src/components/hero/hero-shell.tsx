@@ -48,13 +48,15 @@ export function HeroShell({
         'relative isolate w-full overflow-hidden',
         min,
         'flex flex-col justify-center',
-        'px-5 pb-16 pt-28 sm:px-8 lg:px-12 lg:pb-20 lg:pt-32',
+        // The horizontal gutter belongs to `site-w` on the inner element —
+        // setting it here as well would pad the page twice.
+        'pb-16 pt-28 lg:pb-24 lg:pt-32',
         ground ?? '',
         className ?? '',
       ].join(' ')}
       style={style}
     >
-      <div className={exit ? 'hero-exit relative z-10 mx-auto w-full max-w-[92rem]' : 'relative z-10 mx-auto w-full max-w-[92rem]'}>
+      <div className={exit ? 'hero-exit relative z-10 site-w' : 'relative z-10 site-w'}>
         {children}
       </div>
     </section>

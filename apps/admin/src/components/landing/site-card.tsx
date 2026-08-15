@@ -150,20 +150,23 @@ export function CardDeck({
   className?: string;
   step?: number;
   /**
-   * Drop every other card a little, so the row reads as an arrangement
-   * rather than a table. Only above `lg` — on a phone the grid is one column
-   * and an offset would just look like inconsistent spacing.
+   * Retained for callers, no longer applied.
+   *
+   * This used to drop every other card 32px, on the theory that a staggered
+   * row reads as an arrangement rather than as a table. It does not, once the
+   * cards have unequal heights: a grid row already aligns to its tallest card,
+   * so the offset lands on top of whatever ragged baseline that produced and
+   * the result reads as inconsistent spacing rather than as a deliberate
+   * composition. The cards carry their own entrance stagger, which is what was
+   * actually doing the work.
    */
   offset?: boolean;
 }) {
+  void offset;
   return (
     <div className={className}>
       {children.map((child, i) => (
-        <DealtCard
-          key={i}
-          delay={Math.min(i, 9) * step}
-          offsetY={offset && i % 2 === 1 ? 32 : 0}
-        >
+        <DealtCard key={i} delay={Math.min(i, 9) * step}>
           {child}
         </DealtCard>
       ))}

@@ -43,7 +43,7 @@ const CARDS = [
 export function PageCards() {
   return (
     <section className="relative w-full bg-[hsl(var(--background))] py-20 lg:py-28">
-      <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+      <div className="relative site-w">
         <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[hsl(var(--brand))]">
           Explore
         </p>

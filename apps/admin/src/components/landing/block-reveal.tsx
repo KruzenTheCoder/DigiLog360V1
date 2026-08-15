@@ -98,12 +98,15 @@ export function Mark({
   tone?: Tone;
   className?: string;
 }) {
-  const { ref, run } = usePlayOnce(0);
+  const { ref, armed, run } = usePlayOnce(0);
 
   return (
     <span
       ref={ref}
-      className={`mark ${run ? 'mark-run' : ''} ${className ?? ''}`}
+      // `mark-armed` collapses the fill, and is only applied once we know an
+      // observer exists to grow it back. Without it the mark renders filled,
+      // which is the state the caller's text colour was chosen against.
+      className={`mark ${armed && !run ? 'mark-armed' : ''} ${run ? 'mark-run' : ''} ${className ?? ''}`}
       // The fill is a background on the text itself so the phrase can wrap;
       // the colour travels as a custom property rather than a utility class.
       style={{ '--mark-fill': FILL[tone] } as CSSProperties}

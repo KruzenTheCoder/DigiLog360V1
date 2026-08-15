@@ -224,7 +224,7 @@ export function LandingPage(
             the hero no longer carries its own copy of both. */}
         {/* Top padding clears the floating nav, which sits over this rather
             than above it — that overlap is what makes the nav read as free. */}
-        <div className="relative z-10 mx-auto w-full max-w-[92rem] px-5 pb-14 pt-24 sm:px-8 lg:px-12 lg:pb-20 lg:pt-28">
+        <div className="relative z-10 site-w pb-14 pt-24 lg:pb-20 lg:pt-28">
           <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-14">
             <div className="min-w-0">
               <p
@@ -343,7 +343,7 @@ export function LandingPage(
         {/* Scroll cue — a line running down its own track, so the hero says
             there is more below without a bouncing chevron. */}
         <div
-          className="hero-rise relative z-10 mx-auto mb-2 hidden w-full max-w-[92rem] px-5 sm:px-8 lg:block lg:px-12"
+          className="hero-rise relative z-10 site-w mb-2 hidden lg:block"
           style={{ animationDelay: '1150ms' }}
         >
           <span aria-hidden className="fade-on-scroll flex h-10 w-px overflow-hidden bg-white/15">
@@ -352,7 +352,7 @@ export function LandingPage(
         </div>
 
         <div className="relative z-10 border-t border-white/15 bg-black/10 backdrop-blur-sm">
-          <dl className="mx-auto grid w-full max-w-[92rem] grid-cols-2 gap-y-6 px-5 py-7 sm:px-8 lg:grid-cols-4 lg:px-12">
+          <dl className="site-w grid grid-cols-2 gap-y-6 py-7 lg:grid-cols-4">
             {[
               { v: '<60s', l: 'Field to control room' },
               { v: '3', l: 'Ways to prove a patrol' },
@@ -380,7 +380,7 @@ export function LandingPage(
       {/* ══ PROBLEM ════════════════════════════════════════════════════ */}
       {show('problem') && (
       <section id="problem" className="relative isolate w-full scroll-mt-16 overflow-hidden bg-slate-950 text-white py-20 lg:py-28">
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative site-w">
 
 
 
@@ -452,7 +452,7 @@ export function LandingPage(
       {/* ══ SOLUTION ═══════════════════════════════════════════════════ */}
       {show('solution') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative site-w">
         <Ambient tone="brand" />
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
@@ -490,7 +490,7 @@ export function LandingPage(
       {/* ══ MODULES ════════════════════════════════════════════════════ */}
       {show('what') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative site-w">
           <Reveal>
             <Eyebrow tone="text-violet-600">What you get</Eyebrow>
             <h2 className="mt-5 max-w-[24ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
@@ -523,7 +523,7 @@ export function LandingPage(
       {/* ══ STORY ══════════════════════════════════════════════════════ */}
       {show('story') && (
       <section className="relative isolate w-full overflow-hidden bg-slate-950 text-white py-20 lg:py-28">
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative site-w">
         <Ambient tone="amber" scheme="dark" />
         {/* A slow sweep centred on the timeline — the watch being kept, and
             something in the wide gutters either side of the frames. */}
@@ -624,7 +624,7 @@ export function LandingPage(
       {/* ══ RESPONSE TARGETS ═══════════════════════════════════════════ */}
       {show('targets') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative site-w">
         <Ambient tone="sky" />
           <div className="grid gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16">
             {/* min-w-0 on both tracks: grid items default to min-width:auto and
@@ -708,7 +708,7 @@ export function LandingPage(
       {/* ══ CONSOLE SHOWCASE ═══════════════════════════════════════════ */}
       {show('console') && (
       <section id="console" className="relative isolate w-full scroll-mt-16 overflow-hidden bg-slate-900 text-white py-20 lg:py-28">
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative site-w">
         <div
           aria-hidden
           className="animate-breathe pointer-events-none absolute inset-0 bg-[radial-gradient(1000px_500px_at_50%_0%,rgba(102,126,234,0.25),transparent_65%)] motion-reduce:animate-none"
@@ -760,7 +760,7 @@ export function LandingPage(
       {/* ══ CAPABILITIES ═══════════════════════════════════════════════ */}
       {show('realtime') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative site-w">
         <Ambient tone="sky" />
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
@@ -796,7 +796,7 @@ export function LandingPage(
       {/* ══ THE FIELD APP ══════════════════════════════════════════════ */}
       {show('field') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative site-w">
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
               <div className="min-w-0">
@@ -832,7 +832,7 @@ export function LandingPage(
       {/* ══ ROLES ══════════════════════════════════════════════════════ */}
       {show('who') && (
       <section className="relative isolate w-full overflow-hidden bg-slate-950 text-white py-20 lg:py-28">
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative site-w">
         <Ambient tone="brand" scheme="dark" />
         <Constellation />
           <Reveal>
@@ -873,7 +873,7 @@ export function LandingPage(
       {/* ══ PLATFORM ═══════════════════════════════════════════════════ */}
       {show('underneath') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative site-w">
         <Ambient tone="brand" />
           <Reveal>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
@@ -908,7 +908,7 @@ export function LandingPage(
       {/* ══ OUTCOME ════════════════════════════════════════════════════ */}
       {show('outcome') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative site-w">
           <Reveal>
             <Eyebrow tone="text-emerald-600">The outcome</Eyebrow>
             <h2 className="mt-5 max-w-[22ch] text-[clamp(1.9rem,4.2vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em]">
@@ -955,7 +955,7 @@ export function LandingPage(
       {/* ══ FAQ ════════════════════════════════════════════════════════ */}
       {show('faq') && (
       <section className="relative isolate w-full overflow-hidden bg-[hsl(var(--background))] py-20 lg:py-28">
-        <div className="relative mx-auto w-full max-w-[92rem] px-5 sm:px-8 lg:px-12">
+        <div className="relative site-w">
         <Ambient tone="emerald" />
           <Reveal>
             <Eyebrow tone="text-brand">Questions</Eyebrow>
@@ -1012,7 +1012,7 @@ export function LandingPage(
 
       {showFooter && (
       <footer className="w-full bg-slate-950 py-8 text-slate-500">
-        <div className="mx-auto flex w-full max-w-[92rem] flex-wrap items-center justify-between gap-3 px-5 text-sm sm:px-8 lg:px-12">
+        <div className="site-w flex flex-wrap items-center justify-between gap-3 text-sm">
           <span className="flex items-center gap-2">
             <Logo className="text-lg" onDark />
             <span className="text-slate-500">— {BRAND.tagline}</span>
