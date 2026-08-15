@@ -22,10 +22,14 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useReveal } from '@/lib/animation/use-reveal';
 import { VIEWPORT_HEADING } from '@/config/motion';
+import { FILL, splash, type Tone } from './mark-splash';
 
-type Tone = 'brand' | 'dark' | 'light' | 'red' | 'green' | 'violet' | 'amber';
-
-/** The wipe block is an element, so it can take a utility class. */
+/**
+ * The wipe block is a real element rather than a background, so it takes a
+ * utility class. It stays square — it sweeps past and is gone, and a hard
+ * edge is what makes the sweep legible. The organic shape belongs to the fill
+ * that stays behind, which is `Mark` below.
+ */
 const BLOCK: Record<Tone, string> = {
   brand: 'bg-[hsl(var(--brand))]',
   dark: 'bg-slate-900',
@@ -34,17 +38,6 @@ const BLOCK: Record<Tone, string> = {
   green: 'bg-emerald-500',
   violet: 'bg-violet-500',
   amber: 'bg-amber-500',
-};
-
-/** The marker fill is a background image, so it needs a colour value. */
-const FILL: Record<Tone, string> = {
-  brand: 'hsl(var(--brand))',
-  dark: '#0f172a',
-  light: '#ffffff',
-  red: '#ef4444',
-  green: '#10b981',
-  violet: '#8b5cf6',
-  amber: '#f59e0b',
 };
 
 /**
@@ -107,9 +100,14 @@ export function Mark({
       // observer exists to grow it back. Without it the mark renders filled,
       // which is the state the caller's text colour was chosen against.
       className={`mark ${armed && !run ? 'mark-armed' : ''} ${run ? 'mark-run' : ''} ${className ?? ''}`}
-      // The fill is a background on the text itself so the phrase can wrap;
-      // the colour travels as a custom property rather than a utility class.
-      style={{ '--mark-fill': FILL[tone] } as CSSProperties}
+      // The fill is a background on the text itself so the phrase can wrap.
+      // `--mark-img` is the splash artwork; `--mark-fill` stays as the flat
+      // fallback for anything that cannot resolve it.
+      style={{
+        '--mark-img': splash(tone),
+        '--mark-img-dark': splash(tone, true),
+        '--mark-fill': FILL[tone],
+      } as CSSProperties}
     >
       <span className="mark-ink">{children}</span>
     </span>

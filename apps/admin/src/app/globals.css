@@ -274,17 +274,14 @@ html:has(.site-root) { scroll-padding-top: 6.5rem; }
 .wipe > .wipe-ink { display: inline-block; }
 .wipe > .wipe-block {
   position: absolute;
-  inset: -0.1em -0.2em;
+  inset: -0.08em -0.16em;
   transform: scaleX(0);
   transform-origin: left center;
   pointer-events: none;
-  /* The brush edge. The block contains no text, so masking it is safe. */
-  -webkit-mask-image: var(--brush);
-  mask-image: var(--brush);
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
+  /* Square, deliberately. This one sweeps past and is gone; a hard edge is
+     what makes the sweep legible. The organic shape belongs to the fill that
+     stays behind — see `.mark` below. */
+  border-radius: 0.15em;
 }
 /* Armed but not yet played: hold the text back so the block arrives first. */
 .wipe-armed > .wipe-ink { opacity: 0; }
@@ -311,26 +308,27 @@ html:has(.site-root) { scroll-padding-top: 6.5rem; }
    Growing `background-size` is a paint, not a composite. That is the trade for
    wrapping correctly, and it runs once on a handful of short elements. */
 @keyframes mark-in {
-  from { background-size: 0% 0.94em; }
-  to   { background-size: 100% 0.94em; }
+  from { background-size: 0% 1.24em; }
+  to   { background-size: 100% 1.24em; }
 }
-/* ── Paint ────────────────────────────────────────────────────────────────
-   Both the wipe block and the marker fill used to be rectangles, and a
-   rectangle sliding across a headline reads as a loading bar rather than as
-   ink. These give them a brush edge instead.
+/* ── The mark ─────────────────────────────────────────────────────────────
+   The fill that stays behind an emphasised phrase.
 
-   `--brush` is a single SVG path with a slightly uneven top and bottom and
-   tapered ends, stretched to whatever it is masking (`preserveAspectRatio
-   none`). One inline data URI, no network request, no image decode.
+   It used to be a rectangle, which is the wrong shape for the one piece of
+   colour that remains on screen — it read as a selection highlight rather
+   than as paint. The fill is now an SVG blob with uneven edges, supplied by
+   the component as `--mark-img` because the shape has to carry the tone's
+   colour and a CSS variable cannot be interpolated into a data URI.
 
-   It is applied as a mask only to elements that contain no text. Masking a
-   run of type would chew the letterforms as well as the fill, so the marker
-   highlight gets an asymmetric border-radius instead — the same hand-drawn
-   intent by a route that cannot damage the words sitting on it. */
-:root {
-  --brush: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 60' preserveAspectRatio='none'%3E%3Cpath d='M5,30 C9,13 28,9 56,11 C102,6 148,14 196,9 C238,5 272,11 295,19 C299,25 299,36 295,42 C272,51 232,53 188,49 C138,54 90,47 50,51 C24,53 8,45 5,34 Z' fill='%23000'/%3E%3C/svg%3E");
-}
+   It stays a BACKGROUND rather than becoming a mask. A mask applies to the
+   whole element, so it would chew the letterforms along with the fill; a
+   background paints behind the text and leaves the words alone. Keeping it a
+   background also preserves `box-decoration-break: clone`, so a phrase that
+   wraps gets its own splash on each line instead of one shape stretched
+   across the break.
 
+   The width still animates 0 → 100%, so the splash spreads rather than
+   fading up. */
 .mark { display: inline; }
 .mark > .mark-ink {
   /* The fill hugs the type rather than filling the whole em box.
@@ -344,23 +342,31 @@ html:has(.site-root) { scroll-padding-top: 6.5rem; }
      occupied no extra width, which meant the fill overlapped the word before
      it — "book cannot" with the block eating the space between them. A
      highlight needs its own room; taking the room back defeats the padding. */
-  padding: 0.04em 0.22em;
-  /* Four different corners, so the fill reads as laid down by hand rather
-     than drawn by a border-radius. */
-  border-radius: 0.5em 0.22em 0.42em 0.28em / 0.32em 0.46em 0.24em 0.4em;
-  background-image: linear-gradient(var(--mark-fill), var(--mark-fill));
+  /* Vertical padding gives the organic edge room to sit proud of the type
+     without being clipped by the border box. Inline padding does not push
+     lines apart, so this costs no layout. */
+  padding: 0.12em 0.32em;
+  /* The shape comes from the artwork now, so no radius. The gradient is the
+     fallback for anything that cannot resolve the generated image — a flat
+     fill is the right thing to degrade to. */
+  background-image: var(--mark-img, linear-gradient(var(--mark-fill), var(--mark-fill)));
   background-repeat: no-repeat;
-  background-position: 0 0.14em;
+  background-position: 0 0;
   /* The resting state is FILLED, and the fill is only collapsed once JS has
      armed the reveal. Callers set the text colour to sit on the fill — a
      brand-toned mark is `text-white` — so a mark that starts empty is white
      text on a white section until an observer happens to fire. It has to fail
      to "highlighted", never to "invisible". */
-  background-size: 100% 0.94em;
+  background-size: 100% 1.24em;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
-.motion-ready .mark-armed > .mark-ink { background-size: 0% 0.94em; }
+/* The brand token is a different lightness in the two themes, and the colour
+   is baked into the artwork, so the dark theme gets its own copy. */
+html.dark .mark > .mark-ink {
+  background-image: var(--mark-img-dark, var(--mark-img, linear-gradient(var(--mark-fill), var(--mark-fill))));
+}
+.motion-ready .mark-armed > .mark-ink { background-size: 0% 1.24em; }
 .mark-run > .mark-ink {
   animation: mark-in 640ms cubic-bezier(0.16, 1, 0.3, 1) 220ms both;
 }
@@ -750,7 +756,7 @@ html:has(.site-root) { scroll-padding-top: 6.5rem; }
   .wipe > .wipe-block { display: none; }
   /* The marker fill is not decoration — it is emphasis, and the heading
      reads differently without it — so it stays, it just does not travel. */
-  .mark > .mark-ink { background-size: 100% 0.94em; animation: none; }
+  .mark > .mark-ink { background-size: 100% 1.24em; animation: none; }
 
   /* The board sits flat and still: no entrance, no drift, no lean. */
   .hero-enter { animation: none; opacity: 1; transform: none; }
