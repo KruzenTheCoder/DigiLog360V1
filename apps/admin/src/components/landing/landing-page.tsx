@@ -192,9 +192,11 @@ export function LandingPage(
           nav, so it takes no section padding of its own. */}
       {show('hero') && (
       <section className="relative isolate w-full overflow-hidden bg-brand-gradient text-white">
+        {/* The hero's light sources, drifting slowly so the background is
+            never quite static behind the type. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(1200px_600px_at_78%_-15%,rgba(255,255,255,0.30),transparent_60%),radial-gradient(900px_500px_at_5%_110%,rgba(2,6,23,0.45),transparent_60%)]"
+          className="hero-aurora pointer-events-none absolute inset-0 bg-[radial-gradient(1200px_600px_at_78%_-15%,rgba(255,255,255,0.30),transparent_60%),radial-gradient(900px_500px_at_5%_110%,rgba(2,6,23,0.45),transparent_60%)]"
         />
         <div
           aria-hidden
@@ -219,44 +221,76 @@ export function LandingPage(
         <div className="relative z-10 mx-auto w-full max-w-[92rem] px-5 pb-14 pt-24 sm:px-8 lg:px-12 lg:pb-20 lg:pt-28">
           <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-14">
             <div className="min-w-0">
-              <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/[0.12] px-3.5 py-1.5 text-[0.68rem] font-bold uppercase tracking-[0.16em] backdrop-blur-sm">
-                <span className="relative flex h-2 w-2">
+              <p
+                className="hero-rise mb-6 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[0.10] px-3.5 py-1.5 text-[0.66rem] font-bold uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm"
+                style={{ animationDelay: '80ms' }}
+              >
+                <span className="relative flex h-1.5 w-1.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
                 </span>
                 Live from the first second
               </p>
 
-              <h1 className="max-w-[16ch] text-[clamp(2.25rem,5.4vw,4.25rem)] font-extrabold leading-[1.02] tracking-[-0.035em]">
-                <BlockReveal tone="light">Know what happened.</BlockReveal>
-                <span className="block font-light text-white/85">While it is still</span>
-                happening.
+              {/* Three lines, each rising out from behind its own clip. The
+                  stagger is what carries the sentence — the eye follows it
+                  down rather than being handed the whole block at once. */}
+              <h1 className="max-w-[15ch] text-[clamp(2.5rem,5.8vw,4.75rem)] font-extrabold leading-[1.03] tracking-[-0.04em]">
+                <span className="hl-mask">
+                  <span className="hl-line" style={{ animationDelay: '180ms' }}>
+                    Know what happened.
+                  </span>
+                </span>
+                <span className="hl-mask">
+                  <span
+                    className="hl-line bg-gradient-to-r from-white/95 via-sky-100/90 to-white/60 bg-clip-text font-light text-transparent"
+                    style={{ animationDelay: '300ms' }}
+                  >
+                    While it is still
+                  </span>
+                </span>
+                <span className="hl-mask">
+                  <span className="hl-line" style={{ animationDelay: '420ms' }}>
+                    happening.
+                  </span>
+                </span>
               </h1>
 
-              <p className="mt-6 max-w-[56ch] text-base leading-relaxed text-white/85 lg:text-lg">
+              <p
+                className="hero-rise mt-7 max-w-[54ch] text-base leading-relaxed text-white/80 lg:text-lg"
+                style={{ animationDelay: '620ms' }}
+              >
                 {BRAND.name} replaces the occurrence book, the patrol clock, the visitor register
                 and the key ledger with one live system — so an incident on a dark perimeter reaches
                 the control room while it is still happening, with the evidence already attached.
               </p>
 
-              <div className="mt-7 flex flex-wrap items-center gap-3">
+              <div
+                className="hero-rise mt-8 flex flex-wrap items-center gap-3"
+                style={{ animationDelay: '740ms' }}
+              >
                 <Link href="/login">
-                  <Button variant="secondary" size="lg" className="shadow-lg">
+                  <Button variant="secondary" size="lg" className="shadow-[0_12px_30px_-10px_rgba(2,6,23,0.5)]">
                     Sign in to the console <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
                 <a
                   href="#problem"
-                  className="inline-flex h-12 items-center gap-2 rounded-lg border border-white/35 px-5 text-base font-medium text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                  className="group inline-flex h-12 items-center gap-2 rounded-lg border border-white/30 px-5 text-base font-medium text-white transition hover:border-white/60 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                 >
-                  See how it works <ArrowDown className="h-4 w-4" />
+                  See how it works
+                  <ArrowDown className="h-4 w-4 transition-transform duration-300 group-hover:translate-y-0.5" />
                 </a>
               </div>
 
-              <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2">
-                {HERO_CHIPS.map((c) => (
-                  <li key={c} className="flex items-center gap-1.5 text-sm text-white/80">
-                    <Check className="h-4 w-4 shrink-0 text-white/70" />
+              <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2">
+                {HERO_CHIPS.map((c, i) => (
+                  <li
+                    key={c}
+                    className="hero-rise flex items-center gap-1.5 text-sm text-white/75"
+                    style={{ animationDelay: `${860 + i * 70}ms` }}
+                  >
+                    <Check className="h-4 w-4 shrink-0 text-white/60" />
                     {c}
                   </li>
                 ))}
@@ -300,7 +334,18 @@ export function LandingPage(
           </div>
         </div>
 
-        <div className="relative z-10 border-t border-white/20 bg-black/10 backdrop-blur-sm">
+        {/* Scroll cue — a line running down its own track, so the hero says
+            there is more below without a bouncing chevron. */}
+        <div
+          className="hero-rise relative z-10 mx-auto mb-2 hidden w-full max-w-[92rem] px-5 sm:px-8 lg:block lg:px-12"
+          style={{ animationDelay: '1150ms' }}
+        >
+          <span aria-hidden className="flex h-10 w-px overflow-hidden bg-white/15">
+            <span className="cue-run block h-full w-px bg-white/70" />
+          </span>
+        </div>
+
+        <div className="relative z-10 border-t border-white/15 bg-black/10 backdrop-blur-sm">
           <dl className="mx-auto grid w-full max-w-[92rem] grid-cols-2 gap-y-6 px-5 py-7 sm:px-8 lg:grid-cols-4 lg:px-12">
             {[
               { v: '<60s', l: 'Field to control room' },
@@ -308,11 +353,15 @@ export function LandingPage(
               { v: '6', l: 'Roles, one platform' },
               { v: '0', l: 'Signal needed to report' },
             ].map((s, i) => (
-              <div key={s.l} className={i > 0 ? 'lg:border-l lg:border-white/20 lg:pl-8' : ''}>
+              <div
+                key={s.l}
+                className={`hero-rise ${i > 0 ? 'lg:border-l lg:border-white/15 lg:pl-8' : ''}`}
+                style={{ animationDelay: `${1000 + i * 90}ms` }}
+              >
                 <dt className="text-[clamp(1.6rem,3vw,2.5rem)] font-extrabold leading-none tracking-tight tabular-nums">
                   {s.v}
                 </dt>
-                <dd className="mt-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-white/75">
+                <dd className="mt-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-white/70">
                   {s.l}
                 </dd>
               </div>

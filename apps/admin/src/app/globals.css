@@ -216,6 +216,60 @@ html {
   animation: mark-in 640ms cubic-bezier(0.16, 1, 0.3, 1) 220ms both;
 }
 
+/* ── Hero headline reveal ─────────────────────────────────────────────────
+   Each line rises out from behind a clip, one after another.
+
+   This replaces a block wipe on the headline. The wipe needs dense text to
+   read as a sweep; over three short lines at 4rem it was a slab covering half
+   the hero. A line mask scales the other way — the taller the type, the
+   better it looks.
+
+   The mask must not crop descenders, so it is padded and the padding is taken
+   back off with a negative margin. Without that the tails of g, y and p are
+   sliced off and the headline looks subtly broken rather than obviously so.
+
+   These sit above the fold and run on load, so they are pure CSS: no observer,
+   no client component, nothing to hydrate before the page can animate. */
+.hl-mask {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.16em;
+  margin-bottom: -0.16em;
+}
+@keyframes hl-rise {
+  from { transform: translate3d(0, 115%, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+.hl-line {
+  display: block;
+  animation: hl-rise 1100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Everything supporting the headline arrives after it, on the same curve. */
+@keyframes hero-rise {
+  from { opacity: 0; transform: translate3d(0, 18px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.hero-rise {
+  animation: hero-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* A slow drift across the hero's light sources, so the background is never
+   quite static behind the type. */
+@keyframes hero-aurora {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(3%, -4%, 0) scale(1.12); }
+}
+.hero-aurora { animation: hero-aurora 26s ease-in-out infinite; }
+
+/* The scroll cue: a line that runs down its own track, forever. */
+@keyframes cue-run {
+  0%   { transform: translateY(-100%); }
+  60%  { transform: translateY(100%); }
+  100% { transform: translateY(100%); }
+}
+.cue-run { animation: cue-run 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+
 /* ── Hero 3-D stage ───────────────────────────────────────────────────────
    The board enters from an angle, settles, drifts, and leans toward the
    pointer. The rotation is small and sits inside the hero's overflow-hidden,
@@ -294,4 +348,8 @@ html {
   /* The board sits flat and still: no entrance, no drift, no lean. */
   .hero-enter { animation: none; opacity: 1; transform: none; }
   .hero-tilt { transform: none; transition: none; }
+
+  /* The headline is the content. It arrives already in place. */
+  .hl-line, .hero-rise { animation: none; opacity: 1; transform: none; }
+  .hero-aurora, .cue-run { animation: none; }
 }
