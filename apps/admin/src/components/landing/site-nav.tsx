@@ -14,19 +14,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { ArrowRight, Menu, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowRight, Menu } from 'lucide-react';
 import { Logo } from '@/components/brand/logo';
 import { BRAND } from '@digilog/shared';
+import { SITE_LINKS } from './site-links';
+import { MobileMenu } from './mobile-menu';
 
-export const SITE_LINKS = [
-  { href: '/', label: 'Home' },
-  { href: '/why', label: 'Why it matters' },
-  { href: '/platform', label: 'Platform' },
-  { href: '/story', label: 'One night' },
-  { href: '/console', label: 'The console' },
-  { href: '/answers', label: 'Answers' },
-];
+export { SITE_LINKS };
 
 /**
  * Routes whose hero opens dark, and therefore need pale links until the pill
@@ -41,6 +36,7 @@ export function SiteNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const burgerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 28);
@@ -113,35 +109,24 @@ export function SiteNav() {
             Sign in <ArrowRight className="h-3.5 w-3.5" />
           </Link>
 
+          {/* A generous hit target — the icon is small, the button is not. */}
           <button
+            ref={burgerRef}
             type="button"
-            onClick={() => setOpen((v) => !v)}
-            className={`${ink} lg:hidden`}
-            aria-label={open ? 'Close menu' : 'Open menu'}
+            onClick={() => setOpen(true)}
+            className={`${ink} -mr-2 flex h-11 w-11 items-center justify-center lg:hidden`}
+            aria-label="Open menu"
             aria-expanded={open}
+            aria-haspopup="dialog"
           >
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            <Menu className="h-5 w-5" />
           </button>
         </div>
 
-        {open && (
-          <nav className="pointer-events-auto mt-2 rounded-2xl bg-[hsl(var(--surface))]/95 p-2 shadow-lg backdrop-blur-xl lg:hidden">
-            {SITE_LINKS.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                onClick={() => setOpen(false)}
-                className={`block rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                  pathname === l.href
-                    ? 'bg-[hsl(var(--brand))]/10 text-[hsl(var(--brand))]'
-                    : 'text-slate-600 hover:bg-[hsl(var(--background))] dark:text-slate-300'
-                }`}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </nav>
-        )}
+        {/* The full mobile navigation — a real dialog, not a dropdown. */}
+        <div className="pointer-events-auto">
+          <MobileMenu open={open} onClose={() => setOpen(false)} triggerRef={burgerRef} />
+        </div>
       </div>
     </header>
   );

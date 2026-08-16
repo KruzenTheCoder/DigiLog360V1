@@ -13,6 +13,26 @@ const PUBLIC_PATHS = new Set([
   '/why', '/platform', '/story', '/console', '/answers',
 ]);
 
+/**
+ * Machine-facing files that must never bounce to /login.
+ *
+ * Before this, a crawler requesting /robots.txt or /sitemap.xml got a 307 to
+ * the sign-in page — the middleware treated them like any other protected
+ * route. A search engine reads that as "this site has no robots policy and no
+ * sitemap", and a link-preview bot reads the OG image URL the same way, so
+ * shares rendered without a card.
+ */
+function isMachinePath(pathname: string): boolean {
+  return (
+    pathname === '/robots.txt'
+    || pathname === '/sitemap.xml'
+    || pathname === '/manifest.webmanifest'
+    // The generated social cards (opengraph-image / twitter-image routes).
+    || pathname.includes('/opengraph-image')
+    || pathname.includes('/twitter-image')
+  );
+}
+
 // Cache duration in seconds
 const CACHE_DURATION = {
   static: 60 * 60 * 24 * 365, // 1 year for static assets
@@ -26,6 +46,9 @@ const CACHE_DURATION = {
 
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // Crawlers and preview bots first — no session, no auth round-trip.
+  if (isMachinePath(pathname)) return NextResponse.next({ request });
 
   // Resolve Supabase config up front. If it's missing/misconfigured we must NOT
   // let the middleware throw — an unhandled throw here surfaces as a site-wide

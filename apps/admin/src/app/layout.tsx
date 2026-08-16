@@ -21,9 +21,32 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  // The www host, deliberately: the bare apex still points at legacy hosting
+  // with someone else's certificate, so every absolute URL we mint — canonical
+  // links, OG image URLs, the sitemap — must carry www or the share/crawl
+  // target is a TLS error.
+  metadataBase: new URL('https://www.digilog360.co.za'),
   title: `${BRAND.name} — Security Console`,
   description: `Security operations console by ${BRAND.company}.`,
   applicationName: BRAND.name,
+  // What a share looks like in WhatsApp, LinkedIn or Slack. Without these the
+  // link unfurled as a bare URL — the one impression of the site most buyers
+  // see before they ever open it, and it was blank. The image itself is the
+  // generated card in app/(site)/opengraph-image.tsx.
+  openGraph: {
+    type: 'website',
+    siteName: BRAND.name,
+    title: `${BRAND.name} — ${BRAND.tagline}`,
+    description:
+      'Replace the paper occurrence book, the patrol clock, the visitor register and the key ledger with one live system.',
+    locale: 'en_ZA',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `${BRAND.name} — ${BRAND.tagline}`,
+    description:
+      'Incidents reach the control room in under a minute, with the evidence attached.',
+  },
   icons: {
     icon: BRAND.logo.monogram,
     shortcut: BRAND.logo.monogram,
