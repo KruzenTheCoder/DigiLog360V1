@@ -6,11 +6,20 @@ import { getSupabaseUrl, getSupabaseAnonKey } from './env';
 // Performance Optimizations
 // ============================================================================
 
+// The marketing site is being reworked. While this is false, every marketing
+// page (including the landing page at `/`) 307s to /login. Flip back to true
+// to reopen the site — nothing else needs to change.
+const MARKETING_SITE_ENABLED = false;
+
+// The marketing site — several short pages instead of one long scroll.
+const MARKETING_PATHS = new Set([
+  '/', '/why', '/platform', '/story', '/console', '/answers',
+]);
+
 // Routes anyone may view without signing in.
 const PUBLIC_PATHS = new Set([
-  '/', '/reset-password',
-  // The marketing site — several short pages instead of one long scroll.
-  '/why', '/platform', '/story', '/console', '/answers',
+  '/reset-password',
+  ...MARKETING_PATHS,
 ]);
 
 /**
@@ -49,6 +58,14 @@ export async function updateSession(request: NextRequest) {
 
   // Crawlers and preview bots first — no session, no auth round-trip.
   if (isMachinePath(pathname)) return NextResponse.next({ request });
+
+  // Marketing site switched off: send its pages straight to /login. A 307 is
+  // deliberate — "temporarily moved" keeps the pages indexed for the relaunch.
+  // Signed-in visitors take one extra hop (/ → /login → /menu) via the /login
+  // handler below. No session needed to decide this, so it runs before auth.
+  if (!MARKETING_SITE_ENABLED && MARKETING_PATHS.has(pathname)) {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
 
   // Resolve Supabase config up front. If it's missing/misconfigured we must NOT
   // let the middleware throw — an unhandled throw here surfaces as a site-wide
